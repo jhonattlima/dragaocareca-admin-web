@@ -1,0 +1,44 @@
+.containerMaster {
+  min-height: 100vh;
+}
+
+.container {
+  background-color: rgb(233, 225, 238);
+  border: 1px solid #000;
+  border-radius: 10px;
+  max-width: 1240px;
+}
+
+.section-box {
+  background-color: rgba(255, 255, 255, 0.55);
+  border-radius: 8px;
+}
+
+.file-card {
+  min-height: 86px;
+  border: 1px dashed #797979;
+  border-radius: 8px;
+  background: #f5f5f5;
+  text-align: center;
+  padding: 16px 12px;
+  font-weight: 600;
+}
+
+.file-card small {
+  font-weight: 400;
+  color: #5f5f5f;
+}
+
+.error {
+  color: #b00020;
+}
+
+.success {
+  color: #0b7a22;
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 12px !important;
+  }
+}

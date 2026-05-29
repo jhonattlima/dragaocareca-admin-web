@@ -1,0 +1,30 @@
+.main-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.box {
+  width: 100%;
+  max-width: 540px;
+  padding: 28px;
+  background: #ffffff;
+  border: 1px solid #d2d2d2;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.google-button {
+  display: flex;
+  justify-content: center;
+}
+
+textarea {
+  font-family: Consolas, 'Courier New', monospace;
+}
+
+.error {
+  color: #b00020;
+}
