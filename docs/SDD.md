@@ -39,6 +39,7 @@ Backend remains source of truth for:
 
 - `src/app/core/api.service.ts`
   - episodes list/create/update
+  - episode media uploads
   - feed status
 
 - `src/app/pages/login/*`
@@ -49,6 +50,11 @@ Backend remains source of truth for:
   - sectioned admin layout inspired by legacy app
   - episode form + table
   - feed status panel
+  - drag-and-drop media upload cards for episode audio, trailer, and covers
+  - upload progress bars on each media card
+  - delete buttons only when a file is staged or already present
+  - guest name search filter on episode table
+  - pagination footer separated from the rows-per-page control
 
 ## 5. Routing
 Configured in `app-routing.module.ts`:
@@ -94,6 +100,19 @@ Expected endpoints:
 - `POST /v1/episodes`
 - `PUT /v1/episodes/:episodeId`
 - `GET /v1/feed/status`
+- `POST /v1/episodes/:episodeId/audio`
+- `POST /v1/episodes/:episodeId/trailer`
+- `POST /v1/episodes/:episodeId/cover`
+- `POST /v1/episodes/:episodeId/cover-webp`
+- `DELETE /v1/episodes/:episodeId/audio`
+- `DELETE /v1/episodes/:episodeId/trailer`
+- `DELETE /v1/episodes/:episodeId/cover`
+- `DELETE /v1/episodes/:episodeId/cover-webp`
+
+Media flow:
+- uploads are staged first
+- save/update applies staged media to the selected episode
+- delete removes the staged or existing media file for that episode ID
 
 ## 9. UI Direction
 Layout intentionally follows legacy admin structure:
@@ -118,7 +137,6 @@ npm run build
 Known: current build may show a small initial budget warning; not functional blocker.
 
 ## 12. Known Gaps
-- File upload cards are placeholders pending API upload endpoints integration.
 - Legacy advanced credits subflows (members/guests/music/citations management UX depth) are not fully restored.
 
 ## 13. AI Prompt Starter (Frontend)

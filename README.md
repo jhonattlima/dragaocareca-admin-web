@@ -15,11 +15,13 @@ npm install
 npm start
 ```
 
-By default it calls `http://localhost:3000/v1`.
+By default it calls `http://localhost:3000/v1` (backend app running locally).
 
 Set API + Google client in:
 - `src/environments/environment.ts`
 - `src/environments/environment.prod.ts`
+
+Current config intentionally points both environments to local backend to avoid using legacy/live endpoints during migration validation.
 
 ## Authentication
 

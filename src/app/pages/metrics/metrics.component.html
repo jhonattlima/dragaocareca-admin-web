@@ -1,0 +1,10 @@
+<div class="container border border-dark section-box mb-3">
+  <h2 class="mt-3">Feed / Release Status</h2>
+  <div class="row mb-3" *ngIf="feedStatus">
+    <div class="col-md-3"><strong>Generated:</strong><br>{{ feedStatus.generatedAt }}</div>
+    <div class="col-md-3"><strong>Published:</strong><br>{{ feedStatus.publishedCount }}</div>
+    <div class="col-md-3"><strong>Scheduled:</strong><br>{{ feedStatus.scheduledCount }}</div>
+    <div class="col-md-3"><strong>Next:</strong><br><span *ngIf="feedStatus.nextScheduled">#{{ feedStatus.nextScheduled.episodeId }} - {{ feedStatus.nextScheduled.title }}</span><span *ngIf="!feedStatus.nextScheduled">none</span></div>
+  </div>
+  <p class="error mb-3" *ngIf="errorMessage">{{ errorMessage }}</p>
+</div>
