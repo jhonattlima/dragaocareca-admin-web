@@ -140,6 +140,10 @@ export class ApiService {
     return this.http.get<FeedStatus>(`${environment.apiBaseUrl}/feed/status`);
   }
 
+  getFeedXml(): Observable<string> {
+    return this.http.get(`${environment.apiBaseUrl}/feed`, { responseType: 'text' });
+  }
+
   getHealth(): Observable<HealthStatus> {
     const healthUrl = environment.apiBaseUrl.replace(/\/v1$/, '/health');
     return this.http.get<HealthStatus>(healthUrl);

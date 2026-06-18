@@ -1,0 +1,270 @@
+<div class="episode-form" [class.compact]="compact">
+  <div class="episode-form-header d-flex align-items-center justify-content-between gap-3">
+    <div>
+      <h2 class="episode-form-title">{{ editor.editingEpisodeId ? 'Update Episode Details' : 'Episode Details' }}</h2>
+    </div>
+  </div>
+
+  <div class="section-block">
+    <h2 class="manage-section-title">File Management</h2>
+    <p class="section-hint mb-2">Drag a file onto a card or click to choose one. Files stay staged until you save or update the episode.</p>
+    <p class="section-hint mb-2" *ngIf="!controller.canUpload(editor)">Use a valid episode ID before staging uploads. The picker stays enabled so you can prepare files first.</p>
+    <div class="row g-3 align-items-stretch mb-3">
+      <div class="col-md-3" *ngFor="let upload of controller.uploadDefinitions">
+        <div
+          class="file-card upload-card"
+          [class.dragover]="controller.isUploadDragOver(upload.kind)"
+          [class.disabled]="controller.isUploadBusy(upload.kind)"
+          (dragover)="controller.onUploadDragOver($event, upload.kind)"
+          (dragleave)="controller.onUploadDragLeave($event, upload.kind)"
+          (drop)="controller.onUploadDrop(editor, $event, upload.kind)">
+          <div class="upload-title">{{ upload.label }}</div>
+          <div class="upload-filename">{{ controller.getUploadFilename(editor, upload.kind) }}</div>
+          <small>{{ upload.description }}</small>
+          <button
+            class="btn btn-sm btn-outline-primary mt-2"
+            type="button"
+            [disabled]="controller.isUploadBusy(upload.kind)"
+            (click)="fileInput.click()">
+            {{ controller.isUploadBusy(upload.kind) ? 'Uploading...' : 'Choose or drop file' }}
+          </button>
+          <button
+            class="btn btn-sm btn-outline-danger mt-2 ms-2"
+            type="button"
+            *ngIf="controller.canDeleteUpload(editor, upload.kind)"
+            [disabled]="controller.isUploadBusy(upload.kind)"
+            (click)="controller.deleteUpload(editor, upload.kind)">
+            {{ controller.uploadStates[upload.kind].deleting ? 'Deleting...' : 'Delete file' }}
+          </button>
+          <div class="progress upload-progress mt-2" *ngIf="controller.isUploadBusy(upload.kind) || controller.getUploadProgress(upload.kind) > 0">
+            <div
+              class="progress-bar"
+              role="progressbar"
+              [style.width.%]="controller.getUploadProgress(upload.kind)"
+              [attr.aria-valuenow]="controller.getUploadProgress(upload.kind)"
+              aria-valuemin="0"
+              aria-valuemax="100">
+              {{ controller.getUploadProgress(upload.kind) }}%
+            </div>
+          </div>
+          <input
+            #fileInput
+            class="d-none"
+            type="file"
+            [accept]="upload.accept"
+            (change)="controller.onUploadInputChange(editor, $event, upload.kind)">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-block">
+    <div class="row">
+      <div class="form-group col-md-2 mb-3">
+        <label>ID</label>
+        <input class="form-control" type="number" [(ngModel)]="editor.formModel.episodeId" [disabled]="editor.editingEpisodeId !== null">
+      </div>
+      <div class="form-group col-md-2 mb-3">
+        <label>Episode #</label>
+        <input class="form-control" type="number" [(ngModel)]="editor.formModel.episodeNumber">
+      </div>
+      <div class="form-group col-md-4 mb-3">
+        <label>Episode Type</label>
+        <select class="form-control" [(ngModel)]="editor.formModel.episodeType">
+          <option *ngFor="let opt of controller.episodeTypes" [value]="opt">{{ opt }}</option>
+        </select>
+      </div>
+      <div class="form-group col-md-2 mb-3">
+        <label>Duration</label>
+        <input class="form-control" type="text" [(ngModel)]="editor.formModel.duration" readonly>
+      </div>
+      <div class="form-group col-md-2 mb-3">
+        <label>Explicit</label>
+        <select class="form-control" [(ngModel)]="editor.formModel.explicit">
+          <option value="no">no</option>
+          <option value="yes">yes</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="form-group col-md-6 mb-3">
+        <label>Title</label>
+        <input class="form-control" type="text" [(ngModel)]="editor.formModel.title">
+      </div>
+      <div class="form-group col-md-3 mb-3">
+        <label>Publish DateTime</label>
+        <input class="form-control" type="datetime-local" [(ngModel)]="editor.formModel.pubDate">
+      </div>
+      <div class="form-group col-md-3 mb-3">
+        <label>Bytes</label>
+        <input class="form-control" type="number" [(ngModel)]="editor.formModel.bytes" readonly>
+      </div>
+    </div>
+
+    <div class="form-group mb-3">
+      <label>Summary</label>
+      <textarea class="form-control" rows="5" [(ngModel)]="editor.formModel.summary" placeholder="Episode summary / description"></textarea>
+    </div>
+
+    <div class="row">
+      <div class="form-group col-md-4 mb-3">
+        <label>YouTube Link</label>
+        <input class="form-control" type="text" [(ngModel)]="editor.formModel.youtube" placeholder="https://www.youtube.com/...">
+      </div>
+      <div class="form-group col-md-4 mb-3">
+        <label>Spotify ID</label>
+        <input class="form-control" type="text" [(ngModel)]="editor.formModel.spotifyId">
+      </div>
+    </div>
+
+    <div class="d-flex gap-2 mb-3">
+      <button class="btn btn-success" (click)="controller.saveEpisode(editor)">{{ editor.editingEpisodeId ? 'Update Episode' : 'Save Episode' }}</button>
+      <button class="btn btn-secondary" type="button" (click)="controller.resetEditor(editor)">Clear</button>
+    </div>
+
+    <p class="error mb-2" *ngIf="controller.errorMessage">{{ controller.errorMessage }}</p>
+    <p class="success mb-2" *ngIf="controller.successMessage">{{ controller.successMessage }}</p>
+  </div>
+
+  <div class="section-block">
+    <h2 class="manage-section-title">Participants</h2>
+    <p class="section-hint mb-2">Select members using cards, like the old page.</p>
+    <div class="row g-3">
+      <div class="col-md-3" *ngFor="let member of controller.memberOptions">
+        <button
+          type="button"
+          class="member-card"
+          [class.selected]="controller.isMemberSelected(editor, member)"
+          (click)="controller.toggleMember(editor, member)">
+          <span class="member-name">{{ member.name }}</span>
+          <span class="member-character">{{ member.character }}</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="tag-list mt-3" *ngIf="controller.selectedMemberCards(editor).length > 0">
+      <span class="tag-pill" *ngFor="let member of controller.selectedMemberCards(editor)">
+        {{ member.name }} - {{ member.character }}
+      </span>
+    </div>
+  </div>
+
+  <div class="section-block">
+    <h2 class="manage-section-title">Invitees</h2>
+    <p class="section-hint mb-2">Each invitee can have one or more reference links.</p>
+    <div class="entry-box mb-3" *ngFor="let guest of editor.formModel.guests; let i = index">
+      <div class="row">
+        <div class="col-md-5 mb-2">
+          <label>Name</label>
+          <input class="form-control" type="text" [(ngModel)]="guest.name" placeholder="Invitee name">
+        </div>
+        <div class="col-md-4 mb-2">
+          <label>Link label</label>
+          <input class="form-control" type="text" [(ngModel)]="guest.draftLabel" placeholder="Instagram / site / link">
+        </div>
+        <div class="col-md-3 mb-2">
+          <label>Link</label>
+          <div class="input-group">
+            <input class="form-control" type="text" [(ngModel)]="guest.draftUrl" placeholder="https://...">
+            <button class="btn btn-outline-primary" type="button" (click)="controller.addStructuredLink(editor, 'guests', i)">Add</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="tag-list" *ngIf="guest.links.length > 0">
+        <span class="tag-pill" *ngFor="let link of guest.links; let j = index">
+          {{ link.label }}: {{ link.url }}
+          <button type="button" (click)="controller.removeStructuredLink(editor, 'guests', i, j)">x</button>
+        </span>
+      </div>
+
+      <div class="mt-2">
+        <button class="btn btn-sm btn-outline-secondary me-2" type="button" (click)="controller.addStructuredEntry(editor, 'guests')">Add another invitee</button>
+        <button class="btn btn-sm btn-outline-danger" type="button" (click)="controller.removeStructuredEntry(editor, 'guests', i)" [disabled]="editor.formModel.guests.length === 1">Remove invitee</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-block">
+    <h2 class="manage-section-title">Music Credits</h2>
+    <p class="section-hint mb-2">Same structure as invitees, with name plus one or more links.</p>
+    <div class="entry-box mb-3" *ngFor="let music of editor.formModel.musicCredits; let i = index">
+      <div class="row">
+        <div class="col-md-5 mb-2">
+          <label>Name</label>
+          <input class="form-control" type="text" [(ngModel)]="music.name" placeholder="Track name or credit">
+        </div>
+        <div class="col-md-4 mb-2">
+          <label>Link label</label>
+          <input class="form-control" type="text" [(ngModel)]="music.draftLabel" placeholder="YouTube / Spotify / link">
+        </div>
+        <div class="col-md-3 mb-2">
+          <label>Link</label>
+          <div class="input-group">
+            <input class="form-control" type="text" [(ngModel)]="music.draftUrl" placeholder="https://...">
+            <button class="btn btn-outline-primary" type="button" (click)="controller.addStructuredLink(editor, 'musicCredits', i)">Add</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="tag-list" *ngIf="music.links.length > 0">
+        <span class="tag-pill" *ngFor="let link of music.links; let j = index">
+          {{ link.label }}: {{ link.url }}
+          <button type="button" (click)="controller.removeStructuredLink(editor, 'musicCredits', i, j)">x</button>
+        </span>
+      </div>
+
+      <div class="mt-2">
+        <button class="btn btn-sm btn-outline-secondary me-2" type="button" (click)="controller.addStructuredEntry(editor, 'musicCredits')">Add another music credit</button>
+        <button class="btn btn-sm btn-outline-danger" type="button" (click)="controller.removeStructuredEntry(editor, 'musicCredits', i)" [disabled]="editor.formModel.musicCredits.length === 1">Remove music credit</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-block">
+    <h2 class="manage-section-title">Description Links and References</h2>
+    <p class="section-hint mb-2">Each reference needs a description label and a related link.</p>
+    <div class="entry-box mb-3" *ngFor="let reference of editor.formModel.citations; let i = index">
+      <div class="row">
+        <div class="col-md-6 mb-2">
+          <label>Description label</label>
+          <input class="form-control" type="text" [(ngModel)]="reference.name" placeholder="Reference name">
+        </div>
+        <div class="col-md-5 mb-2">
+          <label>Link</label>
+          <div class="input-group">
+            <input class="form-control" type="text" [(ngModel)]="reference.draftUrl" placeholder="https://...">
+            <button class="btn btn-outline-primary" type="button" (click)="controller.addCitationLink(editor, i)">Add</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="tag-list" *ngIf="reference.links.length > 0">
+        <span class="tag-pill" *ngFor="let link of reference.links; let j = index">
+          {{ link.label }}: {{ link.url }}
+          <button type="button" (click)="controller.removeCitationLink(editor, i, j)">x</button>
+        </span>
+      </div>
+
+      <div class="mt-2">
+        <button class="btn btn-sm btn-outline-secondary me-2" type="button" (click)="controller.addStructuredEntry(editor, 'citations')">Add another reference</button>
+        <button class="btn btn-sm btn-outline-danger" type="button" (click)="controller.removeStructuredEntry(editor, 'citations', i)" [disabled]="editor.formModel.citations.length === 1">Remove reference</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-block">
+    <h2 class="manage-section-title">Tags</h2>
+    <div class="input-group mb-2">
+      <input class="form-control" type="text" [(ngModel)]="editor.listDrafts.tags" (keydown)="controller.onListDraftKeydown(editor, $event, 'tags')" placeholder="podcast, rpg, dragaocareca">
+      <button class="btn btn-outline-primary" type="button" (click)="controller.addListItem(editor, 'tags')">Add</button>
+    </div>
+    <div class="tag-list" *ngIf="editor.formModel.tags?.length">
+      <span class="tag-pill" *ngFor="let item of editor.formModel.tags; let i = index">
+        {{ item }}
+        <button type="button" (click)="controller.removeListItem(editor, 'tags', i)">x</button>
+      </span>
+    </div>
+  </div>
+</div>

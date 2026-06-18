@@ -5,6 +5,7 @@ import { ApiService, Episode, EpisodeWriteInput } from '../../core/api.service';
 
 type EpisodeListField = 'coverCredits' | 'tags';
 type UploadKind = 'audio' | 'trailer' | 'cover' | 'coverLow';
+type ManageTab = 'add' | 'episodes';
 
 interface MemberOption {
   name: string;
@@ -45,12 +46,21 @@ interface EpisodeFormState extends Omit<EpisodeWriteInput, 'guests' | 'musicCred
   citations: StructuredEntry[];
 }
 
+export interface EpisodeEditorState {
+  formModel: EpisodeFormState;
+  selectedMembers: string[];
+  listDrafts: Record<EpisodeListField, string>;
+  editingEpisodeId: number | null;
+}
+
 @Component({
   selector: 'app-manage',
   templateUrl: './manage.component.html',
   styleUrls: ['./manage.component.scss']
 })
 export class ManageComponent implements OnInit {
+  readonly self = this;
+  activeTab: ManageTab = 'add';
   readonly episodeTypes = [
     'Leitura de Pergaminhos',
     'Rapidinhas do Careca',
@@ -75,19 +85,17 @@ export class ManageComponent implements OnInit {
   episodes: Episode[] = [];
   errorMessage = '';
   successMessage = '';
-  editingEpisodeId: number | null = null;
   episodePendingDelete: Episode | null = null;
   deletingEpisode = false;
   episodeSearchText = '';
   episodeGuestSearchText = '';
-  pageSize = 5;
+  pageSize = 10;
   currentPage = 1;
   private suggestedNextPubDate = new Date().toISOString();
   private suggestedNextEpisodeId = 1;
   private suggestedNextEpisodeNumber = 1;
-
-  formModel: EpisodeFormState = this.buildEmptyFormModel();
-  selectedMembers: string[] = [];
+  readonly addEditorState: EpisodeEditorState = this.buildEditorState();
+  readonly episodesEditorState: EpisodeEditorState = this.buildEditorState();
   uploadStates: Record<UploadKind, UploadState> = {
     audio: { busy: false, deleting: false, dragOver: false, progress: 0 },
     trailer: { busy: false, deleting: false, dragOver: false, progress: 0 },
@@ -129,15 +137,30 @@ export class ManageComponent implements OnInit {
     },
   ];
 
-  listDrafts: Record<EpisodeListField, string> = {
-    coverCredits: '',
-    tags: '',
-  };
-
   constructor(private readonly apiService: ApiService) {}
 
-  get selectedMemberCards(): MemberOption[] {
-    return this.memberOptions.filter((member) => this.selectedMembers.includes(member.name));
+  getEditorState(tab: ManageTab): EpisodeEditorState {
+    return tab === 'add' ? this.addEditorState : this.episodesEditorState;
+  }
+
+  get currentEditorState(): EpisodeEditorState {
+    return this.getEditorState(this.activeTab);
+  }
+
+  get formModel(): EpisodeFormState {
+    return this.currentEditorState.formModel;
+  }
+
+  get selectedMembers(): string[] {
+    return this.currentEditorState.selectedMembers;
+  }
+
+  get listDrafts(): Record<EpisodeListField, string> {
+    return this.currentEditorState.listDrafts;
+  }
+
+  get editingEpisodeId(): number | null {
+    return this.currentEditorState.editingEpisodeId;
   }
 
   get filteredEpisodes(): Episode[] {
@@ -180,17 +203,27 @@ export class ManageComponent implements OnInit {
     return Math.min(this.currentPage * this.pageSize, this.filteredEpisodes.length);
   }
 
+  get episodesTabActive(): boolean {
+    return this.activeTab === 'episodes';
+  }
+
+  get addTabActive(): boolean {
+    return this.activeTab === 'add';
+  }
+
   ngOnInit(): void {
     this.loadEpisodes();
   }
 
   startEdit(episode: Episode): void {
-    this.editingEpisodeId = episode.episodeId;
-    this.formModel = {
+    this.activeTab = 'episodes';
+    const editor = this.episodesEditorState;
+    editor.editingEpisodeId = episode.episodeId;
+    editor.formModel = {
       episodeId: episode.episodeId,
       title: episode.title,
       summary: episode.summary,
-      pubDate: episode.pubDate,
+      pubDate: this.toDateTimeLocalValue(episode.pubDate),
       duration: episode.duration,
       explicit: episode.explicit,
       bytes: episode.bytes,
@@ -209,36 +242,41 @@ export class ManageComponent implements OnInit {
       coverLowFileName: episode.coverLowFileName,
       trailerFileName: episode.trailerFileName,
     };
-    this.selectedMembers = [...(episode.authors ?? [])];
-    this.formModel.episodeId = episode.episodeId;
-    this.formModel.episodeNumber = episode.episodeNumber ?? episode.episodeId;
+    editor.selectedMembers = [...(episode.authors ?? [])];
+    editor.formModel.episodeId = episode.episodeId;
+    editor.formModel.episodeNumber = episode.episodeNumber ?? episode.episodeId;
   }
 
   resetForm(): void {
-    this.editingEpisodeId = null;
-    this.formModel = this.buildEmptyFormModel();
-    this.selectedMembers = [];
-    this.resetDrafts();
-  }
+    const editor = this.currentEditorState;
+      editor.editingEpisodeId = null;
+      editor.formModel = this.buildEmptyFormModel();
+      editor.selectedMembers = [];
+      editor.listDrafts = this.buildEmptyListDrafts();
+    }
 
-  saveEpisode(): void {
+  saveEpisode(editor: EpisodeEditorState): void {
     this.errorMessage = '';
     this.successMessage = '';
 
-    if (!this.formModel.episodeId || !this.formModel.title || !this.formModel.pubDate) {
+    if (!editor.formModel.episodeId || !editor.formModel.title || !editor.formModel.pubDate) {
       this.errorMessage = 'Episode ID, title and pubDate are required.';
       return;
     }
 
-    const payload = this.buildPayload();
-    const request = this.editingEpisodeId
-      ? this.apiService.updateEpisode(this.editingEpisodeId, payload)
+    const payload = this.buildPayload(editor);
+    const request = editor.editingEpisodeId
+      ? this.apiService.updateEpisode(editor.editingEpisodeId, payload)
       : this.apiService.createEpisode(payload);
 
     request.subscribe({
       next: () => {
-        this.successMessage = this.editingEpisodeId ? 'Episode updated.' : 'Episode saved.';
-        this.resetForm();
+        this.successMessage = editor.editingEpisodeId ? 'Episode updated.' : 'Episode saved.';
+        if (editor === this.addEditorState) {
+          this.resetEditor(this.addEditorState);
+        } else {
+          this.resetEditor(this.episodesEditorState);
+        }
         this.loadEpisodes();
       },
       error: (error) => {
@@ -247,23 +285,23 @@ export class ManageComponent implements OnInit {
     });
   }
 
-  toggleMember(member: MemberOption): void {
-    const next = new Set(this.selectedMembers);
+  toggleMember(editor: EpisodeEditorState, member: MemberOption): void {
+    const next = new Set(editor.selectedMembers);
     if (next.has(member.name)) {
       next.delete(member.name);
     } else {
       next.add(member.name);
     }
-    this.selectedMembers = [...next];
-    this.formModel.authors = [...this.selectedMembers];
+    editor.selectedMembers = [...next];
+    editor.formModel.authors = [...editor.selectedMembers];
   }
 
-  isMemberSelected(member: MemberOption): boolean {
-    return this.selectedMembers.includes(member.name);
+  isMemberSelected(editor: EpisodeEditorState, member: MemberOption): boolean {
+    return editor.selectedMembers.includes(member.name);
   }
 
-  addStructuredEntry(field: 'guests' | 'musicCredits' | 'citations'): void {
-    const entries = this.formModel[field];
+  addStructuredEntry(editor: EpisodeEditorState, field: 'guests' | 'musicCredits' | 'citations'): void {
+    const entries = editor.formModel[field];
     const lastEntry = entries[entries.length - 1];
     if (!lastEntry || (!lastEntry.name.trim() && !lastEntry.draftUrl.trim())) {
       return;
@@ -272,12 +310,12 @@ export class ManageComponent implements OnInit {
     entries.push(this.buildEmptyEntry());
   }
 
-  removeStructuredEntry(field: 'guests' | 'musicCredits' | 'citations', index: number): void {
-    this.formModel[field].splice(index, 1);
+  removeStructuredEntry(editor: EpisodeEditorState, field: 'guests' | 'musicCredits' | 'citations', index: number): void {
+    editor.formModel[field].splice(index, 1);
   }
 
-  addCitationLink(index: number): void {
-    const entry = this.formModel.citations[index];
+  addCitationLink(editor: EpisodeEditorState, index: number): void {
+    const entry = editor.formModel.citations[index];
     const label = entry.name.trim();
     const url = entry.draftUrl.trim();
     if (!label || !url) {
@@ -288,12 +326,12 @@ export class ManageComponent implements OnInit {
     entry.draftUrl = '';
   }
 
-  removeCitationLink(entryIndex: number, linkIndex: number): void {
-    this.formModel.citations[entryIndex].links.splice(linkIndex, 1);
+  removeCitationLink(editor: EpisodeEditorState, entryIndex: number, linkIndex: number): void {
+    editor.formModel.citations[entryIndex].links.splice(linkIndex, 1);
   }
 
-  addStructuredLink(field: 'guests' | 'musicCredits' | 'citations', index: number): void {
-    const entry = this.formModel[field][index];
+  addStructuredLink(editor: EpisodeEditorState, field: 'guests' | 'musicCredits' | 'citations', index: number): void {
+    const entry = editor.formModel[field][index];
     const label = entry.draftLabel.trim();
     const url = entry.draftUrl.trim();
     if (!label || !url) {
@@ -304,32 +342,32 @@ export class ManageComponent implements OnInit {
     entry.draftUrl = '';
   }
 
-  removeStructuredLink(field: 'guests' | 'musicCredits' | 'citations', entryIndex: number, linkIndex: number): void {
-    this.formModel[field][entryIndex].links.splice(linkIndex, 1);
+  removeStructuredLink(editor: EpisodeEditorState, field: 'guests' | 'musicCredits' | 'citations', entryIndex: number, linkIndex: number): void {
+    editor.formModel[field][entryIndex].links.splice(linkIndex, 1);
   }
 
-  addListItem(field: EpisodeListField): void {
-    const value = this.listDrafts[field].trim();
+  addListItem(editor: EpisodeEditorState, field: EpisodeListField): void {
+    const value = editor.listDrafts[field].trim();
     if (!value) {
       return;
     }
 
-    const current = [...(this.formModel[field] ?? [])];
+    const current = [...(editor.formModel[field] ?? [])];
     current.push(value);
-    this.formModel[field] = current;
-    this.listDrafts[field] = '';
+    editor.formModel[field] = current;
+    editor.listDrafts[field] = '';
   }
 
-  removeListItem(field: EpisodeListField, index: number): void {
-    const current = [...(this.formModel[field] ?? [])];
+  removeListItem(editor: EpisodeEditorState, field: EpisodeListField, index: number): void {
+    const current = [...(editor.formModel[field] ?? [])];
     current.splice(index, 1);
-    this.formModel[field] = current;
+    editor.formModel[field] = current;
   }
 
-  onListDraftKeydown(event: KeyboardEvent, field: EpisodeListField): void {
+  onListDraftKeydown(editor: EpisodeEditorState, event: KeyboardEvent, field: EpisodeListField): void {
     if (event.key === 'Enter') {
       event.preventDefault();
-      this.addListItem(field);
+      this.addListItem(editor, field);
     }
   }
 
@@ -337,9 +375,31 @@ export class ManageComponent implements OnInit {
     this.currentPage = 1;
   }
 
+  onCurrentPageChange(value: number | string): void {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      this.currentPage = 1;
+      return;
+    }
+
+    const nextPage = Math.min(Math.max(Math.trunc(parsed), 1), this.totalPages);
+    this.currentPage = nextPage;
+  }
+
+  switchTab(tab: ManageTab): void {
+    this.activeTab = tab;
+    if (tab === 'episodes') this.currentPage = 1;
+  }
+
   openDeleteEpisode(episode: Episode): void {
     this.errorMessage = '';
     this.successMessage = '';
+
+    if (this.isEpisodeLive(episode)) {
+      this.errorMessage = 'Live episodes cannot be deleted.';
+      return;
+    }
+
     this.episodePendingDelete = episode;
   }
 
@@ -356,6 +416,12 @@ export class ManageComponent implements OnInit {
       return;
     }
 
+    if (this.isEpisodeLive(this.episodePendingDelete)) {
+      this.errorMessage = 'Live episodes cannot be deleted.';
+      this.episodePendingDelete = null;
+      return;
+    }
+
     this.deletingEpisode = true;
     this.errorMessage = '';
     this.successMessage = '';
@@ -368,7 +434,7 @@ export class ManageComponent implements OnInit {
       .subscribe({
         next: () => {
           this.successMessage = `Episode ${episodeId} deleted and backed up.`;
-          if (this.editingEpisodeId === episodeId) {
+          if (this.currentEditorState.editingEpisodeId === episodeId) {
             this.resetForm();
           }
           this.episodePendingDelete = null;
@@ -390,35 +456,65 @@ export class ManageComponent implements OnInit {
       : '';
   }
 
-  getUploadFilename(kind: UploadKind): string {
+  isEpisodeLive(episode: Episode): boolean {
+    const pubDate = new Date(episode.pubDate);
+    if (Number.isNaN(pubDate.getTime())) {
+      return false;
+    }
+
+    return pubDate.getTime() <= Date.now();
+  }
+
+  getEpisodeLiveLabel(episode: Episode): string {
+    return this.isEpisodeLive(episode) ? 'Live' : 'Scheduled';
+  }
+
+  getEpisodeDeleteDisabledReason(episode: Episode): string {
+    return this.isEpisodeLive(episode) ? 'Live episodes cannot be deleted.' : '';
+  }
+
+  getUploadFilename(editor: EpisodeEditorState, kind: UploadKind): string {
     const definition = this.uploadDefinitions.find((item) => item.kind === kind);
     if (!definition) {
       return '';
     }
 
-    const currentFileName = this.formModel[definition.fileField];
+    const currentFileName = editor.formModel[definition.fileField];
     if (currentFileName) {
       return currentFileName;
     }
 
-    return definition.displayName(this.formModel.episodeId || this.suggestedNextEpisodeId);
+    return definition.displayName(editor.formModel.episodeId || this.suggestedNextEpisodeId);
   }
 
-  canUpload(): boolean {
-    return Number.isInteger(this.formModel.episodeId) && this.formModel.episodeId > 0;
+  canUpload(editor: EpisodeEditorState): boolean {
+    return Number.isInteger(editor.formModel.episodeId) && editor.formModel.episodeId > 0;
   }
 
   isUploadBusy(kind: UploadKind): boolean {
     return this.uploadStates[kind].busy || this.uploadStates[kind].deleting;
   }
 
-  hasUploadedFile(kind: UploadKind): boolean {
+  hasUploadedFile(editor: EpisodeEditorState, kind: UploadKind): boolean {
     const definition = this.uploadDefinitions.find((item) => item.kind === kind);
     if (!definition) {
       return false;
     }
 
-    return Boolean(this.formModel[definition.fileField]);
+    return Boolean(editor.formModel[definition.fileField]);
+  }
+
+  canDeleteUpload(editor: EpisodeEditorState, kind: UploadKind): boolean {
+    return this.hasUploadedFile(editor, kind) && !this.isEpisodeEditorLive(editor);
+  }
+
+  isEpisodeEditorLive(editor: EpisodeEditorState): boolean {
+    const pubDate = new Date(editor.formModel.pubDate);
+    if (Number.isNaN(pubDate.getTime())) {
+      return false;
+    }
+
+    return pubDate.getTime() <= Date.now();
   }
 
   getUploadProgress(kind: UploadKind): number {
@@ -441,22 +537,22 @@ export class ManageComponent implements OnInit {
     this.uploadStates[kind] = { ...this.uploadStates[kind], dragOver: false };
   }
 
-  onUploadDrop(event: DragEvent, kind: UploadKind): void {
+  onUploadDrop(editor: EpisodeEditorState, event: DragEvent, kind: UploadKind): void {
     event.preventDefault();
     event.stopPropagation();
     this.uploadStates[kind] = { ...this.uploadStates[kind], dragOver: false };
 
     const file = event.dataTransfer?.files?.[0];
     if (file) {
-      this.uploadMedia(kind, file);
+      this.uploadMedia(editor, kind, file);
     }
   }
 
-  onUploadInputChange(event: Event, kind: UploadKind): void {
+  onUploadInputChange(editor: EpisodeEditorState, event: Event, kind: UploadKind): void {
     const input = event.target as HTMLInputElement | null;
     const file = input?.files?.[0];
     if (file) {
-      this.uploadMedia(kind, file);
+      this.uploadMedia(editor, kind, file);
     }
 
     if (input) {
@@ -483,10 +579,10 @@ export class ManageComponent implements OnInit {
         this.suggestedNextPubDate = this.computeSuggestedNextPubDate(episodes);
         this.suggestedNextEpisodeId = this.computeSuggestedNextEpisodeId(episodes);
         this.suggestedNextEpisodeNumber = this.computeSuggestedNextEpisodeNumber(episodes);
-        if (this.editingEpisodeId === null) {
-          this.formModel.episodeId = this.suggestedNextEpisodeId;
-          this.formModel.episodeNumber = this.suggestedNextEpisodeNumber;
-          this.formModel.pubDate = this.suggestedNextPubDate;
+        if (this.addEditorState.editingEpisodeId === null) {
+          this.addEditorState.formModel.episodeId = this.suggestedNextEpisodeId;
+          this.addEditorState.formModel.episodeNumber = this.suggestedNextEpisodeNumber;
+          this.addEditorState.formModel.pubDate = this.suggestedNextPubDate;
         }
         this.currentPage = 1;
       },
@@ -494,6 +590,33 @@ export class ManageComponent implements OnInit {
         this.errorMessage = error?.error?.message ?? 'Could not load episodes.';
       },
     });
+  }
+
+  selectedMemberCards(editor: EpisodeEditorState): MemberOption[] {
+    return this.memberOptions.filter((member) => editor.selectedMembers.includes(member.name));
+  }
+
+  private buildEditorState(): EpisodeEditorState {
+    return {
+      formModel: this.buildEmptyFormModel(),
+      selectedMembers: [],
+      listDrafts: this.buildEmptyListDrafts(),
+      editingEpisodeId: null,
+    };
+  }
+
+  private buildEmptyListDrafts(): Record<EpisodeListField, string> {
+    return {
+      coverCredits: '',
+      tags: '',
+    };
+  }
+
+  resetEditor(editor: EpisodeEditorState): void {
+    editor.formModel = this.buildEmptyFormModel();
+    editor.selectedMembers = [];
+    editor.listDrafts = this.buildEmptyListDrafts();
+    editor.editingEpisodeId = null;
   }
 
   private buildEmptyFormModel(): EpisodeFormState {
@@ -531,49 +654,42 @@ export class ManageComponent implements OnInit {
     };
   }
 
-  private resetDrafts(): void {
-    this.listDrafts = {
-      coverCredits: '',
-      tags: '',
-    };
-  }
-
-  private buildPayload(): EpisodeWriteInput {
+  buildPayload(editor: EpisodeEditorState): EpisodeWriteInput {
     return {
-      episodeId: this.formModel.episodeId,
-      title: this.formModel.title,
-      summary: this.formModel.summary,
-      pubDate: this.formModel.pubDate,
-      duration: this.formModel.duration,
-      explicit: this.formModel.explicit,
-      bytes: this.formModel.bytes,
-      episodeNumber: this.formModel.episodeNumber,
-      episodeType: this.formModel.episodeType,
-      authors: [...this.selectedMembers],
-      guests: this.serializeStructuredEntries(this.formModel.guests),
-      tags: this.formModel.tags ?? [],
-      citations: this.serializeStructuredEntries(this.formModel.citations),
-      fileName: this.formModel.fileName,
-      coverFileName: this.formModel.coverFileName,
-      coverLowFileName: this.formModel.coverLowFileName,
-      trailerFileName: this.formModel.trailerFileName,
-      youtube: this.formModel.youtube,
-      spotifyId: this.formModel.spotifyId,
-      musicCredits: this.serializeStructuredEntries(this.formModel.musicCredits),
-      coverCredits: this.formModel.coverCredits ?? [],
+      episodeId: editor.formModel.episodeId,
+      title: editor.formModel.title,
+      summary: editor.formModel.summary,
+      pubDate: this.toIsoDateTime(editor.formModel.pubDate),
+      duration: editor.formModel.duration,
+      explicit: editor.formModel.explicit,
+      bytes: editor.formModel.bytes,
+      episodeNumber: editor.formModel.episodeNumber,
+      episodeType: editor.formModel.episodeType,
+      authors: [...editor.selectedMembers],
+      guests: this.serializeStructuredEntries(editor.formModel.guests),
+      tags: editor.formModel.tags ?? [],
+      citations: this.serializeStructuredEntries(editor.formModel.citations),
+      fileName: editor.formModel.fileName,
+      coverFileName: editor.formModel.coverFileName,
+      coverLowFileName: editor.formModel.coverLowFileName,
+      trailerFileName: editor.formModel.trailerFileName,
+      youtube: editor.formModel.youtube,
+      spotifyId: editor.formModel.spotifyId,
+      musicCredits: this.serializeStructuredEntries(editor.formModel.musicCredits),
+      coverCredits: editor.formModel.coverCredits ?? [],
     };
   }
 
-  private uploadMedia(kind: UploadKind, file: File): void {
+  uploadMedia(editor: EpisodeEditorState, kind: UploadKind, file: File): void {
     this.errorMessage = '';
     this.successMessage = '';
 
-    if (!this.canUpload()) {
+    if (!this.canUpload(editor)) {
       this.errorMessage = 'Enter a valid episode ID before uploading media files.';
       return;
     }
 
-    const episodeId = this.formModel.episodeId;
+    const episodeId = editor.formModel.episodeId;
     if (!Number.isInteger(episodeId) || episodeId <= 0) {
       this.errorMessage = 'Enter a valid episode ID before uploading media files.';
       return;
@@ -605,7 +721,7 @@ export class ManageComponent implements OnInit {
             if (!episode) {
               return;
             }
-            this.formModel[definition.fileField] = episode[definition.fileField] ?? this.formModel[definition.fileField];
+            editor.formModel[definition.fileField] = episode[definition.fileField] ?? editor.formModel[definition.fileField];
             this.successMessage = `${definition.label} staged.`;
             this.uploadStates[kind] = { ...this.uploadStates[kind], progress: 100 };
           }
@@ -617,13 +733,13 @@ export class ManageComponent implements OnInit {
       });
   }
 
-  deleteUpload(kind: UploadKind): void {
-    if (!this.canUpload()) {
+  deleteUpload(editor: EpisodeEditorState, kind: UploadKind): void {
+    if (!this.canUpload(editor)) {
       this.errorMessage = 'Enter a valid episode ID before deleting media files.';
       return;
     }
 
-    const episodeId = this.formModel.episodeId;
+    const episodeId = editor.formModel.episodeId;
     if (!Number.isInteger(episodeId) || episodeId <= 0) {
       this.errorMessage = 'Enter a valid episode ID before deleting media files.';
       return;
@@ -635,7 +751,7 @@ export class ManageComponent implements OnInit {
       return;
     }
 
-    if (!this.hasUploadedFile(kind)) {
+    if (!this.hasUploadedFile(editor, kind)) {
       this.successMessage = `${definition.label} is already empty.`;
       return;
     }
@@ -650,7 +766,7 @@ export class ManageComponent implements OnInit {
       }))
       .subscribe({
         next: (episode) => {
-          this.formModel[definition.fileField] = episode[definition.fileField] ?? '';
+          editor.formModel[definition.fileField] = episode[definition.fileField] ?? '';
           this.successMessage = `${definition.label} removed.`;
         },
         error: (error) => {
@@ -732,7 +848,7 @@ export class ManageComponent implements OnInit {
 
   private computeSuggestedNextPubDate(episodes: Episode[]): string {
     if (episodes.length === 0) {
-      return new Date().toISOString();
+      return this.toDateTimeLocalValue(new Date().toISOString());
     }
 
     const latest = episodes.reduce((acc, current) => {
@@ -741,7 +857,7 @@ export class ManageComponent implements OnInit {
 
     const next = new Date(latest.pubDate);
     next.setDate(next.getDate() + 7);
-    return next.toISOString();
+    return this.toDateTimeLocalValue(next.toISOString());
   }
 
   private computeSuggestedNextEpisodeId(episodes: Episode[]): number {
@@ -767,6 +883,29 @@ export class ManageComponent implements OnInit {
 
     const baseNumber = latest.episodeNumber ?? latest.episodeId ?? 0;
     return baseNumber + 1;
+  }
+
+  private toDateTimeLocalValue(value: string | Date): string {
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return '';
+    }
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  }
+
+  private toIsoDateTime(value: string): string {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return value;
+    }
+
+    return date.toISOString();
   }
 
   private matchesGuestQuery(episode: Episode, guestQuery: string): boolean {

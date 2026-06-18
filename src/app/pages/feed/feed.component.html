@@ -1,0 +1,24 @@
+<div class="container section-box feed-shell mb-3">
+  <div class="feed-header d-flex align-items-center justify-content-between gap-3 flex-wrap">
+    <div>
+      <h2 class="feed-title mb-1">Feed</h2>
+      <p class="section-hint mb-0">Collapsible XML view of the feed returned to consumers.</p>
+    </div>
+  </div>
+
+  <p class="error mb-3" *ngIf="errorMessage">{{ errorMessage }}</p>
+  <p class="section-hint mb-3" *ngIf="loading">Loading feed...</p>
+
+  <div class="feed-grid" *ngIf="!loading && !errorMessage">
+    <details class="feed-section" [open]="rawOpen">
+      <summary>XML preview</summary>
+      <object
+        *ngIf="feedXmlUrl"
+        class="feed-frame"
+        [data]="feedXmlUrl"
+        type="application/xml"
+        aria-label="Feed XML preview">
+      </object>
+    </details>
+  </div>
+</div>

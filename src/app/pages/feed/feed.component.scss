@@ -1,0 +1,53 @@
+.feed-shell {
+  padding: 1rem 1rem 1.25rem;
+}
+
+.feed-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.feed-section {
+  border: 1px solid rgba(52, 60, 73, 0.16);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.72);
+  overflow: hidden;
+}
+
+.feed-section summary {
+  cursor: pointer;
+  padding: 14px 16px;
+  font-weight: 700;
+  color: var(--dc-text);
+  list-style: none;
+}
+
+.feed-section summary::-webkit-details-marker {
+  display: none;
+}
+
+.feed-section[open] summary {
+  border-bottom: 1px solid rgba(52, 60, 73, 0.12);
+}
+
+.feed-section > *:not(summary) {
+  padding: 16px;
+}
+
+.feed-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.feed-frame {
+  width: 100%;
+  min-height: 72vh;
+  border: 0;
+  background: rgba(255, 255, 255, 0.75);
+}
+
+@media (max-width: 768px) {
+  .feed-frame {
+    min-height: 60vh;
+  }
+}

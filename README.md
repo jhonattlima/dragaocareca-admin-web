@@ -8,6 +8,10 @@ This is the canonical compressed context for routing, auth toggles, API contract
 
 Angular frontend for `dragaocareca-admin-api`.
 
+Workspace layout:
+- `/home/jhonatt/repos/jhonatt_projects/dragaocareca-admin-api`
+- `/home/jhonatt/repos/jhonatt_projects/dragaocareca-admin-web`
+
 ## Run
 
 ```bash

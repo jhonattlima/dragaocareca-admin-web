@@ -7,9 +7,11 @@ import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { AuthInterceptor } from './core/auth.interceptor';
 import { DashboardComponent } from './pages/dashboard/dashboard.component';
+import { FeedComponent } from './pages/feed/feed.component';
 import { HealthComponent } from './pages/health/health.component';
 import { LoginComponent } from './pages/login/login.component';
 import { ManageComponent } from './pages/manage/manage.component';
+import { EpisodeFormComponent } from './pages/manage/episode-form.component';
 import { MastheadComponent } from './pages/masthead/masthead.component';
 import { MetricsComponent } from './pages/metrics/metrics.component';
 
@@ -18,6 +20,8 @@ import { MetricsComponent } from './pages/metrics/metrics.component';
     AppComponent,
     DashboardComponent,
     LoginComponent,
+    FeedComponent,
+    EpisodeFormComponent,
     MastheadComponent,
     ManageComponent,
     MetricsComponent,

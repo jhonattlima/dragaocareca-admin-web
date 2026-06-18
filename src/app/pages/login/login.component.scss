@@ -4,16 +4,18 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
+  position: relative;
 }
 
 .box {
   width: 100%;
   max-width: 540px;
-  padding: 28px;
-  background: #ffffff;
-  border: 1px solid #d2d2d2;
-  border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  padding: 30px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(52, 60, 73, 0.14);
+  border-radius: 1.15rem;
+  box-shadow: 0 24px 54px rgba(24, 34, 48, 0.14);
+  backdrop-filter: blur(10px);
 }
 
 .google-button {
@@ -23,6 +25,7 @@
 
 textarea {
   font-family: Consolas, 'Courier New', monospace;
+  min-height: 160px;
 }
 
 .error {
