@@ -5,6 +5,7 @@
   --dc-bg-start: #f4ebdf;
   --dc-bg-mid: #e7edf4;
   --dc-bg-end: #d6e1ee;
+  --dc-bg-mosaic: none;
   --dc-surface: rgba(255, 252, 247, 0.74);
   --dc-surface-strong: rgba(255, 255, 255, 0.88);
   --dc-border: rgba(52, 60, 73, 0.16);
@@ -24,10 +25,14 @@ body {
   margin: 0;
   font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   color: var(--dc-text);
-  background:
+  background-image:
     radial-gradient(circle at top left, rgba(255, 255, 255, 0.55), transparent 36%),
     radial-gradient(circle at top right, rgba(255, 255, 255, 0.3), transparent 22%),
+    var(--dc-bg-mosaic),
     linear-gradient(135deg, var(--dc-bg-start), var(--dc-bg-mid) 48%, var(--dc-bg-end));
+  background-size: auto, auto, cover, cover;
+  background-position: top left, top right, center center, center center;
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat;
   background-attachment: fixed;
 }
 
@@ -269,6 +274,51 @@ button[disabled] {
   font-weight: 700;
   line-height: 1;
   padding: 0;
+}
+
+.structured-entry-suggestions {
+  position: absolute;
+  left: 0;
+  right: 12px;
+  top: calc(100% - 4px);
+  z-index: 25;
+  margin-top: 4px;
+  padding: 6px;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(52, 60, 73, 0.16);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 32px rgba(29, 37, 49, 0.16);
+  display: grid;
+  gap: 4px;
+}
+
+.structured-entry-suggestion {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: 0.7rem;
+  padding: 10px 12px;
+  background: rgba(47, 95, 127, 0.05);
+  color: var(--dc-text);
+  transition: background 0.12s ease, transform 0.12s ease;
+}
+
+.structured-entry-suggestion:hover,
+.structured-entry-suggestion:focus {
+  background: rgba(47, 95, 127, 0.12);
+  transform: translateY(-1px);
+}
+
+.structured-entry-suggestion span {
+  font-weight: 700;
+}
+
+.structured-entry-suggestion small {
+  color: var(--dc-muted);
+  font-size: 0.76rem;
 }
 
 .file-card {

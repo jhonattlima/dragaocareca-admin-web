@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { HttpEventType } from '@angular/common/http';
 import { finalize } from 'rxjs';
-import { ApiService, Episode, EpisodeWriteInput } from '../../core/api.service';
+import { ApiService, Episode, EpisodeWriteInput, StructuredEntryCatalogResponse } from '../../core/api.service';
 
 type EpisodeListField = 'coverCredits' | 'tags';
 type UploadKind = 'audio' | 'trailer' | 'cover' | 'coverLow';
@@ -17,11 +17,18 @@ interface LinkItem {
   url: string;
 }
 
+interface StructuredEntrySuggestion {
+  name: string;
+  links: LinkItem[];
+}
+
 interface StructuredEntry {
   name: string;
   links: LinkItem[];
   draftLabel: string;
   draftUrl: string;
+  suggestions: StructuredEntrySuggestion[];
+  suggestionsOpen: boolean;
 }
 
 interface UploadState {
@@ -91,6 +98,12 @@ export class ManageComponent implements OnInit {
   episodeGuestSearchText = '';
   pageSize = 10;
   currentPage = 1;
+  private readonly structuredEntrySuggestionDelayMs = 500;
+  private readonly structuredEntrySuggestionTimers = new WeakMap<StructuredEntry, number>();
+  private readonly structuredEntrySuggestionCache: Record<'guests' | 'musicCredits', StructuredEntrySuggestion[]> = {
+    guests: [],
+    musicCredits: [],
+  };
   private suggestedNextPubDate = new Date().toISOString();
   private suggestedNextEpisodeId = 1;
   private suggestedNextEpisodeNumber = 1;
@@ -311,6 +324,9 @@ export class ManageComponent implements OnInit {
   }
 
   removeStructuredEntry(editor: EpisodeEditorState, field: 'guests' | 'musicCredits' | 'citations', index: number): void {
+    if (field !== 'citations') {
+      this.clearStructuredEntrySuggestionState(editor, field, index);
+    }
     editor.formModel[field].splice(index, 1);
   }
 
@@ -344,6 +360,71 @@ export class ManageComponent implements OnInit {
 
   removeStructuredLink(editor: EpisodeEditorState, field: 'guests' | 'musicCredits' | 'citations', entryIndex: number, linkIndex: number): void {
     editor.formModel[field][entryIndex].links.splice(linkIndex, 1);
+  }
+
+  onStructuredEntryNameFocus(editor: EpisodeEditorState, field: 'guests' | 'musicCredits', index: number): void {
+    const entry = editor.formModel[field][index];
+    if (!entry.name.trim()) {
+      return;
+    }
+
+    this.scheduleStructuredEntrySuggestions(editor, field, index);
+  }
+
+  onStructuredEntryNameInput(editor: EpisodeEditorState, field: 'guests' | 'musicCredits', index: number): void {
+    const entry = editor.formModel[field][index];
+    this.clearStructuredEntrySuggestionTimer(editor, field, index);
+    entry.suggestionsOpen = false;
+    entry.suggestions = [];
+
+    if (!entry.name.trim()) {
+      return;
+    }
+
+    this.scheduleStructuredEntrySuggestions(editor, field, index);
+  }
+
+  onStructuredEntryNameBlur(editor: EpisodeEditorState, field: 'guests' | 'musicCredits', index: number): void {
+    this.clearStructuredEntrySuggestionTimer(editor, field, index);
+    window.setTimeout(() => {
+      const entry = editor.formModel[field][index];
+      if (entry) {
+        entry.suggestionsOpen = false;
+      }
+    }, 150);
+  }
+
+  hasStructuredEntrySuggestions(editor: EpisodeEditorState, field: 'guests' | 'musicCredits', index: number): boolean {
+    const entry = editor.formModel[field][index];
+    return Boolean(entry?.suggestionsOpen && entry.suggestions.length > 0);
+  }
+
+  getStructuredEntrySuggestions(editor: EpisodeEditorState, field: 'guests' | 'musicCredits', index: number): StructuredEntrySuggestion[] {
+    return editor.formModel[field][index]?.suggestions ?? [];
+  }
+
+  applyStructuredEntrySuggestion(
+    editor: EpisodeEditorState,
+    field: 'guests' | 'musicCredits',
+    index: number,
+    suggestion: StructuredEntrySuggestion,
+    event?: MouseEvent
+  ): void {
+    event?.preventDefault();
+    event?.stopPropagation();
+
+    const entry = editor.formModel[field][index];
+    if (!entry) {
+      return;
+    }
+
+    entry.name = suggestion.name;
+    entry.links = suggestion.links.map((link) => ({ ...link }));
+    entry.draftLabel = suggestion.links[0]?.label ?? '';
+    entry.draftUrl = suggestion.links[0]?.url ?? '';
+    entry.suggestions = [];
+    entry.suggestionsOpen = false;
+    this.clearStructuredEntrySuggestionTimer(editor, field, index);
   }
 
   addListItem(editor: EpisodeEditorState, field: EpisodeListField): void {
@@ -576,6 +657,8 @@ export class ManageComponent implements OnInit {
     this.apiService.listEpisodes().subscribe({
       next: (episodes) => {
         this.episodes = episodes;
+        this.rebuildStructuredEntrySuggestionCache(episodes);
+        this.loadStructuredEntryCatalog();
         this.suggestedNextPubDate = this.computeSuggestedNextPubDate(episodes);
         this.suggestedNextEpisodeId = this.computeSuggestedNextEpisodeId(episodes);
         this.suggestedNextEpisodeNumber = this.computeSuggestedNextEpisodeNumber(episodes);
@@ -651,6 +734,8 @@ export class ManageComponent implements OnInit {
       links: [],
       draftLabel: '',
       draftUrl: '',
+      suggestions: [],
+      suggestionsOpen: false,
     };
   }
 
@@ -830,6 +915,8 @@ export class ManageComponent implements OnInit {
           })),
           draftLabel: '',
           draftUrl: '',
+          suggestions: [],
+          suggestionsOpen: false,
         };
         return entry;
       } catch {
@@ -838,6 +925,8 @@ export class ManageComponent implements OnInit {
           links: [],
           draftLabel: '',
           draftUrl: '',
+          suggestions: [],
+          suggestionsOpen: false,
         };
         return entry;
       }
@@ -921,6 +1010,204 @@ export class ManageComponent implements OnInit {
       return (parsed.name ?? guest).toLowerCase();
     } catch {
       return guest.toLowerCase();
+    }
+  }
+
+  private scheduleStructuredEntrySuggestions(editor: EpisodeEditorState, field: 'guests' | 'musicCredits', index: number): void {
+    const entry = editor.formModel[field][index];
+    const query = entry?.name.trim().toLowerCase() ?? '';
+    if (!entry || !query) {
+      return;
+    }
+
+    this.clearStructuredEntrySuggestionTimer(editor, field, index);
+    const sourceEntry = entry;
+
+    const timer = window.setTimeout(() => {
+      if (sourceEntry.name.trim().toLowerCase() !== query) {
+        return;
+      }
+
+      const suggestions = this.structuredEntrySuggestionCache[field]
+        .filter((suggestion) => suggestion.name.toLowerCase().includes(query))
+        .slice(0, 6)
+        .map((suggestion) => ({
+          name: suggestion.name,
+          links: suggestion.links.map((link) => ({ ...link })),
+        }));
+
+      sourceEntry.suggestions = suggestions;
+      sourceEntry.suggestionsOpen = suggestions.length > 0;
+    }, this.structuredEntrySuggestionDelayMs);
+
+    this.structuredEntrySuggestionTimers.set(entry, timer);
+  }
+
+  private clearStructuredEntrySuggestionTimer(editor: EpisodeEditorState, field: 'guests' | 'musicCredits', index: number): void {
+    const entry = editor.formModel[field][index];
+    if (!entry) {
+      return;
+    }
+
+    const timer = this.structuredEntrySuggestionTimers.get(entry);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      this.structuredEntrySuggestionTimers.delete(entry);
+    }
+  }
+
+  private clearStructuredEntrySuggestionState(editor: EpisodeEditorState, field: 'guests' | 'musicCredits', index: number): void {
+    this.clearStructuredEntrySuggestionTimer(editor, field, index);
+    const entry = editor.formModel[field][index];
+    if (entry) {
+      entry.suggestions = [];
+      entry.suggestionsOpen = false;
+    }
+  }
+
+  private rebuildStructuredEntrySuggestionCache(episodes: Episode[]): void {
+    this.structuredEntrySuggestionCache.guests = this.buildStructuredEntrySuggestionCache(episodes, 'guests');
+    this.structuredEntrySuggestionCache.musicCredits = this.buildStructuredEntrySuggestionCache(episodes, 'musicCredits');
+  }
+
+  private buildStructuredEntrySuggestionCache(episodes: Episode[], field: 'guests' | 'musicCredits'): StructuredEntrySuggestion[] {
+    const suggestions = new Map<string, StructuredEntrySuggestion>();
+
+    for (const episode of episodes) {
+      const values = episode[field] ?? [];
+      for (const value of values) {
+        const parsed = this.parseStructuredEntrySuggestionValue(value);
+        if (!parsed?.name) {
+          continue;
+        }
+
+        const key = parsed.name.toLowerCase();
+        const existing = suggestions.get(key);
+        if (!existing) {
+          suggestions.set(key, {
+            name: parsed.name,
+            links: this.uniqueLinks(parsed.links),
+          });
+          continue;
+        }
+
+        existing.links = this.uniqueLinks([...existing.links, ...parsed.links]);
+      }
+    }
+
+    return [...suggestions.values()].sort((left, right) => left.name.localeCompare(right.name));
+  }
+
+  private loadStructuredEntryCatalog(): void {
+    this.apiService.listStructuredEntryCatalog().subscribe({
+      next: (catalog) => {
+        this.mergeStructuredEntryCatalogIntoCache(catalog);
+      },
+      error: () => {
+        // Keep the episode-derived cache when the normalized catalog is unavailable.
+      },
+    });
+  }
+
+  private mergeStructuredEntryCatalogIntoCache(catalog: StructuredEntryCatalogResponse): void {
+    this.structuredEntrySuggestionCache.guests = this.mergeSuggestionSources(
+      this.structuredEntrySuggestionCache.guests,
+      catalog.guests
+    );
+    this.structuredEntrySuggestionCache.musicCredits = this.mergeSuggestionSources(
+      this.structuredEntrySuggestionCache.musicCredits,
+      catalog.musicCredits
+    );
+  }
+
+  private mergeSuggestionSources(
+    primary: StructuredEntrySuggestion[],
+    secondary: Array<{ name: string; links: Array<{ label: string; url: string }> }>
+  ): StructuredEntrySuggestion[] {
+    const merged = new Map<string, StructuredEntrySuggestion>();
+
+    for (const source of [...primary, ...secondary]) {
+      const name = source.name.trim();
+      if (!name) {
+        continue;
+      }
+
+      const key = name.toLowerCase();
+      const existing = merged.get(key);
+      if (!existing) {
+        merged.set(key, {
+          name,
+          links: this.uniqueLinks(source.links),
+        });
+        continue;
+      }
+
+      existing.links = this.uniqueLinks([...existing.links, ...source.links]);
+    }
+
+    return [...merged.values()].sort((left, right) => left.name.localeCompare(right.name));
+  }
+
+  private uniqueLinks(links: Array<{ label: string; url: string }>): LinkItem[] {
+    const unique = new Map<string, LinkItem>();
+
+    for (const link of links) {
+      const label = link.label.trim();
+      const url = this.normalizeReferenceUrl(link.url);
+      if (!label && !url) {
+        continue;
+      }
+
+      const key = `${label.toLowerCase()}|${url.toLowerCase()}`;
+      if (!unique.has(key)) {
+        unique.set(key, { label, url });
+      }
+    }
+
+    return [...unique.values()];
+  }
+
+  private normalizeReferenceUrl(value: string): string {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return '';
+    }
+
+    const prepared = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed.replace(/^\/\//, '')}`;
+    try {
+      const parsed = new URL(prepared);
+      parsed.hash = '';
+      parsed.search = '';
+      parsed.hostname = parsed.hostname.replace(/^www\./i, '').toLowerCase();
+      parsed.pathname = parsed.pathname.replace(/\/+$/, '') || '/';
+      return `${parsed.protocol}//${parsed.hostname}${parsed.pathname}`;
+    } catch {
+      return trimmed
+        .replace(/^https?:\/\//i, '')
+        .replace(/^www\./i, '')
+        .replace(/\/+$/, '');
+    }
+  }
+
+  private parseStructuredEntrySuggestionValue(value: string): StructuredEntrySuggestion | null {
+    const fallbackName = value.trim();
+    if (!fallbackName) {
+      return null;
+    }
+
+    try {
+      const decoded = JSON.parse(value) as { name?: string; links?: Array<Partial<LinkItem>> };
+      const name = (decoded.name ?? fallbackName).trim();
+      const links = (decoded.links ?? [])
+        .map((link) => ({
+          label: (link.label ?? '').trim(),
+          url: (link.url ?? '').trim(),
+        }))
+        .filter((link) => link.label.length > 0 || link.url.length > 0);
+
+      return name ? { name, links } : null;
+    } catch {
+      return { name: fallbackName, links: [] };
     }
   }
 }

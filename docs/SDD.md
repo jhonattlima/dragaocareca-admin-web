@@ -56,6 +56,14 @@ Backend remains source of truth for:
   - guest name search filter on episode table
   - pagination footer separated from the rows-per-page control
 
+- `src/app/pages/health/*`
+  - backend health menu for runtime visibility
+  - shows liveness, uptime, frontend auth bypass, bot running state, and pending launch notifications
+
+- `src/app/app.component.*`
+  - renders a lightweight mosaic background from backend asset tiles
+  - repeats fixed-size cover tiles on larger screens to avoid stretched artwork
+
 ## 5. Routing
 Configured in `app-routing.module.ts`:
 - `/login` -> login page
@@ -90,7 +98,7 @@ When `authBypass=true`:
 - login screen auto-redirects to dashboard
 - `getProfile()` returns local mock profile
 
-Note: for full local bypass, backend should also have `AUTH_BYPASS=true` in `.env`.
+Note: for full local bypass, backend should also have `AUTH_BYPASS=true` in `.env.dev`.
 
 ## 8. Backend Contract Assumptions
 Expected endpoints:
@@ -108,6 +116,9 @@ Expected endpoints:
 - `DELETE /v1/episodes/:episodeId/trailer`
 - `DELETE /v1/episodes/:episodeId/cover`
 - `DELETE /v1/episodes/:episodeId/cover-webp`
+- `GET /health`
+- Health screen bot-status metadata, including launch-queue counts and process state, when exposed by the backend health response
+- `GET /v1/assets/cover-mosaic.json` for the page background tile manifest
 
 Media flow:
 - uploads are staged first

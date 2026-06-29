@@ -45,3 +45,4 @@ Fallback:
   - feed status (`GET /v1/feed/status`)
   - episodes list (`GET /v1/episodes`)
   - episode create/update (`POST/PUT /v1/episodes`)
+  - health menu (`/health`) with backend status, uptime, bot running state, and pending launch notifications

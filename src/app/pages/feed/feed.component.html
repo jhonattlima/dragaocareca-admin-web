@@ -9,16 +9,95 @@
   <p class="error mb-3" *ngIf="errorMessage">{{ errorMessage }}</p>
   <p class="section-hint mb-3" *ngIf="loading">Loading feed...</p>
 
-  <div class="feed-grid" *ngIf="!loading && !errorMessage">
-    <details class="feed-section" [open]="rawOpen">
-      <summary>XML preview</summary>
-      <object
-        *ngIf="feedXmlUrl"
-        class="feed-frame"
-        [data]="feedXmlUrl"
-        type="application/xml"
-        aria-label="Feed XML preview">
-      </object>
-    </details>
+  <div class="feed-grid" *ngIf="!loading && !errorMessage && feedTree">
+    <div class="feed-section">
+      <div class="feed-section-header">
+        <span>Feed status</span>
+        <span class="section-hint">Published and scheduled episode counters from the live feed source.</span>
+      </div>
+
+      <div class="table-responsive feed-table-wrap" *ngIf="feedStatus">
+        <table class="table table-sm feed-table mb-0">
+          <tbody>
+            <tr>
+              <th scope="row">Generated at</th>
+              <td>{{ feedStatus.generatedAt | date:'medium' }}</td>
+            </tr>
+            <tr>
+              <th scope="row">Published</th>
+              <td>{{ feedStatus.publishedCount }}</td>
+            </tr>
+            <tr>
+              <th scope="row">Scheduled</th>
+              <td>{{ feedStatus.scheduledCount }}</td>
+            </tr>
+            <tr>
+              <th scope="row">Next pending</th>
+              <td>
+                <ng-container *ngIf="feedStatus.nextScheduled; else noNextScheduled">
+                  #{{ feedStatus.nextScheduled.episodeId }} - {{ feedStatus.nextScheduled.title }} ({{ feedStatus.nextScheduled.pubDate | date:'medium' }})
+                </ng-container>
+                <ng-template #noNextScheduled>None</ng-template>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="feed-section">
+      <div class="feed-section-header">
+        <span>XML preview</span>
+        <span class="section-hint">Click any tag to collapse or expand its children.</span>
+      </div>
+
+      <ng-template #xmlNode let-node>
+        <ng-container *ngIf="node.children.length; else leafNode">
+          <details class="xml-node" [open]="node.open" [style.--depth]="node.depth">
+            <summary class="xml-line xml-branch" (click)="$event.preventDefault(); toggleNode(node)">
+              <span class="xml-marker">{{ node.open ? '▾' : '▸' }}</span>
+              <span class="xml-open">&lt;{{ node.name }}</span>
+              <span class="xml-attrs" *ngIf="node.attributes.length">
+                <span *ngFor="let attr of node.attributes" class="xml-attr">{{ attr.name }}="{{ attr.value }}"</span>
+              </span>
+              <span class="xml-open">&gt;</span>
+            </summary>
+
+            <div class="xml-children" *ngIf="node.open">
+              <ng-container *ngIf="node.text">
+                <div class="xml-line xml-text-line" [style.--depth]="node.depth + 1">
+                  <span class="xml-marker"></span>
+                  <span class="xml-text">{{ node.text }}</span>
+                </div>
+              </ng-container>
+
+              <ng-container *ngFor="let child of node.children">
+                <ng-container *ngTemplateOutlet="xmlNode; context: { $implicit: child, depth: node.depth + 1 }"></ng-container>
+              </ng-container>
+            </div>
+
+            <div class="xml-line xml-close" [style.--depth]="node.depth">
+              <span class="xml-marker"></span>
+              <span>&lt;/{{ node.name }}&gt;</span>
+            </div>
+          </details>
+        </ng-container>
+
+        <ng-template #leafNode>
+          <div class="xml-line xml-leaf" [style.--depth]="node.depth">
+            <span class="xml-marker"></span>
+            <span class="xml-open">&lt;{{ node.name }}</span>
+            <span class="xml-attrs" *ngIf="node.attributes.length">
+              <span *ngFor="let attr of node.attributes" class="xml-attr">{{ attr.name }}="{{ attr.value }}"</span>
+            </span>
+            <span class="xml-open">&gt;</span>
+            <span *ngIf="node.text" class="xml-text-inline">{{ node.text }}</span>
+            <span class="xml-close-inline">&lt;/{{ node.name }}&gt;</span>
+          </div>
+        </ng-template>
+      </ng-template>
+
+      <ng-container *ngTemplateOutlet="xmlNode; context: { $implicit: feedTree, depth: 0 }"></ng-container>
+    </div>
   </div>
 </div>

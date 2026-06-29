@@ -155,9 +155,30 @@
     <p class="section-hint mb-2">Each invitee can have one or more reference links.</p>
     <div class="entry-box mb-3" *ngFor="let guest of editor.formModel.guests; let i = index">
       <div class="row">
-        <div class="col-md-5 mb-2">
+        <div class="col-md-5 mb-2 position-relative">
           <label>Name</label>
-          <input class="form-control" type="text" [(ngModel)]="guest.name" placeholder="Invitee name">
+          <input
+            class="form-control"
+            type="text"
+            [(ngModel)]="guest.name"
+            placeholder="Invitee name"
+            (ngModelChange)="controller.onStructuredEntryNameInput(editor, 'guests', i)"
+            (focus)="controller.onStructuredEntryNameFocus(editor, 'guests', i)"
+            (blur)="controller.onStructuredEntryNameBlur(editor, 'guests', i)">
+          <div class="structured-entry-suggestions" *ngIf="controller.hasStructuredEntrySuggestions(editor, 'guests', i)">
+            <button
+              type="button"
+              class="structured-entry-suggestion"
+              *ngFor="let suggestion of controller.getStructuredEntrySuggestions(editor, 'guests', i)"
+              (mousedown)="controller.applyStructuredEntrySuggestion(editor, 'guests', i, suggestion, $event)">
+              <span>{{ suggestion.name }}</span>
+              <small *ngIf="suggestion.links.length > 0">{{ suggestion.links.length }} saved link{{ suggestion.links.length === 1 ? '' : 's' }}</small>
+              <small class="text-muted" *ngIf="suggestion.links.length > 0">
+                {{ suggestion.links[0].label || suggestion.links[0].url }}
+              </small>
+              <small class="text-muted" *ngIf="suggestion.links.length === 0">No saved references</small>
+            </button>
+          </div>
         </div>
         <div class="col-md-4 mb-2">
           <label>Link label</label>
@@ -191,9 +212,30 @@
     <p class="section-hint mb-2">Same structure as invitees, with name plus one or more links.</p>
     <div class="entry-box mb-3" *ngFor="let music of editor.formModel.musicCredits; let i = index">
       <div class="row">
-        <div class="col-md-5 mb-2">
+        <div class="col-md-5 mb-2 position-relative">
           <label>Name</label>
-          <input class="form-control" type="text" [(ngModel)]="music.name" placeholder="Track name or credit">
+          <input
+            class="form-control"
+            type="text"
+            [(ngModel)]="music.name"
+            placeholder="Track name or credit"
+            (ngModelChange)="controller.onStructuredEntryNameInput(editor, 'musicCredits', i)"
+            (focus)="controller.onStructuredEntryNameFocus(editor, 'musicCredits', i)"
+            (blur)="controller.onStructuredEntryNameBlur(editor, 'musicCredits', i)">
+          <div class="structured-entry-suggestions" *ngIf="controller.hasStructuredEntrySuggestions(editor, 'musicCredits', i)">
+            <button
+              type="button"
+              class="structured-entry-suggestion"
+              *ngFor="let suggestion of controller.getStructuredEntrySuggestions(editor, 'musicCredits', i)"
+              (mousedown)="controller.applyStructuredEntrySuggestion(editor, 'musicCredits', i, suggestion, $event)">
+              <span>{{ suggestion.name }}</span>
+              <small *ngIf="suggestion.links.length > 0">{{ suggestion.links.length }} saved link{{ suggestion.links.length === 1 ? '' : 's' }}</small>
+              <small class="text-muted" *ngIf="suggestion.links.length > 0">
+                {{ suggestion.links[0].label || suggestion.links[0].url }}
+              </small>
+              <small class="text-muted" *ngIf="suggestion.links.length === 0">No saved references</small>
+            </button>
+          </div>
         </div>
         <div class="col-md-4 mb-2">
           <label>Link label</label>

@@ -1,10 +1,244 @@
-<div class="container border border-dark section-box mb-3">
-  <h2 class="mt-3">Feed / Release Status</h2>
-  <div class="row mb-3" *ngIf="feedStatus">
-    <div class="col-md-3"><strong>Generated:</strong><br>{{ feedStatus.generatedAt }}</div>
-    <div class="col-md-3"><strong>Published:</strong><br>{{ feedStatus.publishedCount }}</div>
-    <div class="col-md-3"><strong>Scheduled:</strong><br>{{ feedStatus.scheduledCount }}</div>
-    <div class="col-md-3"><strong>Next:</strong><br><span *ngIf="feedStatus.nextScheduled">#{{ feedStatus.nextScheduled.episodeId }} - {{ feedStatus.nextScheduled.title }}</span><span *ngIf="!feedStatus.nextScheduled">none</span></div>
+<div class="container section-box metrics-shell mb-3">
+  <div class="metrics-header">
+    <div>
+      <p class="metrics-kicker">Desempenho</p>
+      <h2 class="mt-0 mb-1">No Spotify</h2>
+      <p class="metrics-subtitle">{{ spotifyUpdatedAtLabel }}</p>
+    </div>
+
+    <div class="metrics-header-actions" *ngIf="hasAnyMetrics">
+      <div class="metrics-range-dropdown" [class.is-open]="rangeMenuOpen">
+        <button type="button" class="metrics-range-trigger" (click)="toggleRangeMenu($event)">
+          <span>{{ selectedRangeLabel }}</span>
+          <svg viewBox="0 0 12 12" class="metrics-range-caret" aria-hidden="true">
+            <path d="M2.25 4.5L6 8.25L9.75 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </button>
+
+        <div class="metrics-range-menu" *ngIf="rangeMenuOpen">
+          <button
+            *ngFor="let option of rangeOptions"
+            type="button"
+            class="metrics-range-option"
+            [class.is-active]="selectedRangeKey === option.key"
+            (click)="selectRange(option.key)"
+          >
+            <span>{{ option.label }}</span>
+            <small>{{ option.subtitle }}</small>
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
-  <p class="error mb-3" *ngIf="errorMessage">{{ errorMessage }}</p>
+
+  <p class="error mb-3" *ngIf="metricsError">{{ metricsErrorMessage }}</p>
+  <p class="section-hint mb-3" *ngIf="loading">Loading Spotify metrics...</p>
+
+    <div class="metrics-top-grid" *ngIf="metrics">
+    <div
+      class="metrics-stat-card"
+      [class.is-selected]="selectedChartMetric === 'plays'"
+      role="button"
+      tabindex="0"
+      (click)="selectChartMetric('plays')"
+    >
+      <div class="metrics-stat-label" [title]="'Quantidade de plays concluídos no período selecionado.'">Plays</div>
+      <div class="metrics-stat-value">{{ formatNumber(selectedPlaysSummary.current) }}</div>
+      <div class="metrics-stat-delta" *ngIf="selectedPlaysSummary.deltaPercent !== null">
+        <span class="metrics-pill" [attr.data-tone]="toneFromDelta(selectedPlaysSummary.deltaPercent)">{{ formatPercent(selectedPlaysSummary.deltaPercent) }}</span>
+      </div>
+    </div>
+
+    <div
+      class="metrics-stat-card"
+      [class.is-selected]="selectedChartMetric === 'followers'"
+      role="button"
+      tabindex="0"
+      (click)="selectChartMetric('followers')"
+    >
+      <div class="metrics-stat-label" [title]="'Total de seguidores registrados no intervalo mostrado.'">Followers</div>
+      <div class="metrics-stat-value">{{ formatNumber(selectedFollowersSummary.current) }}</div>
+      <div class="metrics-stat-delta" *ngIf="selectedFollowersSummary.deltaPercent !== null">
+        <span class="metrics-pill" [attr.data-tone]="toneFromDelta(selectedFollowersSummary.deltaPercent)">{{ formatPercent(selectedFollowersSummary.deltaPercent) }}</span>
+      </div>
+    </div>
+  </div>
+
+  <section class="metrics-chart-panel" *ngIf="metrics">
+    <div class="metrics-chart-wrap">
+      <div class="metrics-chart-overlay">
+      <div class="metrics-chart-guide" *ngIf="chartTooltipPosition as tooltip" [style.left.%]="tooltip.x"></div>
+      <div class="metrics-chart-tooltip" *ngIf="chartTooltipPoint && chartTooltipPosition as tooltip" [style.left.%]="tooltip.x" [style.top.%]="tooltip.y">
+        <span class="metrics-chart-tooltip-date">{{ chartTooltipPoint.tooltipLabel }}</span>
+        <div class="metrics-chart-tooltip-row">
+          <span>{{ selectedChartMetric === 'followers' ? 'Followers' : 'Plays' }}</span>
+          <strong>{{ chartTooltipPoint.plays }}</strong>
+        </div>
+      </div>
+      <div
+        *ngIf="chartTooltipPosition as tooltip"
+        class="metrics-chart-marker"
+        [style.left.%]="tooltip.x"
+        [style.top.%]="(tooltip.y / 120) * 100"
+      >
+        <span
+          class="metrics-chart-marker-core"
+          style="background:#6064ff;box-shadow:0 0 0 1px rgba(255,255,255,.96),0 0 0 1px rgba(96,100,255,.22),0 1px 3px rgba(96,100,255,.10)"
+        ></span>
+      </div>
+      </div>
+      <svg
+        viewBox="0 0 100 120"
+        preserveAspectRatio="none"
+        class="metrics-chart-svg"
+        role="img"
+        [attr.aria-label]="chartLabel"
+        (mousemove)="handleChartPointerMove($event)"
+        (mouseleave)="clearHover()"
+      >
+        <defs>
+          <linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stop-color="#6e6cff" stop-opacity="0.34" />
+            <stop offset="100%" stop-color="#6e6cff" stop-opacity="0.04" />
+          </linearGradient>
+        </defs>
+        <path [attr.d]="chartAreaPath" class="metrics-chart-area" vector-effect="non-scaling-stroke"></path>
+        <path [attr.d]="chartPath" class="metrics-chart-line" vector-effect="non-scaling-stroke"></path>
+        <g *ngFor="let point of chartPoints">
+          <circle
+            [attr.cx]="point.x"
+            [attr.cy]="point.y"
+            r="2.2"
+            class="metrics-chart-node"
+            [class.is-active]="point.date === chartTooltipPoint?.date"
+            (mouseenter)="hoverPoint(point)"
+            (focus)="hoverPoint(point)"
+            tabindex="0"
+          ></circle>
+        </g>
+      </svg>
+      <div class="metrics-chart-axis">
+        <span *ngFor="let label of chartLabels" [style.left.%]="label.x">{{ label.label }}</span>
+      </div>
+    </div>
+  </section>
+
+  <section
+    *ngIf="youtubeMetrics || youtubeLoading || youtubeMetricsError"
+    style="margin-top:1.35rem;padding-top:1.15rem;border-top:1px solid rgba(17,17,17,.08);"
+  >
+    <div class="metrics-header">
+      <div>
+        <p class="metrics-kicker">Desempenho</p>
+        <h2 class="mt-0 mb-1">No YouTube Studio</h2>
+        <p class="metrics-subtitle">{{ youtubeUpdatedAtLabel }}</p>
+      </div>
+
+      <div class="metrics-header-actions" *ngIf="youtubeMetrics">
+        <div class="metrics-range-dropdown metrics-youtube-range-dropdown" [class.is-open]="youtubeRangeMenuOpen">
+          <button type="button" class="metrics-range-trigger" (click)="toggleYouTubeRangeMenu($event)">
+            <span>{{ youtubeSelectedRangeLabel }}</span>
+            <svg viewBox="0 0 12 12" class="metrics-range-caret" aria-hidden="true">
+              <path d="M2.25 4.5L6 8.25L9.75 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>
+          </button>
+
+          <div class="metrics-range-menu" *ngIf="youtubeRangeMenuOpen">
+            <button
+              *ngFor="let option of rangeOptions"
+              type="button"
+              class="metrics-range-option"
+              [class.is-active]="youtubeSelectedRangeKey === option.key"
+              (click)="selectYouTubeRange(option.key)"
+            >
+              <span>{{ option.label }}</span>
+              <small>{{ option.subtitle }}</small>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="error mb-3" *ngIf="youtubeMetricsError">{{ youtubeMetricsErrorMessage }}</p>
+    <p class="section-hint mb-3" *ngIf="youtubeLoading">Loading YouTube metrics...</p>
+
+    <div class="metrics-top-grid" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr));" *ngIf="youtubeMetrics">
+      <div
+        class="metrics-stat-card"
+        *ngFor="let card of youtubeSummaryCards"
+        [class.is-selected]="selectedYouTubeChartMetric === card.metricKey"
+        (click)="card.metricKey && selectYouTubeChartMetric(card.metricKey)"
+        [attr.role]="card.metricKey ? 'button' : null"
+        [attr.tabindex]="card.metricKey ? 0 : null"
+      >
+        <div class="metrics-stat-label" [title]="card.description">{{ card.label }}</div>
+        <div class="metrics-stat-value">{{ card.value }}</div>
+        <div class="metrics-stat-delta" *ngIf="card.change">
+          <span class="metrics-pill" [attr.data-tone]="card.tone">{{ card.change }}</span>
+        </div>
+      </div>
+    </div>
+
+    <section class="metrics-chart-panel" *ngIf="youtubeMetrics">
+      <div class="metrics-chart-wrap">
+      <div class="metrics-chart-overlay">
+        <div class="metrics-chart-guide" *ngIf="youtubeChartTooltipPosition as tooltip" [style.left.%]="tooltip.x"></div>
+        <div class="metrics-chart-tooltip" *ngIf="youtubeChartTooltipPoint && youtubeChartTooltipPosition as tooltip" [style.left.%]="tooltip.x" [style.top.%]="tooltip.y">
+          <span class="metrics-chart-tooltip-date">{{ youtubeChartTooltipPoint.tooltipLabel }}</span>
+          <div class="metrics-chart-tooltip-row">
+              <span>{{ youtubeChartTooltipMetricLabel }}</span>
+              <strong>{{ youtubeChartTooltipValue }}</strong>
+          </div>
+        </div>
+        <div
+          *ngIf="youtubeChartTooltipPosition as tooltip"
+          class="metrics-chart-marker metrics-chart-marker-youtube"
+          [style.left.%]="tooltip.x"
+          [style.top.%]="(tooltip.y / 120) * 100"
+        >
+          <span
+            class="metrics-chart-marker-core"
+            style="background:#ea4335;box-shadow:0 0 0 1px rgba(255,255,255,.96),0 0 0 1px rgba(234,67,53,.22),0 1px 3px rgba(234,67,53,.10)"
+          ></span>
+        </div>
+      </div>
+      <svg
+        viewBox="0 0 100 120"
+        preserveAspectRatio="none"
+        class="metrics-chart-svg"
+        role="img"
+          [attr.aria-label]="youtubeChartLabel"
+          (mousemove)="handleYouTubeChartPointerMove($event)"
+          (mouseleave)="clearYouTubeHover()"
+        >
+        <defs>
+          <linearGradient id="youtubeChartFill" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stop-color="#ea4335" stop-opacity="0.30" />
+            <stop offset="100%" stop-color="#ea4335" stop-opacity="0.04" />
+          </linearGradient>
+          <filter id="youtubeMarkerShadow" x="-50%" y="-50%" width="200%" height="200%">
+            <feDropShadow dx="0" dy="1" stdDeviation="1.4" flood-color="#1b1b1b" flood-opacity="0.22"></feDropShadow>
+          </filter>
+        </defs>
+        <path [attr.d]="youtubeChartAreaPath" class="metrics-chart-area" fill="url(#youtubeChartFill)" vector-effect="non-scaling-stroke"></path>
+        <path [attr.d]="youtubeChartPath" class="metrics-chart-line" stroke="#ea4335" vector-effect="non-scaling-stroke"></path>
+          <g *ngFor="let point of youtubeChartPoints">
+            <circle
+              [attr.cx]="point.x"
+              [attr.cy]="point.y"
+              r="2.2"
+              class="metrics-chart-node"
+              [class.is-active]="point.date === youtubeChartTooltipPoint?.date"
+              (mouseenter)="hoverYouTubePoint(point)"
+              (focus)="hoverYouTubePoint(point)"
+              tabindex="0"
+            ></circle>
+          </g>
+        </svg>
+        <div class="metrics-chart-axis">
+          <span *ngFor="let label of youtubeChartLabels" [style.left.%]="label.x">{{ label.label }}</span>
+        </div>
+      </div>
+    </section>
+  </section>
 </div>

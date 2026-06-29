@@ -1,13 +1,124 @@
-.section-box {
-  background-color: rgba(255, 255, 255, 0.72);
+.health-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1rem 0 1.1rem;
+}
+
+.health-kicker {
+  margin: 0 0 0.2rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--dc-muted);
+}
+
+.health-subtitle {
+  margin: 0;
+  color: var(--dc-muted);
+}
+
+.health-table-wrap {
+  border: 1px solid var(--dc-border);
   border-radius: 1rem;
-  box-shadow: 0 16px 32px rgba(25, 34, 46, 0.08);
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 12px 24px rgba(25, 34, 46, 0.06);
 }
 
-.error {
-  color: #b00020;
+.health-table {
+  margin-bottom: 0;
+  border-collapse: separate;
 }
 
-strong {
+.health-table thead th {
+  border-bottom-width: 1px;
+  color: var(--dc-muted);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.health-table tbody tr {
+  border-bottom: 1px solid var(--dc-border);
+}
+
+.health-table tbody th,
+.health-table tbody td {
+  padding-top: 0.85rem;
+  padding-bottom: 0.85rem;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.health-table tbody tr[data-tone='good'] {
+  background: rgba(227, 245, 232, 0.55);
+}
+
+.health-table tbody tr[data-tone='warn'] {
+  background: rgba(255, 241, 214, 0.58);
+}
+
+.health-table tbody tr[data-tone='muted'] {
+  background: rgba(255, 255, 255, 0.32);
+}
+
+.health-table tbody tr.health-subrow th {
+  padding-left: 1.5rem;
+  font-weight: 600;
+  color: var(--dc-muted);
+}
+
+.health-section-row th,
+.health-section-row td {
+  background: rgba(255, 255, 255, 0.96);
+  border-top: 1px solid var(--dc-border);
+  border-bottom: 1px solid var(--dc-border);
+}
+
+.health-section-row {
+  cursor: pointer;
+  border-left: 4px solid rgba(47, 95, 127, 0.45);
+}
+
+.health-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--dc-border);
+  background: rgba(255, 255, 255, 0.88);
   color: var(--dc-text);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.health-pill[data-tone='good'] {
+  border-color: rgba(61, 133, 85, 0.32);
+  background: rgba(227, 245, 232, 0.9);
+}
+
+.health-pill[data-tone='warn'] {
+  border-color: rgba(176, 104, 33, 0.34);
+  background: rgba(255, 241, 214, 0.92);
+}
+
+.health-pill[data-tone='muted'] {
+  border-color: var(--dc-border);
+}
+
+@media (max-width: 640px) {
+  .health-shell {
+    padding: 1rem;
+  }
+
+  .health-header {
+    flex-direction: column;
+  }
 }

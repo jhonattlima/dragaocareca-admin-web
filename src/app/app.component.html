@@ -1,1 +1,10 @@
-<router-outlet></router-outlet>
+<div class="app-mosaic" *ngIf="mosaicTiles.length">
+  <div
+    class="mosaic-tile"
+    *ngFor="let tile of mosaicTiles; let index = index"
+    [style.backgroundImage]="'url(' + tile + ')'"
+  ></div>
+</div>
+<div class="app-content">
+  <router-outlet></router-outlet>
+</div>

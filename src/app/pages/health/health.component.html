@@ -1,8 +1,47 @@
-<div class="container border border-dark section-box mb-3">
-  <h2 class="mt-3">Backend Health</h2>
-  <div class="row mb-3">
-    <div class="col-md-4"><strong>Status:</strong><br>{{ healthStatus?.status || 'unavailable' }}</div>
-    <div class="col-md-4"><strong>Uptime (s):</strong><br>{{ healthStatus?.uptime || 0 }}</div>
-    <div class="col-md-4"><strong>Auth Bypass (frontend):</strong><br>{{ authBypassEnabled ? 'enabled' : 'disabled' }}</div>
+<div class="container border border-dark section-box mb-3 health-shell">
+  <div class="health-header">
+    <div>
+      <p class="health-kicker">Operational view</p>
+      <h2 class="mt-0 mb-1">Health Menu</h2>
+      <p class="health-subtitle">Table layout for the current health checks and future operator signals.</p>
+    </div>
+  </div>
+
+  <div class="table-responsive health-table-wrap">
+    <table class="table align-middle health-table">
+      <thead>
+        <tr>
+          <th scope="col">Check</th>
+          <th scope="col">Value</th>
+          <th scope="col">Details</th>
+          <th scope="col" class="text-end">State</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let row of statusRows" [attr.data-tone]="row.tone" [class.health-subrow]="row.level > 0">
+          <th scope="row">{{ row.label }}</th>
+          <td>{{ row.value }}</td>
+          <td>{{ row.note }}</td>
+          <td class="text-end">
+            <span class="health-pill" [attr.data-tone]="row.tone">{{ row.tone }}</span>
+          </td>
+        </tr>
+        <tr class="health-section-row" [attr.data-tone]="botStatusTone" (click)="toggleBotSection()" [attr.aria-expanded]="botExpanded">
+          <th scope="row">Bot</th>
+          <td>{{ botRunningLabel }}</td>
+          <td colspan="2">Launch notification subsystem</td>
+        </tr>
+        <ng-container *ngIf="botExpanded">
+          <tr *ngFor="let row of botDetailRows" [attr.data-tone]="row.tone" class="health-subrow health-subrow-bot">
+            <th scope="row">{{ row.label }}</th>
+            <td>{{ row.value }}</td>
+            <td>{{ row.note }}</td>
+            <td class="text-end">
+              <span class="health-pill" [attr.data-tone]="row.tone">{{ row.tone }}</span>
+            </td>
+          </tr>
+        </ng-container>
+      </tbody>
+    </table>
   </div>
 </div>
