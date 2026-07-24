@@ -2,9 +2,12 @@
 
 ## Context First (AI / Agent)
 Before making changes, read:
-- `docs/SDD.md`
+- `docs/README.md`
+- `docs/ARCHITECTURE.md`
+- `docs/CONFIGURATION.md`
+- `docs/TESTING.md`
 
-This is the canonical compressed context for routing, auth toggles, API contract, layout direction, and runbook.
+`docs/README.md` is the compressed entry point, but the canonical documentation now follows the flatter GSD-friendly `docs/*.md` layout.
 
 Angular frontend for `dragaocareca-admin-api`.
 
@@ -46,3 +49,5 @@ Fallback:
   - episodes list (`GET /v1/episodes`)
   - episode create/update (`POST/PUT /v1/episodes`)
   - health menu (`/health`) with backend status, uptime, bot running state, and pending launch notifications
+  - metrics (`/metrics`) with Spotify and YouTube snapshots
+  - feed preview (`/feed`) with XML inspection
