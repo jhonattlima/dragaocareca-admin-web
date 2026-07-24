@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { HttpEventType } from '@angular/common/http';
 import { finalize } from 'rxjs';
 import { ApiService, Episode, EpisodeWriteInput, StructuredEntryCatalogResponse } from '../../core/api.service';
@@ -51,6 +51,12 @@ interface EpisodeFormState extends Omit<EpisodeWriteInput, 'guests' | 'musicCred
   guests: StructuredEntry[];
   musicCredits: StructuredEntry[];
   citations: StructuredEntry[];
+  transcriptFileName?: string;
+  transcriptStatus?: 'idle' | 'pending' | 'processing' | 'done' | 'error';
+  transcriptUpdatedAt?: string;
+  transcriptStartedAt?: string | null;
+  transcriptError?: string;
+  transcriptProgress?: number | null;
 }
 
 export interface EpisodeEditorState {
@@ -65,7 +71,7 @@ export interface EpisodeEditorState {
   templateUrl: './manage.component.html',
   styleUrls: ['./manage.component.scss']
 })
-export class ManageComponent implements OnInit {
+export class ManageComponent implements OnInit, OnDestroy {
   readonly self = this;
   activeTab: ManageTab = 'add';
   readonly episodeTypes = [
@@ -92,6 +98,12 @@ export class ManageComponent implements OnInit {
   episodes: Episode[] = [];
   errorMessage = '';
   successMessage = '';
+  duplicateEpisodeIdModalOpen = false;
+  duplicateEpisodeIdModalMessage = '';
+  duplicateEpisodeNumberModalOpen = false;
+  duplicateEpisodeNumberModalMessage = '';
+  resetConfirmModalOpen = false;
+  resetConfirmModalEditor: EpisodeEditorState | null = null;
   episodePendingDelete: Episode | null = null;
   deletingEpisode = false;
   episodeSearchText = '';
@@ -100,6 +112,12 @@ export class ManageComponent implements OnInit {
   currentPage = 1;
   private readonly structuredEntrySuggestionDelayMs = 500;
   private readonly structuredEntrySuggestionTimers = new WeakMap<StructuredEntry, number>();
+  private readonly episodeNumberValidationDelayMs = 2000;
+  private episodeNumberValidationTimer: number | null = null;
+  private transcriptionStatusPollTimer: number | null = null;
+  private transcriptionStatusPollEpisodeId: number | null = null;
+  private transcriptionClockTimer: number | null = null;
+  transcriptionClockTick = Date.now();
   private readonly structuredEntrySuggestionCache: Record<'guests' | 'musicCredits', StructuredEntrySuggestion[]> = {
     guests: [],
     musicCredits: [],
@@ -225,7 +243,24 @@ export class ManageComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.transcriptionClockTimer = window.setInterval(() => {
+      this.transcriptionClockTick = Date.now();
+    }, 1000);
     this.loadEpisodes();
+  }
+
+  ngOnDestroy(): void {
+    if (this.transcriptionClockTimer !== null) {
+      clearInterval(this.transcriptionClockTimer);
+      this.transcriptionClockTimer = null;
+    }
+
+    if (this.episodeNumberValidationTimer !== null) {
+      clearTimeout(this.episodeNumberValidationTimer);
+      this.episodeNumberValidationTimer = null;
+    }
+
+    this.clearTranscriptionStatusPolling();
   }
 
   startEdit(episode: Episode): void {
@@ -254,9 +289,14 @@ export class ManageComponent implements OnInit {
       coverFileName: episode.coverFileName,
       coverLowFileName: episode.coverLowFileName,
       trailerFileName: episode.trailerFileName,
+      transcriptFileName: episode.transcriptFileName,
+      transcriptStatus: episode.transcriptStatus,
+      transcriptUpdatedAt: episode.transcriptUpdatedAt,
+      transcriptStartedAt: episode.transcriptStartedAt,
+      transcriptError: episode.transcriptError,
+      transcriptProgress: episode.transcriptProgress ?? (episode.transcriptStatus === 'done' ? 100 : null),
     };
     editor.selectedMembers = [...(episode.authors ?? [])];
-    editor.formModel.episodeId = episode.episodeId;
     editor.formModel.episodeNumber = episode.episodeNumber ?? episode.episodeId;
   }
 
@@ -274,6 +314,16 @@ export class ManageComponent implements OnInit {
 
     if (!editor.formModel.episodeId || !editor.formModel.title || !editor.formModel.pubDate) {
       this.errorMessage = 'Episode ID, title and pubDate are required.';
+      return;
+    }
+
+    if (editor === this.addEditorState && this.episodes.some((episode) => episode.episodeId === editor.formModel.episodeId)) {
+      this.openDuplicateEpisodeIdModal();
+      return;
+    }
+
+    if (editor === this.addEditorState && this.isDuplicateEpisodeNumber(editor.formModel.episodeNumber, null)) {
+      this.openDuplicateEpisodeNumberModal();
       return;
     }
 
@@ -469,7 +519,13 @@ export class ManageComponent implements OnInit {
 
   switchTab(tab: ManageTab): void {
     this.activeTab = tab;
-    if (tab === 'episodes') this.currentPage = 1;
+    if (tab === 'episodes') {
+      this.clearTranscriptionStatusPolling();
+      this.currentPage = 1;
+      return;
+    }
+
+    this.scheduleAddEditorDefaults();
   }
 
   openDeleteEpisode(episode: Episode): void {
@@ -572,6 +628,125 @@ export class ManageComponent implements OnInit {
     return Number.isInteger(editor.formModel.episodeId) && editor.formModel.episodeId > 0;
   }
 
+  isEpisodeSaveDisabled(editor: EpisodeEditorState): boolean {
+    return editor.formModel.transcriptStatus === 'pending' || editor.formModel.transcriptStatus === 'processing';
+  }
+
+  getTranscriptionStatus(editor: EpisodeEditorState): string {
+    const status = editor.formModel.transcriptStatus;
+    if (!status || status === 'idle') {
+      return editor.formModel.transcriptFileName ? 'Transcription available.' : '';
+    }
+
+    switch (status) {
+      case 'pending':
+        return 'Transcription queued in the background.';
+      case 'processing':
+        return `Transcribing the episode audio... ${this.getTranscriptionProgress(editor)}%${this.getTranscriptionTimingSuffix(editor)}`;
+      case 'done':
+        return 'Transcript saved and ready.';
+      case 'error':
+        return editor.formModel.transcriptError
+          ? `Transcription failed: ${editor.formModel.transcriptError}`
+          : 'Transcription failed.';
+      default:
+        return '';
+    }
+  }
+
+  getTranscriptionProgress(editor: EpisodeEditorState): number {
+    const status = editor.formModel.transcriptStatus;
+    if (!status || status === 'idle' || status === 'error') {
+      return 0;
+    }
+
+    const progress = editor.formModel.transcriptProgress;
+    if (typeof progress === 'number' && Number.isFinite(progress)) {
+      return Math.max(0, Math.min(100, Math.round(progress)));
+    }
+
+    return status === 'done' ? 100 : 0;
+  }
+
+  hasTranscriptionProgress(editor: EpisodeEditorState): boolean {
+    const status = editor.formModel.transcriptStatus;
+    return status === 'pending' || status === 'processing';
+  }
+
+  getTranscriptionTimingSuffix(editor: EpisodeEditorState): string {
+    const text = this.getTranscriptionTimingText(editor);
+    return text ? ` · ${text}` : '';
+  }
+
+  getTranscriptionTimingText(editor: EpisodeEditorState): string {
+    const elapsed = this.getTranscriptionElapsedSeconds(editor);
+    const remaining = this.getTranscriptionRemainingSeconds(editor);
+
+    if (elapsed === null && remaining === null) {
+      return '';
+    }
+
+    const parts: string[] = [];
+    if (elapsed !== null) {
+      parts.push(`elapsed ${this.formatDuration(elapsed)}`);
+    }
+    if (remaining !== null) {
+      parts.push(`~${this.formatDuration(remaining)} left`);
+    }
+
+    return parts.join(' · ');
+  }
+
+  getTranscriptionElapsedSeconds(editor: EpisodeEditorState): number | null {
+    if (editor.formModel.transcriptStatus !== 'processing') {
+      return null;
+    }
+
+    const startedAt = editor.formModel.transcriptStartedAt ? new Date(editor.formModel.transcriptStartedAt) : null;
+    if (!startedAt || Number.isNaN(startedAt.getTime())) {
+      return null;
+    }
+
+    return Math.max(0, Math.floor((this.transcriptionClockTick - startedAt.getTime()) / 1000));
+  }
+
+  getTranscriptionRemainingSeconds(editor: EpisodeEditorState): number | null {
+    if (editor.formModel.transcriptStatus !== 'processing') {
+      return null;
+    }
+
+    const startedAt = editor.formModel.transcriptStartedAt ? new Date(editor.formModel.transcriptStartedAt) : null;
+    if (!startedAt || Number.isNaN(startedAt.getTime())) {
+      return null;
+    }
+
+    const progress = this.getTranscriptionProgress(editor);
+    if (progress <= 0) {
+      return null;
+    }
+
+    const elapsedSeconds = this.getTranscriptionElapsedSeconds(editor);
+    if (elapsedSeconds === null) {
+      return null;
+    }
+
+    const estimatedTotalSeconds = Math.max(elapsedSeconds, Math.ceil((elapsedSeconds * 100) / progress));
+    return Math.max(0, estimatedTotalSeconds - elapsedSeconds);
+  }
+
+  formatDuration(totalSeconds: number): string {
+    const safeSeconds = Math.max(0, Math.round(totalSeconds));
+    const hours = Math.floor(safeSeconds / 3600);
+    const minutes = Math.floor((safeSeconds % 3600) / 60);
+    const seconds = safeSeconds % 60;
+
+    if (hours > 0) {
+      return `${hours}h ${String(minutes).padStart(2, '0')}m`;
+    }
+
+    return `${minutes}m ${String(seconds).padStart(2, '0')}s`;
+  }
+
   isUploadBusy(kind: UploadKind): boolean {
     return this.uploadStates[kind].busy || this.uploadStates[kind].deleting;
   }
@@ -662,11 +837,7 @@ export class ManageComponent implements OnInit {
         this.suggestedNextPubDate = this.computeSuggestedNextPubDate(episodes);
         this.suggestedNextEpisodeId = this.computeSuggestedNextEpisodeId(episodes);
         this.suggestedNextEpisodeNumber = this.computeSuggestedNextEpisodeNumber(episodes);
-        if (this.addEditorState.editingEpisodeId === null) {
-          this.addEditorState.formModel.episodeId = this.suggestedNextEpisodeId;
-          this.addEditorState.formModel.episodeNumber = this.suggestedNextEpisodeNumber;
-          this.addEditorState.formModel.pubDate = this.suggestedNextPubDate;
-        }
+        this.scheduleAddEditorDefaults();
         this.currentPage = 1;
       },
       error: (error) => {
@@ -696,10 +867,37 @@ export class ManageComponent implements OnInit {
   }
 
   resetEditor(editor: EpisodeEditorState): void {
+    if (editor === this.addEditorState) {
+      this.clearTranscriptionStatusPolling();
+    }
     editor.formModel = this.buildEmptyFormModel();
     editor.selectedMembers = [];
     editor.listDrafts = this.buildEmptyListDrafts();
     editor.editingEpisodeId = null;
+    if (editor === this.addEditorState) {
+      this.scheduleAddEditorDefaults();
+    }
+  }
+
+  requestResetEditor(editor: EpisodeEditorState): void {
+    this.resetConfirmModalEditor = editor;
+    this.resetConfirmModalOpen = true;
+  }
+
+  cancelResetEditor(): void {
+    this.resetConfirmModalOpen = false;
+    this.resetConfirmModalEditor = null;
+  }
+
+  confirmResetEditor(): void {
+    if (!this.resetConfirmModalEditor) {
+      this.cancelResetEditor();
+      return;
+    }
+
+    const editor = this.resetConfirmModalEditor;
+    this.cancelResetEditor();
+    this.resetEditor(editor);
   }
 
   private buildEmptyFormModel(): EpisodeFormState {
@@ -725,6 +923,12 @@ export class ManageComponent implements OnInit {
       coverFileName: '',
       coverLowFileName: '',
       trailerFileName: '',
+      transcriptFileName: '',
+      transcriptStatus: 'idle',
+      transcriptUpdatedAt: '',
+      transcriptStartedAt: null,
+      transcriptError: '',
+      transcriptProgress: null,
     };
   }
 
@@ -737,6 +941,43 @@ export class ManageComponent implements OnInit {
       suggestions: [],
       suggestionsOpen: false,
     };
+  }
+
+  private ensureAddEditorDefaults(): void {
+    if (this.addEditorState.editingEpisodeId !== null) {
+      return;
+    }
+
+    this.syncAddEditorId();
+    this.syncAddEditorEpisodeNumber();
+  }
+
+  private scheduleAddEditorDefaults(): void {
+    window.setTimeout(() => {
+      this.ensureAddEditorDefaults();
+    }, 0);
+  }
+
+  private openDuplicateEpisodeIdModal(): void {
+    this.duplicateEpisodeIdModalMessage =
+      'This ID is already being used by an episode. Please select a new Id or go to edit tab if you want to update it';
+    this.duplicateEpisodeIdModalOpen = true;
+    window.setTimeout(() => {
+      this.syncAddEditorId();
+    }, 0);
+    this.errorMessage = '';
+    this.successMessage = '';
+  }
+
+  private openDuplicateEpisodeNumberModal(): void {
+    this.duplicateEpisodeNumberModalMessage =
+      'This episode number is already being used by an episode. Please select a new number or go to edit tab if you want to update it';
+    this.duplicateEpisodeNumberModalOpen = true;
+    window.setTimeout(() => {
+      this.syncAddEditorEpisodeNumber();
+    }, 0);
+    this.errorMessage = '';
+    this.successMessage = '';
   }
 
   buildPayload(editor: EpisodeEditorState): EpisodeWriteInput {
@@ -765,6 +1006,140 @@ export class ManageComponent implements OnInit {
     };
   }
 
+  onEpisodeIdChange(editor: EpisodeEditorState, value: number | string): void {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return;
+    }
+
+    editor.formModel.episodeId = Math.trunc(parsed);
+
+    if (editor !== this.addEditorState) {
+      return;
+    }
+
+    if (!Number.isInteger(editor.formModel.episodeId) || editor.formModel.episodeId <= 0) {
+      return;
+    }
+
+    if (this.episodes.some((episode) => episode.episodeId === editor.formModel.episodeId)) {
+      this.openDuplicateEpisodeIdModal();
+      return;
+    }
+
+    editor.formModel.episodeNumber = editor.formModel.episodeId;
+  }
+
+  onEpisodeNumberChange(editor: EpisodeEditorState, value: number | string): void {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return;
+    }
+
+    editor.formModel.episodeNumber = Math.trunc(parsed);
+
+    if (editor !== this.addEditorState) {
+      return;
+    }
+
+    if (this.episodeNumberValidationTimer !== null) {
+      clearTimeout(this.episodeNumberValidationTimer);
+      this.episodeNumberValidationTimer = null;
+    }
+
+    if (!Number.isInteger(editor.formModel.episodeNumber) || editor.formModel.episodeNumber <= 0) {
+      return;
+    }
+
+    const currentValue = editor.formModel.episodeNumber;
+    this.episodeNumberValidationTimer = window.setTimeout(() => {
+      this.episodeNumberValidationTimer = null;
+      if (editor !== this.addEditorState) {
+        return;
+      }
+
+      if (this.isDuplicateEpisodeNumber(currentValue, null) && this.addTabActive) {
+        this.openDuplicateEpisodeNumberModal();
+      }
+    }, this.episodeNumberValidationDelayMs);
+  }
+
+  closeDuplicateEpisodeIdModal(): void {
+    this.duplicateEpisodeIdModalOpen = false;
+    this.duplicateEpisodeIdModalMessage = '';
+    this.syncAddEditorId();
+  }
+
+  closeDuplicateEpisodeNumberModal(): void {
+    this.duplicateEpisodeNumberModalOpen = false;
+    this.duplicateEpisodeNumberModalMessage = '';
+    this.syncAddEditorEpisodeNumber();
+  }
+
+  private syncAddEditorId(): void {
+    this.addEditorState.formModel = {
+      ...this.addEditorState.formModel,
+      episodeId: this.suggestedNextEpisodeId,
+    };
+  }
+
+  private syncAddEditorEpisodeNumber(): void {
+    this.addEditorState.formModel = {
+      ...this.addEditorState.formModel,
+      episodeNumber: this.suggestedNextEpisodeNumber,
+    };
+  }
+
+  private syncTranscriptionStatusPolling(episodeId: number, editor: EpisodeEditorState): void {
+    if (this.transcriptionStatusPollEpisodeId === episodeId && this.transcriptionStatusPollTimer !== null) {
+      return;
+    }
+
+    this.clearTranscriptionStatusPolling();
+    this.transcriptionStatusPollEpisodeId = episodeId;
+
+    const refresh = (): void => {
+      this.apiService.getEpisodeTranscriptionStatus(episodeId).subscribe({
+        next: (status) => {
+          if (editor !== this.addEditorState || this.addEditorState.formModel.episodeId !== episodeId) {
+            this.clearTranscriptionStatusPolling();
+            return;
+          }
+
+          editor.formModel.transcriptStatus = status.status;
+          editor.formModel.transcriptUpdatedAt = status.transcriptUpdatedAt ?? editor.formModel.transcriptUpdatedAt;
+          editor.formModel.transcriptStartedAt = status.transcriptStartedAt ?? editor.formModel.transcriptStartedAt ?? null;
+          editor.formModel.transcriptError = status.transcriptError ?? '';
+          editor.formModel.transcriptProgress = status.progress ?? (status.status === 'done' ? 100 : null);
+
+          if (status.status === 'done') {
+            editor.formModel.transcriptFileName = status.transcriptFileName ?? editor.formModel.transcriptFileName;
+            this.clearTranscriptionStatusPolling();
+            return;
+          }
+
+          if (status.status === 'error') {
+            this.clearTranscriptionStatusPolling();
+          }
+        },
+        error: () => {
+          this.clearTranscriptionStatusPolling();
+        },
+      });
+    };
+
+    refresh();
+    this.transcriptionStatusPollTimer = window.setInterval(refresh, 2000);
+  }
+
+  private clearTranscriptionStatusPolling(): void {
+    if (this.transcriptionStatusPollTimer !== null) {
+      clearInterval(this.transcriptionStatusPollTimer);
+      this.transcriptionStatusPollTimer = null;
+    }
+    this.transcriptionStatusPollEpisodeId = null;
+  }
+
   uploadMedia(editor: EpisodeEditorState, kind: UploadKind, file: File): void {
     this.errorMessage = '';
     this.successMessage = '';
@@ -786,6 +1161,15 @@ export class ManageComponent implements OnInit {
       return;
     }
 
+    if (kind === 'audio') {
+      editor.formModel.transcriptStatus = 'pending';
+      editor.formModel.transcriptUpdatedAt = new Date().toISOString();
+      editor.formModel.transcriptStartedAt = null;
+      editor.formModel.transcriptError = '';
+      editor.formModel.transcriptProgress = 0;
+      this.successMessage = 'Audio upload started. Transcription will start as soon as the file is staged.';
+    }
+
     this.uploadStates[kind] = { busy: true, deleting: false, dragOver: false, progress: 0 };
 
     this.getUploadRequest(kind, episodeId, file)
@@ -802,12 +1186,38 @@ export class ManageComponent implements OnInit {
           }
 
           if (event.type === HttpEventType.Response) {
-            const episode = event.body;
+            const episode = event.body as (Episode & { message?: string }) | null;
             if (!episode) {
               return;
             }
             editor.formModel[definition.fileField] = episode[definition.fileField] ?? editor.formModel[definition.fileField];
+            if (typeof episode.transcriptStatus !== 'undefined') {
+              editor.formModel.transcriptStatus = episode.transcriptStatus;
+            }
+            if (typeof episode.transcriptUpdatedAt !== 'undefined') {
+              editor.formModel.transcriptUpdatedAt = episode.transcriptUpdatedAt;
+            }
+            if (typeof episode.transcriptStartedAt !== 'undefined') {
+              editor.formModel.transcriptStartedAt = episode.transcriptStartedAt;
+            }
+            if (typeof episode.transcriptError !== 'undefined') {
+              editor.formModel.transcriptError = episode.transcriptError;
+            }
+            if (typeof episode.transcriptProgress !== 'undefined') {
+              editor.formModel.transcriptProgress = episode.transcriptProgress;
+            } else if (episode.transcriptStatus === 'done') {
+              editor.formModel.transcriptProgress = 100;
+            }
+            if (kind === 'audio' && editor === this.addEditorState) {
+              this.syncTranscriptionStatusPolling(episodeId, editor);
+              if (episode.transcriptStatus && ['done', 'error'].includes(episode.transcriptStatus)) {
+                this.clearTranscriptionStatusPolling();
+              }
+            }
             this.successMessage = `${definition.label} staged.`;
+            if (episode.message) {
+              this.successMessage = episode.message;
+            }
             this.uploadStates[kind] = { ...this.uploadStates[kind], progress: 100 };
           }
         },
@@ -954,11 +1364,15 @@ export class ManageComponent implements OnInit {
       return 1;
     }
 
-    const latest = episodes.reduce((acc, current) => {
-      return new Date(current.pubDate).getTime() > new Date(acc.pubDate).getTime() ? current : acc;
-    });
+    const highestEpisodeId = episodes.reduce((max, current) => {
+      const currentEpisodeId = Number(current.episodeId);
+      if (!Number.isFinite(currentEpisodeId)) {
+        return max;
+      }
+      return Math.max(max, Math.trunc(currentEpisodeId));
+    }, 0);
 
-    return (latest.episodeId ?? 0) + 1;
+    return highestEpisodeId + 1;
   }
 
   private computeSuggestedNextEpisodeNumber(episodes: Episode[]): number {
@@ -966,12 +1380,33 @@ export class ManageComponent implements OnInit {
       return 1;
     }
 
-    const latest = episodes.reduce((acc, current) => {
-      return new Date(current.pubDate).getTime() > new Date(acc.pubDate).getTime() ? current : acc;
-    });
+    const highestEpisodeNumber = episodes.reduce((max, current) => {
+      const currentEpisodeNumber = Number(this.getEpisodeDisplayNumber(current));
+      if (!Number.isFinite(currentEpisodeNumber)) {
+        return max;
+      }
+      return Math.max(max, Math.trunc(currentEpisodeNumber));
+    }, 0);
 
-    const baseNumber = latest.episodeNumber ?? latest.episodeId ?? 0;
-    return baseNumber + 1;
+    return highestEpisodeNumber + 1;
+  }
+
+  getEpisodeDisplayNumber(episode: Episode): number {
+    return episode.episodeNumber ?? episode.episodeId;
+  }
+
+  private isDuplicateEpisodeNumber(value: number | undefined, currentEpisodeId: number | null): boolean {
+    if (value === undefined || !Number.isInteger(value) || value <= 0) {
+      return false;
+    }
+
+    return this.episodes.some((episode) => {
+      if (currentEpisodeId !== null && episode.episodeId === currentEpisodeId) {
+        return false;
+      }
+
+      return this.getEpisodeDisplayNumber(episode) === value;
+    });
   }
 
   private toDateTimeLocalValue(value: string | Date): string {

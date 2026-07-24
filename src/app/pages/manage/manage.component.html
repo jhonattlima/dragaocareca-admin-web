@@ -32,7 +32,7 @@
         <table class="table table-striped table-sm" *ngIf="filteredEpisodes.length > 0">
           <thead>
             <tr>
-              <th>ID</th>
+              <th>Number</th>
               <th>Title</th>
               <th>PubDate</th>
               <th>Live</th>
@@ -43,7 +43,7 @@
           </thead>
           <tbody>
             <tr *ngFor="let episode of pagedEpisodes">
-              <td>{{ episode.episodeId }}</td>
+              <td>{{ getEpisodeDisplayNumber(episode) }}</td>
               <td>{{ episode.title }}</td>
               <td>{{ episode.pubDate | date:'dd/MM/yyyy HH:mm' }}</td>
               <td>
@@ -101,6 +101,38 @@
       <button class="btn btn-danger" type="button" [disabled]="deletingEpisode" (click)="confirmDeleteEpisode()">
         {{ deletingEpisode ? 'Deleting...' : 'Delete' }}
       </button>
+    </div>
+  </div>
+</div>
+
+<div class="delete-modal-backdrop" *ngIf="duplicateEpisodeIdModalOpen">
+  <div class="delete-modal" role="dialog" aria-modal="true" aria-labelledby="duplicateEpisodeIdTitle">
+    <h3 id="duplicateEpisodeIdTitle">Episode ID already in use</h3>
+    <p>{{ duplicateEpisodeIdModalMessage }}</p>
+    <div class="d-flex justify-content-end">
+      <button class="btn btn-primary" type="button" (click)="closeDuplicateEpisodeIdModal()">OK</button>
+    </div>
+  </div>
+</div>
+
+<div class="delete-modal-backdrop" *ngIf="duplicateEpisodeNumberModalOpen">
+  <div class="delete-modal" role="dialog" aria-modal="true" aria-labelledby="duplicateEpisodeNumberTitle">
+    <h3 id="duplicateEpisodeNumberTitle">Episode number already in use</h3>
+    <p>{{ duplicateEpisodeNumberModalMessage }}</p>
+    <div class="d-flex justify-content-end">
+      <button class="btn btn-primary" type="button" (click)="closeDuplicateEpisodeNumberModal()">OK</button>
+    </div>
+  </div>
+</div>
+
+<div class="delete-modal-backdrop" *ngIf="resetConfirmModalOpen">
+  <div class="delete-modal" role="dialog" aria-modal="true" aria-labelledby="resetConfirmTitle">
+    <h3 id="resetConfirmTitle">Reset form</h3>
+    <p>Reset the current episode form?</p>
+    <p class="section-hint">This will clear the current draft fields and staged media references for the active editor.</p>
+    <div class="d-flex justify-content-end gap-2">
+      <button class="btn btn-outline-secondary" type="button" (click)="cancelResetEditor()">Cancel</button>
+      <button class="btn btn-danger" type="button" (click)="confirmResetEditor()">Reset</button>
     </div>
   </div>
 </div>

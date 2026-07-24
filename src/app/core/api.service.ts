@@ -26,6 +26,12 @@ export interface Episode {
   spotifyId?: string;
   musicCredits?: string[];
   coverCredits?: string[];
+  transcriptFileName?: string;
+  transcriptStatus?: 'idle' | 'pending' | 'processing' | 'done' | 'error';
+  transcriptUpdatedAt?: string;
+  transcriptStartedAt?: string | null;
+  transcriptError?: string;
+  transcriptProgress?: number | null;
 }
 
 export interface EpisodeWriteInput {
@@ -158,6 +164,15 @@ export interface YouTubeMetricsSnapshot {
   debug?: Record<string, unknown>;
 }
 
+export interface EpisodeTranscriptionStatus {
+  status: 'idle' | 'pending' | 'processing' | 'done' | 'error';
+  transcriptFileName: string | null;
+  transcriptUpdatedAt: string | null;
+  transcriptStartedAt: string | null;
+  progress: number | null;
+  transcriptError: string | null;
+}
+
 export interface DeleteEpisodeResponse {
   episodeId: number;
   message: string;
@@ -261,6 +276,10 @@ export class ApiService {
 
   getFeedPreviewXml(): Observable<string> {
     return this.http.get(`${environment.apiBaseUrl}/feed/preview`, { responseType: 'text' });
+  }
+
+  getEpisodeTranscriptionStatus(episodeId: number): Observable<EpisodeTranscriptionStatus> {
+    return this.http.get<EpisodeTranscriptionStatus>(`${environment.apiBaseUrl}/episodes/${episodeId}/transcription`);
   }
 
   getSpotifyMetrics(days = 30): Observable<SpotifyMetricsSnapshot | SpotifyMetricsErrorResponse> {
