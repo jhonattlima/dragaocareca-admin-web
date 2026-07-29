@@ -56,6 +56,7 @@ The frontend expects the backend to expose:
 - `GET /v1/feed`
 - `GET /v1/feed/preview`
 - `GET /v1/episodes/:episodeId/transcription`
+- `GET /v1/episodes/:episodeId/episodes-generated-summary`
 - `POST /v1/episodes/:episodeId/audio`
 - `POST /v1/episodes/:episodeId/trailer`
 - `POST /v1/episodes/:episodeId/cover`

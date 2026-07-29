@@ -57,7 +57,8 @@
 2. Local editor state stages add/edit forms, structured people/link entries, uploads, and pagination.
 3. Save/update uses `POST /v1/episodes` or `PUT /v1/episodes/:episodeId`.
 4. Media upload/delete flows call the matching episode media endpoints and patch local file-name state from the response.
-5. Delete episode uses `DELETE /v1/episodes/:episodeId` and refreshes the list.
+5. After draft transcription reaches `done`, the manage page polls `GET /v1/episodes/:episodeId/episodes-generated-summary` and fills the summary field when generated text is available.
+6. Delete episode uses `DELETE /v1/episodes/:episodeId` and refreshes the list.
 
 **Operational Views:**
 1. `FeedComponent` loads preview XML and feed status in parallel.
@@ -97,6 +98,8 @@
 - Location: `src/app/core/api.service.ts`
 - Triggers: Page load, user action, polling
 - Responsibilities: Issue backend requests and encode the API contract
+
+The transcript-to-summary flow remains backend-owned: the frontend only polls the two status endpoints and presents progress, errors, and generated text.
 
 ## Error Handling
 
