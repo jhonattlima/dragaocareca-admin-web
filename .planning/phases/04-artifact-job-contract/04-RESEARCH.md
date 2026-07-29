@@ -6,7 +6,7 @@
 
 ## User Constraints
 
-No phase-specific `*-CONTEXT.md` exists. The following constraints are locked by the project and milestone documents:
+Phase-specific decisions are locked in `04-CONTEXT.md`; the following constraints are locked by the project, milestone, and phase context documents:
 
 - `[VERIFIED: codebase grep]` Keep ZIP creation and artifact resolution in the backend; Angular remains a thin API orchestrator.
 - `[VERIFIED: codebase grep]` Do not accept arbitrary filesystem paths; resolve artifacts from an episode identity and an allowlisted selector set.
@@ -31,7 +31,7 @@ No phase-specific `*-CONTEXT.md` exists. The following constraints are locked by
 
 `/home/jhonatt/repos/jhonatt_projects/dragaocareca-admin-api` already has the important artifact primitives, but not the Phase 4 asynchronous contract. `[VERIFIED: codebase grep]` `src/services/episode-artifact-download.service.ts` defines the canonical selectors, preflights only final files, and returns available/missing artifacts. `[VERIFIED: codebase grep]` `src/routes/episodes.routes.ts:430-526` currently exposes only `GET /v1/episodes/:episodeId/artifacts/download`, performs ZIP assembly during the request, and returns the ZIP stream directly. Therefore the planner must treat the current route as the implementation baseline to refactor or preserve for compatibility, not as evidence that job start/status endpoints already exist.
 
-The API has an established in-process background pattern that is suitable for a first artifact-job implementation: queue state, process pending records serially, guard overlapping worker runs with an `activeRun` promise, and poll on a configured interval. `[VERIFIED: codebase grep]` This pattern is used by transcription and launch-notification workers. For artifact jobs, persist job metadata and status in SQLite so status survives request boundaries and can be inspected by a separate polling request; use a job-specific temporary ZIP path and deterministic archive entry names. `[ASSUMED]` The exact new route names and SQLite table shape below are recommendations because no async artifact-job symbols currently exist.
+The API has an established in-process background pattern that is suitable for the artifact-job implementation: queue state, process pending records serially, guard overlapping worker runs with an `activeRun` promise, and poll on a configured interval. `[VERIFIED: codebase grep]` This pattern is used by transcription and launch-notification workers. Per `04-CONTEXT.md` D-01 through D-15 and the resolved decisions below, persist job metadata and status in SQLite, use the exact nested job routes, coalesce identical active requests, use job-specific temporary ZIP paths, and retain completed archives for exactly 45 minutes.
 
 **Primary recommendation:** Add an authenticated `POST` job-start route plus authenticated status and download routes under the existing episode resource, reuse the selector/preflight/media-layout services, persist jobs in SQLite, and process them through a serialized worker with explicit cleanup/retention.
 
@@ -127,7 +127,7 @@ Content-Type: application/json
 }
 ```
 
-`[ASSUMED]` Preflight should occur before enqueueing, so invalid selectors fail synchronously with `400`, an unknown episode returns `404`, and a request with zero available artifacts returns `404` or `422` without creating a useless job. A partial request should still create a job and retain `missing` in the immutable snapshot. The planner should select one no-artifacts status code and make the verifier assert it consistently; retaining the current `404` minimizes migration risk.
+Per D-08 through D-10 and the resolved decisions below, preflight occurs before enqueueing, invalid selectors fail synchronously with `400`, an unknown episode returns `404`, and a request with zero available artifacts returns `404` without creating a job. A partial request still creates a job and retains `missing` in the immutable snapshot.
 
 ### 2. Poll status
 
@@ -423,40 +423,23 @@ const runOnce = async (): Promise<void> => {
 
 | # | Claim | Section | Risk if Wrong |
 |---|-------|---------|---------------|
-| A1 | New routes should be nested as `POST /episodes/{episodeId}/artifacts/jobs`, status under the same resource, and download under `/download`. | Recommended Async Contract | Cross-repo route disagreement would block frontend integration. |
-| A2 | SQLite `artifact_jobs` persistence is preferable to an in-memory map. | Architecture Patterns | Requires schema/migration work; a different durable store would change the plan. |
-| A3 | A serialized worker with one active run is sufficient for the first release. | Architecture Patterns | Large concurrent downloads could require a bounded worker pool. |
-| A4 | Preflight snapshots `available` and `missing` at job creation. | Recommended Async Contract | Files changing during processing could produce different partial semantics. |
-| A5 | No-available-artifact requests retain the current `404` behavior. | Recommended Async Contract | Product/API convention may prefer `422`. |
-| A6 | Completed ZIPs should expire after a short TTL and failed files should be removed immediately. | Common Pitfalls | Retention period affects operations, storage, and user retry behavior. |
-| A7 | The missing DC 334 media fixture must be supplied or generated outside the checked-in API data currently inspected. | Environment Availability | Release validation cannot prove full artifact contents without it. |
+| A1 | Exact nested job routes and public snapshot are locked by D-01 through D-04. | Resolved Open Questions | Phase 5 consumes these paths and fields. |
+| A2 | SQLite `artifact_jobs` persistence is locked by D-12. | Architecture Patterns / D-12 | Status must survive separate requests and basic restarts. |
+| A3 | Existing serialized worker and active-run guard are retained as the implementation pattern. | Architecture Patterns / D-14 | Identical active requests coalesce; unrelated jobs follow existing worker constraints. |
+| A4 | Preflight snapshots `available` and `missing` at job creation per D-08 and D-09. | Recommended Async Contract | Partial-download semantics are immutable and testable. |
+| A5 | No-available-artifact requests return `404` before job creation per D-10 and resolved planning clarification. | Resolved Open Questions | The verifier asserts one consistent policy. |
+| A6 | Completed ZIPs expire after exactly 45 minutes and failed files are removed immediately per D-15 and resolved planning clarification. | Common Pitfalls / Resolved Open Questions | Cleanup is bounded and testable. |
+| A7 | DC 334 fixture provisioning is an explicit Phase 6/manual prerequisite. | Resolved Open Questions | Phase 4 uses isolated verifier fixtures; Phase 6 performs real-content validation. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Which exact async route names and job response schema should the API and frontend lock?**
-   - What we know: Existing route namespace is `/v1/episodes/:episodeId/artifacts/download`; no job routes exist.
-   - What's unclear: Nested job resource naming, `202` response fields, and whether to retain the synchronous route.
-   - Recommendation: Decide this before Phase 5 and update API OpenAPI plus a shared frontend contract table in the plan.
+The planning discussion resolved the previously open contract questions. These decisions are authoritative for Phase 4 and are sourced from `04-CONTEXT.md` plus the checker-directed clarification on 2026-07-29:
 
-2. **What is the concurrency policy?**
-   - What we know: Existing workers serialize processing and prevent overlapping runs with `activeRun`.
-   - What's unclear: Whether multiple jobs may queue for one or many episodes, and whether duplicate selector sets are deduplicated.
-   - Recommendation: Allow independent persisted jobs but process with a bounded/serialized worker for v1.1; add a clear duplicate policy and test it.
-
-3. **What retention period and restart recovery are required?**
-   - What we know: No artifact-job retention/configuration exists today.
-   - What's unclear: TTL, cleanup interval, and whether `processing` jobs are reset to `pending` after restart.
-   - Recommendation: Lock TTL and recovery transitions in the API plan; do not expose a download URL that can outlive its stored file.
-
-4. **Where is the DC 334 Season 3 episode folder?**
-   - What we know: `[VERIFIED: codebase grep]` `data/all_episodes.json` contains episode ID 334 metadata; no `data/media/.../334` directory or supplied artifact folder was found in the sibling API checkout.
-   - What's unclear: Whether the fixture is external, ignored, mounted in deployment, or expected to be created during Phase 6.
-   - Recommendation: Make fixture provisioning an explicit prerequisite for VAL-04/Phase 6, not an implicit test assumption.
-
-5. **Should status expose a download URL or should the frontend construct the endpoint?**
-   - What we know: Existing frontend builds endpoint URLs directly in `ApiService`; existing API uses deterministic paths.
-   - What's unclear: Whether job URLs should be absolute, relative, or omitted.
-   - Recommendation: Return a relative `downloadUrl` only after completion, while keeping frontend URL construction typed and backend-controlled.
+1. **Async endpoints and response shape — resolved by D-01 through D-04.** Use `POST /v1/episodes/:episodeId/artifacts/jobs` to create, `GET /v1/episodes/:episodeId/artifacts/jobs/:jobId` to poll, and `GET /v1/episodes/:episodeId/artifacts/jobs/:jobId/download` for the authenticated completed ZIP. Return the opaque job ID and the public snapshot fields defined by D-04; no legacy synchronous route is a second job-creation path.
+2. **Duplicate active requests — resolved by D-14 and the 2026-07-29 planning clarification.** Identical active requests for the same episode and normalized selector set coalesce to one active job; unrelated requests may remain queued under the serialized worker pattern.
+3. **Retention and no-artifact behavior — resolved by D-10, D-15, and the 2026-07-29 planning clarification.** Retain completed archives for exactly 45 minutes, clean expired artifacts, and reject a request whose selected artifacts are all unavailable with `404` before creating a job.
+4. **DC 334 fixture provisioning — resolved by the 2026-07-29 planning clarification.** Provisioning the Season 3 fixture is an explicit Phase 6/manual prerequisite, not an implicit Phase 4 verifier dependency; Phase 4 verifies the contract with isolated fixtures and records the prerequisite for later release validation.
+5. **Status download URL — resolved by D-04 and the route contract above.** Include a relative `downloadUrl` only for completed jobs; pending, processing, and failed snapshots use `null`, while the frontend remains responsible for authenticated request orchestration.
 
 ## Environment Availability
 
@@ -560,7 +543,7 @@ const runOnce = async (): Promise<void> => {
 
 ### Tertiary (LOW confidence)
 
-- `[ASSUMED]` Async route names, SQLite job table, retention period, concurrency policy, and exact status/download error codes; these require cross-repository agreement before implementation.
+- No unresolved tertiary contract questions remain; implementation follows the locked `04-CONTEXT.md` decisions and the resolved Open Questions section above.
 
 ## Metadata
 

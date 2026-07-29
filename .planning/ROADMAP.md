@@ -22,7 +22,12 @@
   2. The job exposes pending, processing, completed, and failed states with percentage progress that the client can consume.
   3. After completion, an authenticated request returns the ZIP with a safe filename and identifies requested artifacts omitted because they were unavailable.
   4. API verification demonstrates job creation, progress transitions, completion, failure, missing artifacts, and invalid selector/path rejection.
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — Establish SQLite-backed artifact-job lifecycle and deterministic failure seam
+- [ ] 04-02-PLAN.md — Expose authenticated start, status, and completed-download REST contract
+- [ ] 04-03-PLAN.md — Verify lifecycle, security, cleanup, partial results, expiry, and OpenAPI parity
 
 ### Phase 5: Episode Download Modal
 **Goal**: Operators can open an episode’s artifact picker, choose the files they need, and start one asynchronous download without disrupting episode management.
