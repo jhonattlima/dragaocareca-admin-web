@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Episode Artifact Downloads
-current_phase: 4
-current_phase_name: v1.1 phase 1 of 3
-status: planning
-stopped_at: Phase 4 context gathered
-last_updated: "2026-07-29T16:37:19.855Z"
-last_activity: 2026-07-28
-last_activity_desc: v1.1 roadmap created with phases 4-6
+current_phase: 04
+current_phase_name: artifact-job-contract
+status: executing
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-07-29T20:11:40.508Z"
+last_activity: 2026-07-29
+last_activity_desc: Phase 04 execution started
 progress:
   total_phases: 1
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 3
+  completed_plans: 1
 ---
 
 # Project State
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-29)
 
 **Core value:** Keep the admin workflow reliable, legible, and backend-driven so operators can manage episodes and inspect system state without fighting the UI.
-**Current focus:** Phase 4 — Artifact Job Contract
+**Current focus:** Phase 04 — artifact-job-contract
 
 ## Current Position
 
-Phase: 4 (v1.1 phase 1 of 3) — Artifact Job Contract
-Plan: —
-Status: Ready to plan
-Last activity: 2026-07-28 — v1.1 roadmap created with phases 4-6
+Phase: 04 (artifact-job-contract) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-07-29 — Phase 04 execution started
 
 ## Performance Metrics
 
@@ -52,6 +52,11 @@ Last activity: 2026-07-28 — v1.1 roadmap created with phases 4-6
 - Trend: complete
 
 *Updated after each plan completion*
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 04 P01 | 24min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -66,6 +71,8 @@ Recent decisions affecting current work:
 - Keep ZIP creation and artifact resolution in the backend; Angular remains a thin orchestrator.
 - Use an asynchronous job/progress contract for ZIP generation and native browser Blob download behavior.
 - Preserve the sectioned legacy-inspired manage layout and `authBypass` behavior.
+- [Phase ?]: Phase 04-01: Persist artifact jobs in SQLite with pending/processing/completed/failed states and bounded stage-weighted progress.
+- [Phase ?]: Phase 04-01: Keep artifact selector/path resolution backend-owned and use verifier-only stage/failure controls for deterministic cleanup proof.
 
 ### Pending Todos
 
@@ -84,6 +91,6 @@ None for v1.0. MNT-01 and MNT-02 carry forward to the next milestone.
 
 ## Session Continuity
 
-Last session: 2026-07-29T16:37:19.844Z
-Stopped at: Phase 4 context gathered
-Resume file: .planning/phases/04-artifact-job-contract/04-CONTEXT.md
+Last session: 2026-07-29T20:11:40.502Z
+Stopped at: Completed 04-01-PLAN.md
+Resume file: None

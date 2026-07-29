@@ -10,7 +10,7 @@ Requirements for milestone v1.1 Episode Artifact Downloads.
 ### Artifact Download API
 
 - [ ] **API-01**: The user can start a ZIP-generation job for one episode using selected artifact keys.
-- [ ] **API-02**: The API reports ZIP-generation progress as a percentage with pending, processing, completed, and failed states.
+- [x] **API-02**: The API reports ZIP-generation progress as a percentage with pending, processing, completed, and failed states.
 - [ ] **API-03**: The user receives the completed ZIP through an authenticated download response after generation finishes.
 - [ ] **API-04**: The completed response provides a safe download filename and reports requested artifacts that were unavailable.
 - [ ] **API-05**: The API validates artifact selections and does not accept arbitrary filesystem paths.
@@ -59,7 +59,7 @@ Mapped to the v1.1 roadmap phases.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | API-01 | Phase 4 | Pending |
-| API-02 | Phase 4 | Pending |
+| API-02 | Phase 4 | Complete |
 | API-03 | Phase 4 | Pending |
 | API-04 | Phase 4 | Pending |
 | API-05 | Phase 4 | Pending |
@@ -77,6 +77,7 @@ Mapped to the v1.1 roadmap phases.
 | VAL-04 | Phase 4 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 17 total
 - Mapped to phases: 17
 - Unmapped: 0 ✓
