@@ -1,36 +1,39 @@
 ---
-gsd_state_version: '1.0'
-status: planning
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: Transcript Summary Integration
+status: complete
+last_updated: "2026-07-29T00:50:00.000Z"
+last_activity: 2026-07-29
 progress:
-  total_phases: 4
-  completed_phases: 0
-  total_plans: 9
-  completed_plans: 0
-  percent: 0
+  total_phases: 3
+  completed_phases: 3
+  total_plans: 6
+  completed_plans: 6
+  percent: 100
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-07-24)
+See: .planning/PROJECT.md (updated 2026-07-29)
 
 **Core value:** Keep the admin workflow reliable, legible, and backend-driven so operators can manage episodes and inspect system state without fighting the UI.
-**Current focus:** Phase 1: Shell and Auth Baseline
+**Current focus:** Milestone complete — ready for archive/next milestone setup
 
 ## Current Position
 
-Phase: 1 of 4 (Shell and Auth Baseline)
-Plan: 0 of 2 in current phase
-Status: Ready to plan
-Last activity: 2026-07-24 — Initialized PROJECT.md, REQUIREMENTS.md, ROADMAP.md, and STATE.md from the existing codebase map
-
-Progress: [░░░░░░░░░░] 0%
+Phase: Complete
+Plan: —
+Status: Complete
+Last activity: 2026-07-29 — v1.0 verified and archived
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 0
+
+- Total plans completed: 6
 - Average duration: n/a
 - Total execution time: 0.0 hours
 
@@ -41,8 +44,9 @@ Progress: [░░░░░░░░░░] 0%
 | - | - | - | - |
 
 **Recent Trend:**
-- Last 5 plans: none yet
-- Trend: n/a
+
+- Last 5 plans: phase 1, phase 2, phase 3 complete
+- Trend: complete
 
 *Updated after each plan completion*
 
@@ -56,24 +60,27 @@ Recent decisions affecting current work:
 - Keep business logic on the backend.
 - Preserve the sectioned admin layout.
 - Honor `authBypass` in local development.
+- Center the milestone on transcript-driven summary generation.
+- Verified the live transcript-to-summary flow and closed v1.0.
 
 ### Pending Todos
 
-None yet.
+None for v1.0. MNT-01 and MNT-02 carry forward to the next milestone.
 
 ### Blockers/Concerns
 
 - `.git` operations are read-only in this session, so workflow commits could not be created here.
 - The Angular build currently reports budget warnings that should be tracked in maintenance work.
+- The API repository has no automated test script for the transcript-to-summary transition.
 
 ## Deferred Items
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| *(none)* | | | |
+| maintenance | API transition test and Angular budget warnings | deferred to next milestone | 2026-07-29 |
 
 ## Session Continuity
 
 Last session: 2026-07-24
-Stopped at: Project initialization completed from the existing brownfield admin app context
+Stopped at: Milestone v1.0 transcript summary integration started
 Resume file: None

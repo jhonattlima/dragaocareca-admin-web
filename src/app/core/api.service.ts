@@ -32,6 +32,11 @@ export interface Episode {
   transcriptStartedAt?: string | null;
   transcriptError?: string;
   transcriptProgress?: number | null;
+  summaryStatus?: 'idle' | 'pending' | 'processing' | 'done' | 'error';
+  summaryUpdatedAt?: string | null;
+  summaryStartedAt?: string | null;
+  summaryError?: string | null;
+  summaryProgress?: number | null;
 }
 
 export interface EpisodeWriteInput {
@@ -173,6 +178,18 @@ export interface EpisodeTranscriptionStatus {
   transcriptError: string | null;
 }
 
+export interface EpisodeGeneratedSummaryStatus {
+  status: 'idle' | 'pending' | 'processing' | 'done' | 'error';
+  summaryFileName: string | null;
+  summaryUpdatedAt: string | null;
+  summaryStartedAt: string | null;
+  progress: number | null;
+  error: string | null;
+  version: number | null;
+  promptVersion: string | null;
+  summaryText?: string | null;
+}
+
 export interface DeleteEpisodeResponse {
   episodeId: number;
   message: string;
@@ -280,6 +297,10 @@ export class ApiService {
 
   getEpisodeTranscriptionStatus(episodeId: number): Observable<EpisodeTranscriptionStatus> {
     return this.http.get<EpisodeTranscriptionStatus>(`${environment.apiBaseUrl}/episodes/${episodeId}/transcription`);
+  }
+
+  getEpisodeGeneratedSummaryStatus(episodeId: number): Observable<EpisodeGeneratedSummaryStatus> {
+    return this.http.get<EpisodeGeneratedSummaryStatus>(`${environment.apiBaseUrl}/episodes/${episodeId}/episodes-generated-summary`);
   }
 
   getSpotifyMetrics(days = 30): Observable<SpotifyMetricsSnapshot | SpotifyMetricsErrorResponse> {

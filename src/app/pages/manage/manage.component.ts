@@ -57,6 +57,12 @@ interface EpisodeFormState extends Omit<EpisodeWriteInput, 'guests' | 'musicCred
   transcriptStartedAt?: string | null;
   transcriptError?: string;
   transcriptProgress?: number | null;
+  summaryStatus?: 'idle' | 'pending' | 'processing' | 'done' | 'error';
+  summaryUpdatedAt?: string | null;
+  summaryStartedAt?: string | null;
+  summaryError?: string | null;
+  summaryProgress?: number | null;
+  summaryManuallyEdited?: boolean;
 }
 
 export interface EpisodeEditorState {
@@ -116,6 +122,8 @@ export class ManageComponent implements OnInit, OnDestroy {
   private episodeNumberValidationTimer: number | null = null;
   private transcriptionStatusPollTimer: number | null = null;
   private transcriptionStatusPollEpisodeId: number | null = null;
+  private summaryStatusPollTimer: number | null = null;
+  private summaryStatusPollEpisodeId: number | null = null;
   private transcriptionClockTimer: number | null = null;
   transcriptionClockTick = Date.now();
   private readonly structuredEntrySuggestionCache: Record<'guests' | 'musicCredits', StructuredEntrySuggestion[]> = {
@@ -260,7 +268,7 @@ export class ManageComponent implements OnInit, OnDestroy {
       this.episodeNumberValidationTimer = null;
     }
 
-    this.clearTranscriptionStatusPolling();
+    this.clearEpisodeGenerationPolling();
   }
 
   startEdit(episode: Episode): void {
@@ -295,6 +303,12 @@ export class ManageComponent implements OnInit, OnDestroy {
       transcriptStartedAt: episode.transcriptStartedAt,
       transcriptError: episode.transcriptError,
       transcriptProgress: episode.transcriptProgress ?? (episode.transcriptStatus === 'done' ? 100 : null),
+      summaryStatus: episode.summaryStatus ?? 'idle',
+      summaryUpdatedAt: episode.summaryUpdatedAt ?? '',
+      summaryStartedAt: episode.summaryStartedAt ?? null,
+      summaryError: episode.summaryError ?? '',
+      summaryProgress: episode.summaryProgress ?? null,
+      summaryManuallyEdited: false,
     };
     editor.selectedMembers = [...(episode.authors ?? [])];
     editor.formModel.episodeNumber = episode.episodeNumber ?? episode.episodeId;
@@ -654,6 +668,97 @@ export class ManageComponent implements OnInit, OnDestroy {
     }
   }
 
+  getSummaryStatus(editor: EpisodeEditorState): string {
+    const status = editor.formModel.summaryStatus;
+    if (!status || status === 'idle') {
+      return editor.formModel.transcriptStatus === 'done'
+        ? `Generating the episode summary... ${this.getSummaryProgress(editor)}%`
+        : '';
+    }
+
+    switch (status) {
+      case 'pending':
+        return 'Summary generation queued in the background.';
+      case 'processing':
+        return `Generating the episode summary... ${this.getSummaryProgress(editor)}%`;
+      case 'done':
+        return 'Summary saved and ready.';
+      case 'error':
+        return editor.formModel.summaryError
+          ? `Summary generation failed: ${editor.formModel.summaryError}`
+          : 'Summary generation failed.';
+      default:
+        return '';
+    }
+  }
+
+  getSummaryProgress(editor: EpisodeEditorState): number {
+    const status = editor.formModel.summaryStatus;
+    if (!status || status === 'idle' || status === 'error') {
+      return 0;
+    }
+
+    const progress = editor.formModel.summaryProgress;
+    if (typeof progress === 'number' && Number.isFinite(progress)) {
+      return Math.max(0, Math.min(100, Math.round(progress)));
+    }
+
+    return status === 'done' ? 100 : 0;
+  }
+
+  onSummaryChange(editor: EpisodeEditorState): void {
+    editor.formModel.summaryManuallyEdited = true;
+  }
+
+  hasSummaryProgress(editor: EpisodeEditorState): boolean {
+    const status = editor.formModel.summaryStatus;
+    return status === 'pending' || status === 'processing';
+  }
+
+  isSummaryGenerationStage(editor: EpisodeEditorState): boolean {
+    return editor.formModel.transcriptStatus === 'done' && !editor.formModel.summaryStatus;
+  }
+
+  hasGenerationProgress(editor: EpisodeEditorState): boolean {
+    return this.hasTranscriptionProgress(editor)
+      || this.isSummaryGenerationStage(editor)
+      || this.hasSummaryProgress(editor)
+      || editor.formModel.summaryStatus === 'done';
+  }
+
+  getGenerationProgress(editor: EpisodeEditorState): number {
+    if (this.hasTranscriptionProgress(editor)) {
+      return this.getTranscriptionProgress(editor);
+    }
+
+    if (this.isSummaryGenerationStage(editor) || this.hasSummaryProgress(editor)) {
+      return this.getSummaryProgress(editor);
+    }
+
+    if (editor.formModel.summaryStatus === 'done') {
+      return 100;
+    }
+
+    return this.getTranscriptionProgress(editor);
+  }
+
+  getGenerationStatus(editor: EpisodeEditorState): string {
+    if (this.hasTranscriptionProgress(editor)) {
+      return this.getTranscriptionStatus(editor);
+    }
+
+    if (
+      this.isSummaryGenerationStage(editor)
+      || this.hasSummaryProgress(editor)
+      || editor.formModel.summaryStatus === 'done'
+      || editor.formModel.summaryStatus === 'error'
+    ) {
+      return this.getSummaryStatus(editor);
+    }
+
+    return this.getTranscriptionStatus(editor);
+  }
+
   getTranscriptionProgress(editor: EpisodeEditorState): number {
     const status = editor.formModel.transcriptStatus;
     if (!status || status === 'idle' || status === 'error') {
@@ -868,7 +973,7 @@ export class ManageComponent implements OnInit, OnDestroy {
 
   resetEditor(editor: EpisodeEditorState): void {
     if (editor === this.addEditorState) {
-      this.clearTranscriptionStatusPolling();
+      this.clearEpisodeGenerationPolling();
     }
     editor.formModel = this.buildEmptyFormModel();
     editor.selectedMembers = [];
@@ -929,6 +1034,12 @@ export class ManageComponent implements OnInit, OnDestroy {
       transcriptStartedAt: null,
       transcriptError: '',
       transcriptProgress: null,
+      summaryStatus: 'idle',
+      summaryUpdatedAt: '',
+      summaryStartedAt: null,
+      summaryError: '',
+      summaryProgress: null,
+      summaryManuallyEdited: false,
     };
   }
 
@@ -1101,8 +1212,8 @@ export class ManageComponent implements OnInit, OnDestroy {
     const refresh = (): void => {
       this.apiService.getEpisodeTranscriptionStatus(episodeId).subscribe({
         next: (status) => {
-          if (editor !== this.addEditorState || this.addEditorState.formModel.episodeId !== episodeId) {
-            this.clearTranscriptionStatusPolling();
+          if (editor.formModel.episodeId !== episodeId) {
+            this.clearEpisodeGenerationPolling();
             return;
           }
 
@@ -1112,24 +1223,28 @@ export class ManageComponent implements OnInit, OnDestroy {
           editor.formModel.transcriptError = status.transcriptError ?? '';
           editor.formModel.transcriptProgress = status.progress ?? (status.status === 'done' ? 100 : null);
 
-          if (status.status === 'done') {
-            editor.formModel.transcriptFileName = status.transcriptFileName ?? editor.formModel.transcriptFileName;
-            this.clearTranscriptionStatusPolling();
+          if (status.status === 'error') {
+            this.clearEpisodeGenerationPolling();
             return;
           }
 
-          if (status.status === 'error') {
+          if (status.status === 'done') {
+            editor.formModel.transcriptFileName = status.transcriptFileName ?? editor.formModel.transcriptFileName;
             this.clearTranscriptionStatusPolling();
+            this.syncSummaryStatusPolling(episodeId, editor);
+            return;
           }
         },
-        error: () => {
+        error: (error) => {
+          editor.formModel.transcriptStatus = 'error';
+          editor.formModel.transcriptError = error?.error?.message ?? error?.message ?? 'Could not check transcription status.';
           this.clearTranscriptionStatusPolling();
         },
       });
     };
 
-    refresh();
     this.transcriptionStatusPollTimer = window.setInterval(refresh, 2000);
+    refresh();
   }
 
   private clearTranscriptionStatusPolling(): void {
@@ -1138,6 +1253,61 @@ export class ManageComponent implements OnInit, OnDestroy {
       this.transcriptionStatusPollTimer = null;
     }
     this.transcriptionStatusPollEpisodeId = null;
+  }
+
+  private syncSummaryStatusPolling(episodeId: number, editor: EpisodeEditorState): void {
+    if (this.summaryStatusPollEpisodeId === episodeId && this.summaryStatusPollTimer !== null) {
+      return;
+    }
+
+    this.clearSummaryStatusPolling();
+    this.summaryStatusPollEpisodeId = episodeId;
+
+    const refresh = (): void => {
+      this.apiService.getEpisodeGeneratedSummaryStatus(episodeId).subscribe({
+        next: (status) => {
+          if (editor.formModel.episodeId !== episodeId) {
+            this.clearEpisodeGenerationPolling();
+            return;
+          }
+
+          editor.formModel.summaryStatus = status.status;
+          editor.formModel.summaryUpdatedAt = status.summaryUpdatedAt ?? editor.formModel.summaryUpdatedAt ?? '';
+          editor.formModel.summaryStartedAt = status.summaryStartedAt ?? editor.formModel.summaryStartedAt ?? null;
+          editor.formModel.summaryError = status.error ?? '';
+          editor.formModel.summaryProgress = status.progress ?? (status.status === 'done' ? 100 : null);
+
+          if (typeof status.summaryText === 'string' && status.summaryText.trim().length > 0 && !editor.formModel.summaryManuallyEdited) {
+            editor.formModel.summary = status.summaryText.trim();
+          }
+
+          if (status.status === 'done' || status.status === 'error') {
+            this.clearSummaryStatusPolling();
+          }
+        },
+        error: (error) => {
+          editor.formModel.summaryStatus = 'error';
+          editor.formModel.summaryError = error?.error?.message ?? error?.message ?? 'Could not check summary generation status.';
+          this.clearSummaryStatusPolling();
+        },
+      });
+    };
+
+    this.summaryStatusPollTimer = window.setInterval(refresh, 2000);
+    refresh();
+  }
+
+  private clearSummaryStatusPolling(): void {
+    if (this.summaryStatusPollTimer !== null) {
+      clearInterval(this.summaryStatusPollTimer);
+      this.summaryStatusPollTimer = null;
+    }
+    this.summaryStatusPollEpisodeId = null;
+  }
+
+  private clearEpisodeGenerationPolling(): void {
+    this.clearTranscriptionStatusPolling();
+    this.clearSummaryStatusPolling();
   }
 
   uploadMedia(editor: EpisodeEditorState, kind: UploadKind, file: File): void {
@@ -1167,6 +1337,13 @@ export class ManageComponent implements OnInit, OnDestroy {
       editor.formModel.transcriptStartedAt = null;
       editor.formModel.transcriptError = '';
       editor.formModel.transcriptProgress = 0;
+      // A new transcript starts a new suggestion cycle; do not keep stale summary state.
+      editor.formModel.summaryStatus = 'pending';
+      editor.formModel.summaryUpdatedAt = '';
+      editor.formModel.summaryStartedAt = null;
+      editor.formModel.summaryError = '';
+      editor.formModel.summaryProgress = 0;
+      editor.formModel.summaryManuallyEdited = false;
       this.successMessage = 'Audio upload started. Transcription will start as soon as the file is staged.';
     }
 
@@ -1208,10 +1385,10 @@ export class ManageComponent implements OnInit, OnDestroy {
             } else if (episode.transcriptStatus === 'done') {
               editor.formModel.transcriptProgress = 100;
             }
-            if (kind === 'audio' && editor === this.addEditorState) {
+            if (kind === 'audio') {
               this.syncTranscriptionStatusPolling(episodeId, editor);
-              if (episode.transcriptStatus && ['done', 'error'].includes(episode.transcriptStatus)) {
-                this.clearTranscriptionStatusPolling();
+              if (episode.transcriptStatus === 'error') {
+                this.clearEpisodeGenerationPolling();
               }
             }
             this.successMessage = `${definition.label} staged.`;

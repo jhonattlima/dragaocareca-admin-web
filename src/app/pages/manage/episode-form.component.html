@@ -45,18 +45,18 @@
               {{ controller.getUploadProgress(upload.kind) }}%
             </div>
           </div>
-          <div class="alert alert-info py-1 px-2 mt-2 mb-0 small" *ngIf="upload.kind === 'audio' && controller.getTranscriptionStatus(editor)">
-            {{ controller.getTranscriptionStatus(editor) }}
+          <div class="alert alert-info py-1 px-2 mt-2 mb-0 small" *ngIf="upload.kind === 'audio' && controller.getGenerationStatus(editor)">
+            {{ controller.getGenerationStatus(editor) }}
           </div>
-          <div class="progress upload-progress mt-2" *ngIf="upload.kind === 'audio' && controller.hasTranscriptionProgress(editor)">
+          <div class="progress upload-progress mt-2" *ngIf="upload.kind === 'audio' && controller.hasGenerationProgress(editor)">
             <div
               class="progress-bar"
               role="progressbar"
-              [style.width.%]="controller.getTranscriptionProgress(editor)"
-              [attr.aria-valuenow]="controller.getTranscriptionProgress(editor)"
+              [style.width.%]="controller.getGenerationProgress(editor)"
+              [attr.aria-valuenow]="controller.getGenerationProgress(editor)"
               aria-valuemin="0"
               aria-valuemax="100">
-              {{ controller.getTranscriptionProgress(editor) }}%
+              {{ controller.getGenerationProgress(editor) }}%
             </div>
           </div>
           <input
@@ -116,7 +116,12 @@
 
     <div class="form-group mb-3">
       <label>Summary</label>
-      <textarea class="form-control" rows="5" [(ngModel)]="editor.formModel.summary" placeholder="Episode summary / description"></textarea>
+      <textarea
+        class="form-control"
+        rows="5"
+        [(ngModel)]="editor.formModel.summary"
+        (ngModelChange)="controller.onSummaryChange(editor)"
+        placeholder="Episode summary / description"></textarea>
     </div>
 
     <div class="row">
