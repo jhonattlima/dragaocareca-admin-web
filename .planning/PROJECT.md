@@ -10,16 +10,21 @@ The frontend should stay thin: it orchestrates API calls and presents state, whi
 
 Keep the admin workflow reliable, legible, and backend-driven so operators can manage episodes and inspect system state without fighting the UI.
 
+## Current Milestone: v1.1 Episode Artifact Downloads
+
+**Goal:** Let operators select available episode artifacts and download them together as a backend-generated ZIP from the episodes list.
+
+**Target features:**
+- add an artifact-download action to each episode row
+- open a modal with episode file, trailer, cover art, low cover art (`.webp`), and transcript options selected by default when available
+- request the selected artifacts from the API and download the returned ZIP with clear loading, partial-file, empty-selection, and error states
+- configure and validate the DC 334 Season 3 mock episode in the API
+
 ## Current State
 
 **Shipped:** v1.0 Transcript Summary Integration (2026-07-29)
 
 The admin workflow now tracks backend transcript and AI-summary generation in sequence, reuses the existing progress bar, auto-fills generated summaries, preserves operator edits, and surfaces polling failures without blocking episode editing.
-
-## Next Milestone Goals
-
-- Update stale or misleading tests to match the current app shell and workflow structure.
-- Reduce manage-screen coupling so episode editing, uploads, and progress display are easier to change safely.
 
 ## Archived v1.0 Scope
 
@@ -65,7 +70,7 @@ The app is an Angular 15 frontend with template-driven forms, a shared `ApiServi
 - **Backend contract**: Keep the frontend thin and API-driven — business logic belongs in the backend API.
 - **Auth mode**: Respect `environment.authBypass` in both login and route protection — local development depends on it.
 - **Layout**: Preserve the sectioned, legacy-inspired admin layout — do not regress to a bare scaffold.
-- **Milestone scope**: Summary generation is the next tracked milestone — keep the work centered on the new-episode transcript-to-summary flow.
+- **Milestone scope**: Artifact downloads are the next tracked milestone — keep the work centered on selecting and downloading episode files from the list.
 - **Verification**: `npm run build` must stay green before changes are considered done.
 
 ## Key Decisions
@@ -77,6 +82,8 @@ The app is an Angular 15 frontend with template-driven forms, a shared `ApiServi
 | Preserve the sectioned admin layout | The current UI is intentionally legacy-inspired and operational, not minimal | ✓ Good |
 | Honor `authBypass` in local development | The repo already relies on that toggle for local operator flow | ✓ Good |
 | Center the next milestone on transcript-driven summary generation | The backend feature is already available there and the current UI has the necessary progress/summary surface | ✓ Good |
+| Keep ZIP creation backend-owned | The API already provides the artifact-download contract; the Angular client should only select artifacts and save the response | ✓ Good |
+| Reuse native browser download behavior | The existing stack does not need a ZIP or file-saving dependency for one authenticated Blob response | ✓ Good |
 
 ## Evolution
 
@@ -96,4 +103,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-29 after v1.0 milestone*
+*Last updated: 2026-07-29 after v1.1 milestone setup*
