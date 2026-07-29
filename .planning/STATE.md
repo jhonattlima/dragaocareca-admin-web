@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-07-29T01:32:56.619Z"
 last_activity: 2026-07-28
 progress:
-  total_phases: 0
+  total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-29)
 
 **Core value:** Keep the admin workflow reliable, legible, and backend-driven so operators can manage episodes and inspect system state without fighting the UI.
-**Current focus:** Milestone complete — ready for archive/next milestone setup
+**Current focus:** Phase 4 — Artifact Job Contract
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 4 (v1.1 phase 1 of 3) — Artifact Job Contract
 Plan: —
-Status: Defining requirements
-Last activity: 2026-07-28 — Milestone v1.1 started
+Status: Ready to plan
+Last activity: 2026-07-28 — v1.1 roadmap created with phases 4-6
 
 ## Performance Metrics
 
@@ -60,8 +60,9 @@ Recent decisions affecting current work:
 - Keep business logic on the backend.
 - Preserve the sectioned admin layout.
 - Honor `authBypass` in local development.
-- Center the milestone on transcript-driven summary generation.
-- Verified the live transcript-to-summary flow and closed v1.0.
+- Keep ZIP creation and artifact resolution in the backend; Angular remains a thin orchestrator.
+- Use an asynchronous job/progress contract for ZIP generation and native browser Blob download behavior.
+- Preserve the sectioned legacy-inspired manage layout and `authBypass` behavior.
 
 ### Pending Todos
 
@@ -69,18 +70,17 @@ None for v1.0. MNT-01 and MNT-02 carry forward to the next milestone.
 
 ### Blockers/Concerns
 
-- `.git` operations are read-only in this session, so workflow commits could not be created here.
-- The Angular build currently reports budget warnings that should be tracked in maintenance work.
-- The API repository has no automated test script for the transcript-to-summary transition.
+- Phase 4 depends on coordinating the job/progress contract with the sibling `dragaocare-api` repository.
+- Confirm transcript readiness semantics, CORS exposure for download headers, and the canonical DC 334 fixture location during planning.
 
 ## Deferred Items
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| maintenance | API transition test and Angular budget warnings | deferred to next milestone | 2026-07-29 |
+| maintenance | API transition test and Angular budget warnings | deferred to v1.1 validation | 2026-07-29 |
 
 ## Session Continuity
 
-Last session: 2026-07-24
-Stopped at: Milestone v1.0 transcript summary integration started
+Last session: 2026-07-28
+Stopped at: v1.1 roadmap created; Phase 4 is ready to plan
 Resume file: None

@@ -54,32 +54,32 @@ Deferred to a future release.
 
 ## Traceability
 
-Populated when the v1.1 roadmap is approved.
+Mapped to the v1.1 roadmap phases.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| API-01 | Pending | Pending |
-| API-02 | Pending | Pending |
-| API-03 | Pending | Pending |
-| API-04 | Pending | Pending |
-| API-05 | Pending | Pending |
-| UI-01 | Pending | Pending |
-| UI-02 | Pending | Pending |
-| UI-03 | Pending | Pending |
-| UI-04 | Pending | Pending |
-| UI-05 | Pending | Pending |
-| UI-06 | Pending | Pending |
-| UI-07 | Pending | Pending |
-| UI-08 | Pending | Pending |
-| VAL-01 | Pending | Pending |
-| VAL-02 | Pending | Pending |
-| VAL-03 | Pending | Pending |
-| VAL-04 | Pending | Pending |
+| API-01 | Phase 4 | Pending |
+| API-02 | Phase 4 | Pending |
+| API-03 | Phase 4 | Pending |
+| API-04 | Phase 4 | Pending |
+| API-05 | Phase 4 | Pending |
+| UI-01 | Phase 5 | Pending |
+| UI-02 | Phase 5 | Pending |
+| UI-03 | Phase 5 | Pending |
+| UI-04 | Phase 5 | Pending |
+| UI-05 | Phase 5 | Pending |
+| UI-06 | Phase 5 | Pending |
+| UI-07 | Phase 6 | Pending |
+| UI-08 | Phase 6 | Pending |
+| VAL-01 | Phase 6 | Pending |
+| VAL-02 | Phase 6 | Pending |
+| VAL-03 | Phase 6 | Pending |
+| VAL-04 | Phase 4 | Pending |
 
 **Coverage:**
 - v1 requirements: 17 total
-- Mapped to phases: 0
-- Unmapped: 17 ⚠️
+- Mapped to phases: 17
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-07-29*
