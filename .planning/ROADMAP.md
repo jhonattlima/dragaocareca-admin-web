@@ -25,12 +25,12 @@
   3. After completion, an authenticated request returns the ZIP with a safe filename and identifies requested artifacts omitted because they were unavailable.
   4. API verification demonstrates job creation, progress transitions, completion, failure, missing artifacts, and invalid selector/path rejection.
 
-**Plans**: 1/3 plans executed
+**Plans**: 2/3 plans executed
 
 Plans:
 
 - [x] 04-01-PLAN.md — Establish SQLite-backed artifact-job lifecycle and deterministic failure seam
-- [ ] 04-02-PLAN.md — Expose authenticated start, status, and completed-download REST contract
+- [x] 04-02-PLAN.md — Expose authenticated start, status, and completed-download REST contract
 - [ ] 04-03-PLAN.md — Verify lifecycle, security, cleanup, partial results, expiry, and OpenAPI parity
 
 ### Phase 5: Episode Download Modal
@@ -72,6 +72,6 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 1-3 | v1.0 Transcript Summary Integration | 6/6 | Complete | 2026-07-29 |
-| 4. Artifact Job Contract | v1.1 | 1/3 | In Progress|  |
+| 4. Artifact Job Contract | v1.1 | 2/3 | In Progress|  |
 | 5. Episode Download Modal | v1.1 | 0/TBD | Not started | - |
 | 6. Browser Download & Release Validation | v1.1 | 0/TBD | Not started | - |
