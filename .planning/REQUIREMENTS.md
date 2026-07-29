@@ -31,7 +31,7 @@ Requirements for milestone v1.1 Episode Artifact Downloads.
 - [ ] **VAL-01**: API mock data is configured for the Season 3 DC 334 episode using the provided episode folder.
 - [ ] **VAL-02**: The complete UI flow is manually validated, including visible progress and ZIP contents.
 - [ ] **VAL-03**: Existing frontend tests and `npm run build` remain passing.
-- [ ] **VAL-04**: API tests or equivalent verification cover job creation, progress transitions, completion, failure, and missing artifacts.
+- [x] **VAL-04**: API tests or equivalent verification cover job creation, progress transitions, completion, failure, and missing artifacts.
 
 ## v2 Requirements
 
@@ -74,7 +74,7 @@ Mapped to the v1.1 roadmap phases.
 | VAL-01 | Phase 6 | Pending |
 | VAL-02 | Phase 6 | Pending |
 | VAL-03 | Phase 6 | Pending |
-| VAL-04 | Phase 4 | Pending |
+| VAL-04 | Phase 4 | Complete |
 
 **Coverage:**
 

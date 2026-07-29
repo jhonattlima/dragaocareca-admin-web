@@ -4,16 +4,16 @@ milestone: v1.1
 milestone_name: Episode Artifact Downloads
 current_phase: 04
 current_phase_name: artifact-job-contract
-status: executing
-stopped_at: Completed 04-02-PLAN.md
-last_updated: "2026-07-29T20:19:34.858Z"
+status: verifying
+stopped_at: Completed 04-03-PLAN.md
+last_updated: "2026-07-29T20:30:59.760Z"
 last_activity: 2026-07-29
 last_activity_desc: Phase 04 execution started
 progress:
   total_phases: 1
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 2
+  completed_plans: 3
 ---
 
 # Project State
@@ -29,9 +29,9 @@ See: .planning/PROJECT.md (updated 2026-07-29)
 
 Phase: 04 (artifact-job-contract) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-07-29 — Phase 04 execution started
-Progress: [███████░░░] 67%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -59,6 +59,7 @@ Progress: [███████░░░] 67%
 |------|----------|-------|-------|
 | Phase 04 P01 | 24min | 2 tasks | 6 files |
 | Phase 04 P02 | 10min | 2 tasks | 3 files |
+| Phase 04 P03 | 18min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -77,6 +78,8 @@ Recent decisions affecting current work:
 - [Phase ?]: Phase 04-01: Keep artifact selector/path resolution backend-owned and use verifier-only stage/failure controls for deterministic cleanup proof.
 - [Phase ?]: D-01 through D-04: separate authenticated artifact-job start, status, and completed-download operations expose an opaque public snapshot.
 - [Phase ?]: D-08 through D-11: strict canonical selector validation and server-owned paths preserve partial availability without filesystem disclosure.
+- [Phase ?]: 04-03: direct-router verifier proves deterministic artifact-job lifecycle, security, cleanup, and OpenAPI parity.
+- [Phase ?]: 04-03: concurrent starts are serialized and cleanup uses server-derived job paths only.
 
 ### Pending Todos
 
@@ -95,6 +98,6 @@ None for v1.0. MNT-01 and MNT-02 carry forward to the next milestone.
 
 ## Session Continuity
 
-Last session: 2026-07-29T20:19:34.853Z
-Stopped at: Completed 04-02-PLAN.md
+Last session: 2026-07-29T20:30:59.755Z
+Stopped at: Completed 04-03-PLAN.md
 Resume file: None
