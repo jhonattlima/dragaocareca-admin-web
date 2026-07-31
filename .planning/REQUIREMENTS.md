@@ -19,10 +19,10 @@ Requirements for milestone v1.1 Episode Artifact Downloads.
 
 - [ ] **UI-01**: The user can see an artifact-download action on each episode row.
 - [ ] **UI-02**: The user can open a download modal for the selected episode.
-- [ ] **UI-03**: The modal offers episode file, trailer, cover art, low cover art (`.webp`), and transcript options.
+- [x] **UI-03**: The modal offers episode file, trailer, cover art, low cover art (`.webp`), and transcript options.
 - [ ] **UI-04**: All available artifact options are checked by default, while unavailable options are clearly disabled or omitted.
 - [ ] **UI-05**: The user can select or deselect artifacts before confirming the download.
-- [ ] **UI-06**: After confirmation, the modal shows ZIP-generation progress and prevents duplicate submissions.
+- [x] **UI-06**: After confirmation, the modal shows ZIP-generation progress and prevents duplicate submissions.
 - [ ] **UI-07**: The browser downloads the ZIP automatically when generation completes.
 - [ ] **UI-08**: The modal shows clear empty-selection, partial-download, failure, reset, and retry states.
 
@@ -65,10 +65,10 @@ Mapped to the v1.1 roadmap phases.
 | API-05 | Phase 4 | Complete |
 | UI-01 | Phase 5 | Pending |
 | UI-02 | Phase 5 | Pending |
-| UI-03 | Phase 5 | Pending |
+| UI-03 | Phase 5 | Complete |
 | UI-04 | Phase 5 | Pending |
 | UI-05 | Phase 5 | Pending |
-| UI-06 | Phase 5 | Pending |
+| UI-06 | Phase 5 | Complete |
 | UI-07 | Phase 6 | Pending |
 | UI-08 | Phase 6 | Pending |
 | VAL-01 | Phase 6 | Pending |

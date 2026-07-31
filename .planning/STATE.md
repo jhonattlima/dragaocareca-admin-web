@@ -5,15 +5,15 @@ milestone_name: Episode Artifact Downloads
 current_phase: 04
 current_phase_name: artifact-job-contract
 status: verifying
-stopped_at: Phase 5 planned
-last_updated: "2026-07-31T02:53:48.970Z"
+stopped_at: Completed 05-01-PLAN.md
+last_updated: "2026-07-31T02:59:49.327Z"
 last_activity: 2026-07-29
 last_activity_desc: Phase 04 execution started
 progress:
   total_phases: 2
   completed_phases: 1
   total_plans: 6
-  completed_plans: 3
+  completed_plans: 4
 ---
 
 # Project State
@@ -31,7 +31,7 @@ Phase: 04 (artifact-job-contract) — EXECUTING
 Plan: 3 of 3
 Status: Phase complete — ready for verification
 Last activity: 2026-07-29 — Phase 04 execution started
-Progress: [██████████] 100%
+Progress: [███████░░░] 67%
 
 ## Performance Metrics
 
@@ -60,6 +60,7 @@ Progress: [██████████] 100%
 | Phase 04 P01 | 24min | 2 tasks | 6 files |
 | Phase 04 P02 | 10min | 2 tasks | 3 files |
 | Phase 04 P03 | 18min | 2 tasks | 3 files |
+| Phase 05 P01 | 6min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,8 @@ Recent decisions affecting current work:
 - [Phase ?]: D-08 through D-11: strict canonical selector validation and server-owned paths preserve partial availability without filesystem disclosure.
 - [Phase ?]: 04-03: direct-router verifier proves deterministic artifact-job lifecycle, security, cleanup, and OpenAPI parity.
 - [Phase ?]: 04-03: concurrent starts are serialized and cleanup uses server-derived job paths only.
+- [Phase ?]: Phase 05-01: Keep artifact selectors as a closed TypeScript union and send only canonical selector strings to the backend.
+- [Phase ?]: Phase 05-01: Expose downloadUrl through the status snapshot as opaque state data; native ZIP delivery remains deferred to Phase 6.
 
 ### Pending Todos
 
@@ -98,6 +101,6 @@ None for v1.0. MNT-01 and MNT-02 carry forward to the next milestone.
 
 ## Session Continuity
 
-Last session: 2026-07-31T02:53:48.963Z
-Stopped at: Phase 5 planned
-Resume file: .planning/phases/05-episode-download-modal/05-01-PLAN.md
+Last session: 2026-07-31T02:59:49.321Z
+Stopped at: Completed 05-01-PLAN.md
+Resume file: None
