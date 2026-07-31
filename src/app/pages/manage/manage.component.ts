@@ -409,10 +409,10 @@ export class ManageComponent implements OnInit, OnDestroy {
       return 'Preparing files';
     }
     const progress = this.getArtifactProgress();
-    if (progress === null || progress < 35) {
+    if (progress === null || progress < 25) {
       return 'Preparing files';
     }
-    if (progress < 85) {
+    if (progress < 90) {
       return 'Creating ZIP';
     }
     return 'Finalizing ZIP';
