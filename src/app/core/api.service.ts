@@ -190,6 +190,25 @@ export interface EpisodeGeneratedSummaryStatus {
   summaryText?: string | null;
 }
 
+export type EpisodeArtifactSelector = 'episode' | 'trailer' | 'image' | 'image-low' | 'transcript';
+
+export interface EpisodeArtifactJobSnapshot {
+  jobId: string;
+  episodeId: number;
+  requested: EpisodeArtifactSelector[];
+  available: EpisodeArtifactSelector[];
+  missing: EpisodeArtifactSelector[];
+  state: 'pending' | 'processing' | 'completed' | 'failed';
+  progress: number;
+  stateText: string;
+  queuePosition: number | null;
+  downloadUrl: string | null;
+  expiresAt: string | null;
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface DeleteEpisodeResponse {
   episodeId: number;
   message: string;
@@ -301,6 +320,14 @@ export class ApiService {
 
   getEpisodeGeneratedSummaryStatus(episodeId: number): Observable<EpisodeGeneratedSummaryStatus> {
     return this.http.get<EpisodeGeneratedSummaryStatus>(`${environment.apiBaseUrl}/episodes/${episodeId}/episodes-generated-summary`);
+  }
+
+  startEpisodeArtifactJob(episodeId: number, artifacts: EpisodeArtifactSelector[]): Observable<EpisodeArtifactJobSnapshot> {
+    return this.http.post<EpisodeArtifactJobSnapshot>(`${environment.apiBaseUrl}/episodes/${episodeId}/artifacts/jobs`, { artifacts });
+  }
+
+  getEpisodeArtifactJobStatus(episodeId: number, jobId: string): Observable<EpisodeArtifactJobSnapshot> {
+    return this.http.get<EpisodeArtifactJobSnapshot>(`${environment.apiBaseUrl}/episodes/${episodeId}/artifacts/jobs/${jobId}`);
   }
 
   getSpotifyMetrics(days = 30): Observable<SpotifyMetricsSnapshot | SpotifyMetricsErrorResponse> {
