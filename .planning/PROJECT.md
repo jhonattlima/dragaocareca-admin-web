@@ -2,105 +2,70 @@
 
 ## What This Is
 
-This is an Angular admin client for the Dragao Careca podcast operations workflow. It gives operators a sectioned, legacy-inspired UI for signing in, editing episode metadata, staging media, inspecting feed output, and checking runtime health and metrics.
+An Angular admin client for the Dragao Careca podcast operations workflow. It provides a sectioned, legacy-inspired UI for authentication, episode editing, media staging, feed inspection, runtime health, metrics, transcript/summary generation, and backend-generated episode artifact downloads.
 
-The frontend should stay thin: it orchestrates API calls and presents state, while the backend remains the source of truth for feed decisions, persistence, and auth validation.
+The frontend stays thin: it orchestrates API calls and presents state, while the backend remains the source of truth for feed decisions, persistence, artifact resolution, and auth validation.
 
 ## Core Value
 
 Keep the admin workflow reliable, legible, and backend-driven so operators can manage episodes and inspect system state without fighting the UI.
 
-## Current Milestone: v1.1 Episode Artifact Downloads
-
-**Goal:** Let operators select available episode artifacts and download them together as a backend-generated ZIP from the episodes list.
-
-**Target features:**
-- add an artifact-download action to each episode row
-- open a modal with episode file, trailer, cover art, low cover art (`.webp`), and transcript options selected by default when available
-- request the selected artifacts from the API and download the returned ZIP with clear loading, partial-file, empty-selection, and error states
-- configure and validate the DC 334 Season 3 mock episode in the API
-
 ## Current State
 
-**Shipped:** v1.0 Transcript Summary Integration (2026-07-29)
+**Shipped:** v1.1 Episode Artifact Downloads (2026-07-31)
 
-The admin workflow now tracks backend transcript and AI-summary generation in sequence, reuses the existing progress bar, auto-fills generated summaries, preserves operator edits, and surfaces polling failures without blocking episode editing.
+Operators can select episode artifacts from the Episodes list, monitor backend ZIP preparation, and receive an authenticated native browser download. The release includes the SQLite-backed API job lifecycle, canonical selector validation, accessible modal, progress polling, server-authoritative filenames, retry/reset behavior, CORS header exposure, DC334 full-selection evidence, and green frontend build/test gates.
 
-## Archived v1.0 Scope
+The happy path was accepted as the release scope. The broader live recovery matrix was intentionally not performed; UI-08 and VAL-02 remain documented validation debt.
 
-**Goal:** Integrate the backend’s AI-generated episode summary into the new episode workflow, with progress visible while the summary is being created and the generated text auto-filled into the summary field when ready.
+## Validated Requirements
 
-**Target features:**
-- show summary-generation progress in the new episode tab by reusing the existing transcript progress bar, resetting it to summary mode when transcript reaches 100%
-- auto-fill the summary textarea when the backend returns the generated summary
-- preserve the normal episode editing flow so the operator can review and save the summary
+### v1.0 Transcript Summary Integration
 
-## Requirements
+- ✓ Transcript and summary generation progress is shown in the new episode workflow.
+- ✓ Generated summaries auto-fill the Summary field and remain editable.
+- ✓ Late polling updates do not overwrite operator edits.
 
-### Validated
+### v1.1 Episode Artifact Downloads
 
-- ✓ Authentication works through Google GIS in normal mode and an `authBypass` dev toggle in local mode.
-- ✓ Operators can create and update episodes with metadata, participants, tags, citations, and media references.
-- ✓ Operators can stage and delete episode audio, trailer, cover, and cover-webp files with upload progress feedback.
-- ✓ Operators can inspect feed status and preview the generated feed XML.
-- ✓ Operators can inspect Spotify metrics, YouTube metrics, and backend health/bot status.
-- ✓ The app uses a branded shell with a sticky masthead and the legacy-inspired sectioned layout described in `docs/README.md`.
+- ✓ API-01–API-05: authenticated, validated asynchronous artifact ZIP jobs.
+- ✓ UI-01–UI-07: episode-row action, accessible modal, canonical selectors, progress, duplicate protection, and native download.
+- ✓ VAL-01: supplied DC334 fixture staged and restored during retained validation.
+- ✓ VAL-03: frontend tests/build and dependency gates pass.
+- ✓ VAL-04: API lifecycle, security, failure, partial-result, cleanup, and OpenAPI verification.
 
-### Validated
+## Deferred Validation
 
-- ✓ Add summary-generation progress plumbing to the new episode workflow.
-- ✓ Auto-fill the summary textarea from the backend response once AI generation completes.
-- ✓ Keep the generated summary editable and safe from being overwritten by late polling updates.
+- UI-08: complete live partial/failure/authentication/retry/reset/reopen/repeated-completion recovery matrix.
+- VAL-02: complete manual validation of visible progress and ZIP contents for a correctly matched live fixture.
 
-### Out of Scope
+## Out of Scope
 
-- Reimplementing backend business rules in the frontend — feed generation, publish timing, persistence, and auth validation stay server-side.
-- Replacing the sectioned admin UI with a minimalist placeholder layout — that would regress the working operator workflow.
-- Adding direct storage or backend integrations outside the existing API contract — the frontend should continue to orchestrate API calls only.
+- Reimplementing backend business rules in the frontend.
+- Replacing the sectioned admin UI with a minimalist placeholder.
+- Client-side ZIP creation or arbitrary filesystem path selection.
+- Separate browser downloads for each artifact.
+- Canceling in-progress jobs, batch downloads, or download history (future requirements).
 
-## Context
+## Context and Constraints
 
-This repo already contains the working admin app. The canonical behavioral assumptions are in `docs/README.md`, `docs/ARCHITECTURE.md`, and `docs/CONFIGURATION.md`, and the brownfield codebase map in `.planning/codebase/` documents the current stack, structure, and constraints.
+The app is Angular 15 with TypeScript 4.8, Bootstrap 5.3.8, template-driven forms, a shared `ApiService`, auth guard/interceptor plumbing, and routed manage/feed/metrics/health/login screens. Canonical behavioral assumptions live in `docs/README.md`, `docs/ARCHITECTURE.md`, and `docs/CONFIGURATION.md`.
 
-The app is an Angular 15 frontend with template-driven forms, a shared `ApiService`, auth guard/interceptor plumbing, and routed screens for manage/feed/metrics/health/login. The manage screen already contains transcript status, progress polling, and a summary textarea, which makes the new milestone an extension of existing behavior rather than a full-screen rewrite.
-
-## Constraints
-
-- **Tech stack**: Angular 15 + TypeScript 4.8 + Bootstrap 5.3.8 — the app must fit the existing frontend stack.
-- **Backend contract**: Keep the frontend thin and API-driven — business logic belongs in the backend API.
-- **Auth mode**: Respect `environment.authBypass` in both login and route protection — local development depends on it.
-- **Layout**: Preserve the sectioned, legacy-inspired admin layout — do not regress to a bare scaffold.
-- **Milestone scope**: Artifact downloads are the next tracked milestone — keep the work centered on selecting and downloading episode files from the list.
-- **Verification**: `npm run build` must stay green before changes are considered done.
+- Keep business logic in the sibling API.
+- Respect `environment.authBypass`.
+- Preserve the legacy-inspired sectioned layout.
+- Keep `npm run build` green.
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
-|----------|-----------|---------|
-| Treat the current repo as the project baseline, not a new product idea | The codebase already implements the admin workflow; onboarding should document and stabilize it | ✓ Good |
-| Keep business logic on the backend | The SDD and current code both define the frontend as an orchestrator, not the source of truth | ✓ Good |
-| Preserve the sectioned admin layout | The current UI is intentionally legacy-inspired and operational, not minimal | ✓ Good |
-| Honor `authBypass` in local development | The repo already relies on that toggle for local operator flow | ✓ Good |
-| Center the next milestone on transcript-driven summary generation | The backend feature is already available there and the current UI has the necessary progress/summary surface | ✓ Good |
-| Keep ZIP creation backend-owned | The API already provides the artifact-download contract; the Angular client should only select artifacts and save the response | ✓ Good |
-| Reuse native browser download behavior | The existing stack does not need a ZIP or file-saving dependency for one authenticated Blob response | ✓ Good |
-
-## Evolution
-
-This document evolves at phase transitions and milestone boundaries.
-
-**After each phase transition** (via `$gsd-transition`):
-1. Requirements invalidated? → Move to Out of Scope with reason
-2. Requirements validated? → Move to Validated with phase reference
-3. New requirements emerged? → Add to Active
-4. Decisions to log? → Add to Key Decisions
-5. "What This Is" still accurate? → Update if drifted
-
-**After each milestone** (via `$gsd-complete-milestone`):
-1. Full review of all sections
-2. Core Value check — still the right priority?
-3. Audit Out of Scope — reasons still valid?
-4. Update Context with current state
+|---|---|---|
+| Keep artifact resolution and ZIP creation backend-owned | Prevent filesystem/path leakage and duplicate business logic | ✓ Good |
+| Use canonical artifact selectors only | Stable API vocabulary and safe validation boundary | ✓ Good |
+| Use persisted asynchronous jobs with progress polling | ZIP creation can outlive a request and needs visible state | ✓ Good |
+| Use native authenticated Blob delivery | Avoid unnecessary client ZIP/file-saver dependencies | ✓ Good |
+| Preserve the existing Episodes-tab workflow | Add capability without disrupting episode editing | ✓ Good |
+| Fail closed when the live fixture identity is mismatched | Avoid mutating unrelated production-like data to force validation | ✓ Good |
 
 ---
-*Last updated: 2026-07-29 after v1.1 milestone setup*
+*Last updated: 2026-07-31 after v1.1 milestone*

@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Episode Artifact Downloads
-current_phase: 06
-current_phase_name: browser-download-release-validation
-status: ready_for_verification
+status: Awaiting next milestone
 stopped_at: Completed 06-04-PLAN.md
-last_updated: "2026-07-31T15:18:10.355Z"
+last_updated: "2026-07-31T17:54:17.101Z"
 last_activity: 2026-07-31
-last_activity_desc: Phase 06 Plan 04 gap closure completed; live recovery matrix remains partial
+last_activity_desc: Milestone v1.1 completed and archived
 progress:
   total_phases: 3
   completed_phases: 3
   total_plans: 11
   completed_plans: 11
+current_phase: 06
+current_phase_name: browser-download-release-validation
 ---
 
 # Project State
@@ -27,11 +27,10 @@ See: .planning/PROJECT.md (updated 2026-07-29)
 
 ## Current Position
 
-Phase: 06 (browser-download-release-validation) — VERIFYING
-Plan: 4 of 4
-Status: Plan complete — ready for verification
-Last activity: 2026-07-31 — Phase 06 Plan 04 gap closure completed; live recovery matrix remains partial
-Progress: [██████████] 100%
+Phase: Milestone v1.1 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-07-31 — Milestone v1.1 completed and archived
 
 ## Performance Metrics
 
@@ -119,9 +118,17 @@ None for v1.0. MNT-01 and MNT-02 carry forward to the next milestone.
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
 | maintenance | API transition test and Angular budget warnings | deferred to v1.1 validation | 2026-07-29 |
+| uat | Phase 4 UAT record remains marked testing with no open scenarios | acknowledged at v1.1 closeout; happy-path scope accepted | 2026-07-31 |
+| verification | Phase 4 verification status is human_needed | acknowledged at v1.1 closeout; API automated evidence accepted | 2026-07-31 |
+| verification | Phase 5 verification status is human_needed | acknowledged at v1.1 closeout; user UAT accepted | 2026-07-31 |
+| verification | Phase 6 verification status is human_needed | acknowledged at v1.1 closeout; happy-path scope accepted | 2026-07-31 |
 
 ## Session Continuity
 
 Last session: 2026-07-31T15:18:10.349Z
 Stopped at: Completed 06-04-PLAN.md
 Resume file: None
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone
