@@ -1575,7 +1575,7 @@ export class ManageComponent implements OnInit, OnDestroy {
     }
   }
 
-  private isArtifactJobActive(snapshot: EpisodeArtifactJobSnapshot | null | undefined): boolean {
+  isArtifactJobActive(snapshot: EpisodeArtifactJobSnapshot | null | undefined): boolean {
     return snapshot?.state === 'pending' || snapshot?.state === 'processing';
   }
 

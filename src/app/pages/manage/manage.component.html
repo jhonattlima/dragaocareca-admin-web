@@ -38,6 +38,7 @@
               <th>Live</th>
               <th>Duration</th>
               <th>Invitees</th>
+              <th>Downloads</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -53,6 +54,16 @@
               </td>
               <td>{{ episode.duration }}</td>
               <td>{{ episode.guests?.length || 0 }}</td>
+              <td class="episode-downloads">
+                <button
+                  class="btn btn-outline-primary btn-sm episode-download-button"
+                  type="button"
+                  [attr.aria-label]="'Download episode artifacts for episode ' + getEpisodeDisplayNumber(episode)"
+                  title="Download episode artifacts"
+                  (click)="openArtifactModal(episode, $any($event.currentTarget))">
+                  <span aria-hidden="true">⇩</span>
+                </button>
+              </td>
               <td class="episode-actions">
                 <button class="btn btn-primary btn-sm me-2" type="button" (click)="startEdit(episode)">Edit</button>
                 <button class="btn btn-outline-danger btn-sm" type="button" [disabled]="isEpisodeLive(episode)" [title]="getEpisodeDeleteDisabledReason(episode)" (click)="openDeleteEpisode(episode)">Delete</button>
@@ -89,6 +100,79 @@
       </div>
     </div>
   </ng-container>
+</div>
+
+<div class="delete-modal-backdrop artifact-modal-backdrop" *ngIf="artifactModalOpen">
+  <div
+    class="delete-modal artifact-modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="artifactModalTitle"
+    aria-describedby="artifactModalDescription"
+    tabindex="-1"
+    (keydown)="onArtifactModalKeydown($event)">
+    <div class="artifact-modal-header">
+      <div>
+        <p class="artifact-modal-kicker">Episode downloads</p>
+        <h3 id="artifactModalTitle" data-artifact-modal-heading tabindex="-1">Download episode artifacts</h3>
+      </div>
+      <button class="btn-close" type="button" aria-label="Close download dialog" title="Close" (click)="closeArtifactModal()"></button>
+    </div>
+
+    <p id="artifactModalDescription" class="section-hint">
+      Choose the files to prepare for <strong>{{ artifactModalEpisode?.title }}</strong>.
+    </p>
+
+    <div class="artifact-option-list" aria-label="Available episode artifacts">
+      <label class="artifact-option" *ngFor="let option of artifactOptions" [class.artifact-option-unavailable]="!option.available">
+        <input
+          type="checkbox"
+          [checked]="option.checked"
+          [disabled]="!option.available || isArtifactJobActive(artifactJob)"
+          [attr.aria-label]="option.label + ' ' + option.formatHint"
+          (change)="toggleArtifactOption(option)">
+        <span class="artifact-option-copy">
+          <span class="artifact-option-label">{{ option.label }} <span class="artifact-format-hint">{{ option.formatHint }}</span></span>
+          <span class="artifact-option-filename" [title]="option.tooltip">
+            {{ option.available ? option.fileName : 'Unavailable — file not uploaded.' }}
+          </span>
+        </span>
+      </label>
+    </div>
+
+    <p class="artifact-empty-state" *ngIf="!hasAvailableArtifacts()">
+      No artifacts are available for this episode yet. Upload at least one file before preparing an archive.
+    </p>
+
+    <div class="artifact-progress-panel" *ngIf="artifactJob || artifactPollingError || artifactModalMessage">
+      <div class="artifact-status-row" *ngIf="artifactJob || artifactPollingError">
+        <span>{{ getArtifactStatusLabel() || 'Preparing archive' }}</span>
+        <span class="text-muted" *ngIf="artifactPollingError">{{ artifactPollingError }}</span>
+      </div>
+      <div class="progress artifact-progress" *ngIf="artifactJob && artifactJob.state !== 'failed'" role="progressbar" [attr.aria-valuemin]="0" [attr.aria-valuemax]="100" [attr.aria-valuenow]="getArtifactProgress()">
+        <div class="progress-bar" [class.progress-bar-indeterminate]="!isArtifactProgressDeterminate()" [style.width.%]="getArtifactProgress() ?? 100">
+          <span class="visually-hidden">{{ getArtifactStatusLabel() }}</span>
+        </div>
+      </div>
+      <p class="artifact-warning" *ngIf="getArtifactMissingLabels().length > 0">
+        Some requested files were unavailable: {{ getArtifactMissingLabels().join(', ') }}.
+      </p>
+      <p class="artifact-error" *ngIf="artifactJob?.state === 'failed'">
+        {{ artifactJob?.error || 'The archive could not be prepared.' }}
+      </p>
+      <div class="artifact-ready" *ngIf="artifactJob?.state === 'completed'">
+        <strong>Archive ready</strong>
+        <span>{{ artifactJob?.downloadUrl }}</span>
+      </div>
+      <p class="artifact-inline-message" *ngIf="artifactModalMessage">{{ artifactModalMessage }}</p>
+    </div>
+
+    <div class="artifact-modal-actions d-flex justify-content-end gap-2">
+      <button class="btn btn-outline-secondary" type="button" (click)="closeArtifactModal()">Close</button>
+      <button class="btn btn-outline-primary" type="button" *ngIf="isArtifactRetryAvailable()" (click)="retryArtifactJob()">Retry</button>
+      <button class="btn btn-primary" type="button" [disabled]="isArtifactConfirmDisabled()" (click)="confirmArtifactJob()">Prepare archive</button>
+    </div>
+  </div>
 </div>
 
 <div class="delete-modal-backdrop" *ngIf="episodePendingDelete">
