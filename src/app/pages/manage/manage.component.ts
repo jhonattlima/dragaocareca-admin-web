@@ -151,6 +151,7 @@ export class ManageComponent implements OnInit, OnDestroy {
   private artifactJobPollTimer: number | null = null;
   private artifactJobPollEpisodeId: number | null = null;
   private artifactJobPollId: string | null = null;
+  private readonly artifactJobStartInFlight = new Map<number, symbol>();
   private transcriptionClockTimer: number | null = null;
   transcriptionClockTick = Date.now();
   private readonly structuredEntrySuggestionCache: Record<'guests' | 'musicCredits', StructuredEntrySuggestion[]> = {
@@ -434,6 +435,10 @@ export class ManageComponent implements OnInit, OnDestroy {
     }
 
     const episodeId = this.artifactModalEpisode.episodeId;
+    if (this.artifactJobStartInFlight.has(episodeId)) {
+      return;
+    }
+
     const artifacts = this.artifactOptions
       .filter((option) => option.available && option.checked)
       .map((option) => option.selector);
@@ -444,12 +449,20 @@ export class ManageComponent implements OnInit, OnDestroy {
 
     this.artifactModalMessage = '';
     this.artifactPollingError = '';
+    const startToken = Symbol(`artifact-job-start-${episodeId}`);
+    this.artifactJobStartInFlight.set(episodeId, startToken);
     this.apiService.startEpisodeArtifactJob(episodeId, artifacts).subscribe({
       next: (snapshot) => {
+        if (this.artifactJobStartInFlight.get(episodeId) === startToken) {
+          this.artifactJobStartInFlight.delete(episodeId);
+        }
         this.storeArtifactJob(snapshot);
         this.ensureArtifactJobPolling(episodeId, snapshot.jobId);
       },
       error: (error) => {
+        if (this.artifactJobStartInFlight.get(episodeId) === startToken) {
+          this.artifactJobStartInFlight.delete(episodeId);
+        }
         if (this.isArtifactUnavailableResponse(error)) {
           this.markArtifactOptionsUnavailable();
           this.artifactModalMessage = 'No selected files are currently available. Review the options and retry.';
