@@ -1,8 +1,10 @@
 # Phase 6 Validation Record
 
-Status: PARTIAL — RECOVERY TESTS EXECUTED; PROGRESS THRESHOLD ESCALATED
+Status: PARTIAL — PROGRESS THRESHOLD CLOSED; FULL SUITE HAS PRE-EXISTING FAILURES
 
-This artifact is the evidence record for Phase 6. Task 1 and Task 2 populate the automated and fixture sections. Task 3 is the blocking human checkpoint; it must be explicitly approved only after the real browser, CORS, ZIP, recovery, and cleanup checks pass.
+This artifact is the evidence record for Phase 6. Plans 06-01 through 06-03 populate the automated and fixture sections. Manual browser recovery and release approval remain explicitly separate from the automated threshold correction.
+
+The original automated table below is retained as the 06-02 baseline; the current 06-03 rerun is recorded in the reconciliation table that follows it.
 
 ## Scope and locked acceptance rules
 
@@ -20,7 +22,7 @@ This artifact is the evidence record for Phase 6. Task 1 and Task 2 populate the
 | UI-08 | ManageComponent state/recovery specs for empty, partial, failed, network/auth, expired, retry, reset, and reopen; focused suite compiled | Browser recovery matrix with request counts proving same-job delivery retry and no duplicate preparation POST | PARTIAL — bounded recovery harness blocked after empty-selection check |
 | VAL-01 | Sibling API build and configured media-layout inspection | Episode 334 row plus real source fixture copied to effective `MEDIA_STORAGE_ROOT/episodes/334/`, with selector availability recorded | PASS — real fixture resolved; restored afterward |
 | VAL-02 | Existing Angular tests cover state/wiring but cannot prove OS download or ZIP contents | Browser progress plus archive listing matches selected available selectors and visible omissions | PASS for full-selection archive; intermediate-stage/recovery limitations recorded |
-| VAL-03 | Full Karma suite, sibling API build, `npm run build`, package diff check | Human checkpoint confirms release evidence is complete | BUILD PASS; Karma remains environment-blocked |
+| VAL-03 | Full Karma suite, sibling API build, `npm run build`, package diff check | Human checkpoint confirms release evidence is complete | BUILD PASS; browser Karma executes, but the full suite retains pre-existing UI-01/UI-06 failures and an existing polling-spy afterAll error |
 
 ## Automated checks
 
@@ -36,6 +38,23 @@ Record the date, working directory, exact command, exit code, and concise output
 | Dependency immutability | `git diff --exit-code -- package.json package-lock.json` | 0 | PASS; no package or lockfile changes. CWD/date as above. |
 
 Pre-existing Angular budget warnings must be recorded separately from command failure; they do not silently become new failures.
+
+### 06-03 threshold correction and release-gate rerun — 2026-07-31
+
+The existing Playwright Chromium binary was supplied through `CHROME_BIN`:
+`/home/jhonatt/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome`.
+All commands ran from `/home/jhonatt/repos/jhonatt_projects/dragaocareca-admin-web`.
+
+| Check | Exact command | Exit code | Result |
+|---|---|---:|---|
+| Focused API contract | `CHROME_BIN=/home/jhonatt/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/core/api.service.spec.ts'` | 0 | 4/4 assertions passed in Chrome Headless 149. |
+| Focused threshold contract | `CHROME_BIN=/home/jhonatt/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/pages/manage/phase6-progress-threshold.spec.ts'` | 0 | 1/1 assertion passed, covering 24/25/89/90% labels. |
+| Combined focused API/Manage/threshold | `CHROME_BIN=/home/jhonatt/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/core/api.service.spec.ts' --include='src/app/pages/manage/manage.component.spec.ts' --include='src/app/pages/manage/phase6-progress-threshold.spec.ts'` | 1 | 20 assertions executed; threshold and API assertions passed, while pre-existing ManageComponent UI-01 and UI-06 failed. The run also reported the existing `undefined.subscribe` polling-spy afterAll error. |
+| Full frontend Karma suite | `CHROME_BIN=/home/jhonatt/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome npm test -- --watch=false --browsers=ChromeHeadless` | 1 | 28 assertions executed; 26 passed and the same pre-existing UI-01/UI-06 tests failed. The existing polling-spy `undefined.subscribe` afterAll error was also reported. |
+| Frontend production build | `npm run build` | 0 | PASS. Existing selector-parser warnings (`legend+*`, `.form-floating>~label`) and Angular metrics stylesheet (3.96 kB > 2.00 kB) and initial bundle (678.85 kB > 500.00 kB) budget warnings remain. Build hash: `a4d773fb83093a85`. |
+| Dependency immutability | `git diff --exit-code -- package.json package-lock.json` | 0 | PASS; no dependency manifest or lockfile changes. |
+
+The focused threshold failure recorded below is superseded: `ManageComponent.getArtifactStage()` now mirrors the sibling API's `<25` preparation, `<90` archive-assembly, and `>=90` finalization boundaries. The full-suite failures are pre-existing UI fixture/DOM assumptions and incomplete polling spies outside this plan's display-only change; they remain release-test debt and were not altered here.
 
 ## Authoritative CORS prerequisite
 
@@ -93,7 +112,7 @@ This is a human verification checkpoint, not an automated substitute. Do not mar
 6. Confirm repeated completed status emissions do not create another Blob request/download and object URLs are revoked after successful and thrown activation.
 7. Restore the API row/configuration/media destination and record cleanup evidence.
 
-Human checkpoint result: PARTIAL PASS — Playwright-managed Chromium completed the real DC 334 full-selection browser download and cleanup checks. The bounded recovery harness did not complete the full matrix: after unchecking all options, the application correctly disabled `Prepare archive`, but the harness waited for a clickable button and timed out; no later recovery scenarios are claimed. Karma remains blocked by the separate missing ChromeHeadless binary.
+Human checkpoint result: PARTIAL PASS — Playwright-managed Chromium completed the real DC 334 full-selection browser download and cleanup checks. The bounded recovery harness did not complete the full matrix: after unchecking all options, the application correctly disabled `Prepare archive`, but the harness waited for a clickable button and timed out; no later recovery scenarios are claimed. The 06-03 Karma rerun used the existing Chromium binary; its full-suite failures are recorded separately as pre-existing test debt.
 
 ### Playwright browser evidence — 2026-07-31
 
@@ -131,14 +150,14 @@ needed. Setting Karma's existing launcher hook to that binary executed real brow
 |---|---|---|---|---|
 | Browser runner unavailable | `src/app/core/api.service.spec.ts` | `CHROME_BIN=/home/jhonatt/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/core/api.service.spec.ts'` | 4/4 assertions passed in Chrome Headless 149 | FILLED |
 | Recovery matrix incomplete | `src/app/pages/manage/phase6-validation.spec.ts` | `CHROME_BIN=/home/jhonatt/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/pages/manage/phase6-validation.spec.ts'` | 6/6 assertions passed: empty, partial, failed preparation, network/401/403/404/409, same-job delivery retry without a preparation POST, reset, and repeated completion | FILLED |
-| API/UI progress-stage threshold mismatch | `src/app/pages/manage/phase6-progress-threshold.spec.ts` | `CHROME_BIN=/home/jhonatt/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/pages/manage/phase6-progress-threshold.spec.ts'` | 1 test failed: actual `Preparing files — 25%` vs expected `Creating ZIP — 25%`; actual `Finalizing ZIP — 85%` vs expected `Creating ZIP — 85%` | BLOCKER — ESCALATE |
+| API/UI progress-stage threshold mismatch (historical result) | `src/app/pages/manage/phase6-progress-threshold.spec.ts` | Prior CHROME_BIN-qualified run | Historical 06-02 failure at old boundaries; 06-03 rerun passed 1/1 after the `<25`/`<90` correction. | CLOSED BY 06-03 |
 
 The threshold failure is an implementation issue, not a test-fixture issue. The sibling API
 uses `<25` for preparation, `<90` for archive assembly, and `>=90` for finalization in
 `../dragaocareca-admin-api/src/services/episode-artifact-preparation.service.ts`; the frontend
-uses `<35` and `<85` in `src/app/pages/manage/manage.component.ts`. The frontend should align
-its displayed stage boundaries with the API contract (or the contract must be deliberately
-changed and tested on both sides). Application source was not modified during this audit.
+uses the corrected `<25` and `<90` boundaries in `src/app/pages/manage/manage.component.ts`.
+06-03 aligned the displayed stage boundaries with the API contract and tested both sides of
+each boundary. No sibling API source was modified.
 
 The full browser-backed frontend command was also run:
 
@@ -158,4 +177,4 @@ the safe browser-capable validation command.
 |---|---|---:|---|
 | Karma ChromeHeadless cannot run | FILLED | 0 | Existing Playwright Chromium supplied through `CHROME_BIN`; no install/dependency change |
 | Browser recovery scenarios incomplete | FILLED | 1 | Test fixture corrected to mock the retry polling observable; rerun green |
-| API/frontend progress-stage mismatch | ESCALATED (BLOCKER) | 1 | Boundary test fails at both 25% and 85%; implementation fix is out of scope and prohibited |
+| API/frontend progress-stage mismatch | CLOSED | 1 | 06-03 corrected the frontend to `<25`/`<90` and the boundary suite passed 1/1 |
