@@ -5,15 +5,15 @@ milestone_name: Episode Artifact Downloads
 current_phase: 05
 current_phase_name: episode-download-modal
 status: verifying
-stopped_at: Completed 06-02-PLAN.md with documented browser recovery limitations
-last_updated: "2026-07-31T14:07:42.431Z"
+stopped_at: Completed 06-03-PLAN.md
+last_updated: "2026-07-31T14:47:39.456Z"
 last_activity: 2026-07-31
 last_activity_desc: Phase 05 gap closure completed
 progress:
   total_phases: 3
   completed_phases: 3
-  total_plans: 9
-  completed_plans: 9
+  total_plans: 10
+  completed_plans: 10
 ---
 
 # Project State
@@ -66,6 +66,7 @@ Progress: [██████████] 100%
 | Phase 05-episode-download-modal P04 | 6min | 2 tasks | 2 files |
 | Phase 06 P01 | 8min | 2 tasks | 5 files |
 | Phase 06-browser-download-release-validation P02 | 31min | 3 tasks | 3 files |
+| Phase 06-browser-download-release-validation P03 | 18min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -98,6 +99,8 @@ Recent decisions affecting current work:
 - [Phase ?]: Phase 06-01: Guard native delivery by completed job identity and URL; delivery retry reuses the retained URL without starting preparation again.
 - [Phase ?]: Phase 06-01: Accept only validated server Content-Disposition filenames and revoke temporary object URLs in guaranteed cleanup.
 - [Phase ?]: Phase 06-02: expose Content-Disposition and X-Missing-Artifacts through sibling API CORS; record real DC334 browser ZIP evidence while leaving incomplete recovery scenarios unapproved.
+- [Phase ?]: 06-03: mirror sibling API progress labels with <25 preparation, <90 archive assembly, and >=90 finalization boundaries.
+- [Phase ?]: 06-03: retain manual recovery gaps and pre-existing full-suite test failures as explicit release debt.
 
 ### Pending Todos
 
@@ -116,6 +119,6 @@ None for v1.0. MNT-01 and MNT-02 carry forward to the next milestone.
 
 ## Session Continuity
 
-Last session: 2026-07-31T14:07:42.425Z
-Stopped at: Completed 06-02-PLAN.md with documented browser recovery limitations
+Last session: 2026-07-31T14:47:39.449Z
+Stopped at: Completed 06-03-PLAN.md
 Resume file: None
