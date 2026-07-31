@@ -1,5 +1,9 @@
+import { CommonModule } from '@angular/common';
+import { fakeAsync, TestBed, tick } from '@angular/core/testing';
+import { FormsModule } from '@angular/forms';
 import { of, throwError } from 'rxjs';
-import { ApiService, EpisodeGeneratedSummaryStatus, EpisodeTranscriptionStatus } from '../../core/api.service';
+import { ApiService, Episode, EpisodeArtifactJobSnapshot, EpisodeGeneratedSummaryStatus, EpisodeTranscriptionStatus } from '../../core/api.service';
+import { EpisodeFormComponent } from './episode-form.component';
 import { ManageComponent } from './manage.component';
 
 describe('ManageComponent summary flow', () => {
@@ -7,7 +11,14 @@ describe('ManageComponent summary flow', () => {
   let component: ManageComponent;
 
   beforeEach(() => {
-    apiService = jasmine.createSpyObj<ApiService>('ApiService', ['getEpisodeTranscriptionStatus', 'getEpisodeGeneratedSummaryStatus']);
+    apiService = jasmine.createSpyObj<ApiService>('ApiService', [
+      'getEpisodeTranscriptionStatus',
+      'getEpisodeGeneratedSummaryStatus',
+      'startEpisodeArtifactJob',
+      'getEpisodeArtifactJobStatus',
+      'listEpisodes',
+    ]);
+    apiService.listEpisodes.and.returnValue(of([]));
     component = new ManageComponent(apiService);
   });
 
@@ -157,4 +168,160 @@ describe('ManageComponent summary flow', () => {
     expect(editor.formModel.summaryStatus).toBe('done');
     expect((component as unknown as { summaryStatusPollTimer: number | null }).summaryStatusPollTimer).toBeNull();
   });
+});
+
+describe('ManageComponent artifact download modal', () => {
+  let apiService: jasmine.SpyObj<ApiService>;
+  let fixture: ReturnType<typeof TestBed.createComponent<ManageComponent>>;
+  let component: ManageComponent;
+  const episode: Episode = {
+    episodeId: 42,
+    title: 'A test episode',
+    summary: 'Summary',
+    pubDate: '2026-07-24T00:00:00.000Z',
+    duration: '01:00:00',
+    explicit: 'no',
+    fileName: ' episode-42.mp3 ',
+    trailerFileName: '',
+    coverFileName: 'cover-42.jpg',
+    coverLowFileName: 'cover-42.webp',
+    transcriptFileName: 'transcript-42.txt',
+    guests: [],
+  };
+
+  const completedSnapshot = (overrides: Partial<EpisodeArtifactJobSnapshot> = {}): EpisodeArtifactJobSnapshot => ({
+    jobId: 'job-42',
+    episodeId: 42,
+    requested: ['episode', 'image', 'image-low', 'transcript'],
+    available: ['episode', 'image', 'image-low', 'transcript'],
+    missing: [],
+    state: 'completed',
+    progress: 100,
+    stateText: 'Archive ready',
+    queuePosition: null,
+    downloadUrl: '/v1/episodes/42/artifacts/jobs/job-42/download',
+    expiresAt: null,
+    error: null,
+    createdAt: '2026-07-31T00:00:00.000Z',
+    updatedAt: '2026-07-31T00:00:01.000Z',
+    ...overrides,
+  });
+
+  beforeEach(async () => {
+    apiService = jasmine.createSpyObj<ApiService>('ApiService', [
+      'getEpisodeTranscriptionStatus',
+      'getEpisodeGeneratedSummaryStatus',
+      'startEpisodeArtifactJob',
+      'getEpisodeArtifactJobStatus',
+      'listEpisodes',
+    ]);
+    apiService.listEpisodes.and.returnValue(of([]));
+    await TestBed.configureTestingModule({
+      declarations: [ManageComponent, EpisodeFormComponent],
+      imports: [CommonModule, FormsModule],
+      providers: [{ provide: ApiService, useValue: apiService }],
+    }).compileComponents();
+    fixture = TestBed.createComponent(ManageComponent);
+    component = fixture.componentInstance;
+    component.activeTab = 'episodes';
+    component.episodes = [episode];
+    fixture.detectChanges();
+  });
+
+  it('UI-01 exposes one labeled icon-only Downloads action per episode row and opens UI-02 modal', fakeAsync(() => {
+    const downloadButton = fixture.nativeElement.querySelector('.episode-download-button') as HTMLButtonElement;
+    expect(fixture.nativeElement.querySelector('th').parentElement.textContent).toContain('Downloads');
+    expect(downloadButton.getAttribute('title')).toBe('Download episode artifacts');
+    expect(downloadButton.getAttribute('aria-label')).toContain('Download episode artifacts');
+    expect(downloadButton.textContent?.trim()).toBe('⇩');
+
+    downloadButton.click();
+    fixture.detectChanges();
+    tick();
+    fixture.detectChanges();
+
+    const dialog = fixture.nativeElement.querySelector('[role="dialog"][aria-modal="true"]') as HTMLElement;
+    expect(dialog).not.toBeNull();
+    expect(dialog.getAttribute('aria-labelledby')).toBe('artifactModalTitle');
+    expect(document.activeElement?.id).toBe('artifactModalTitle');
+  }));
+
+  it('UI-03 and UI-04 render the five canonical options in order with trimmed availability defaults', () => {
+    component.openArtifactModal(episode);
+    fixture.detectChanges();
+
+    const options = Array.from(fixture.nativeElement.querySelectorAll('.artifact-option')) as HTMLElement[];
+    expect(options.map((option) => option.querySelector('.artifact-option-label')?.textContent?.trim())).toEqual([
+      'Episode audio .mp3',
+      'Trailer .mp3',
+      'Cover art .jpg/.jpeg',
+      'Low cover art .webp',
+      'Transcript .txt',
+    ]);
+    const checkboxes = Array.from(fixture.nativeElement.querySelectorAll('.artifact-option input')) as HTMLInputElement[];
+    expect(checkboxes.map((checkbox) => checkbox.checked)).toEqual([true, false, true, true, true]);
+    expect(checkboxes[1].disabled).toBeTrue();
+    expect(checkboxes[1].parentElement?.textContent).toContain('Unavailable — file not uploaded.');
+    expect(checkboxes[0].parentElement?.querySelector('.artifact-option-filename')?.getAttribute('title')).toBe('episode-42.mp3');
+  });
+
+  it('UI-05 validates an empty selection and submits only checked canonical selectors', () => {
+    component.openArtifactModal(episode);
+    fixture.detectChanges();
+    component.artifactOptions.forEach((option) => option.checked = false);
+    component.confirmArtifactJob();
+    expect(apiService.startEpisodeArtifactJob).not.toHaveBeenCalled();
+    expect(component.artifactModalMessage).toContain('Select at least one');
+
+    component.artifactOptions[0].checked = true;
+    component.artifactOptions[2].checked = true;
+    apiService.startEpisodeArtifactJob.and.returnValue(of(completedSnapshot({ state: 'pending', progress: 0 })));
+    component.confirmArtifactJob();
+    expect(apiService.startEpisodeArtifactJob).toHaveBeenCalledOnceWith(42, ['episode', 'image']);
+  });
+
+  it('UI-06 renders local progress, prevents duplicate starts, and retains terminal partial results', () => {
+    component.openArtifactModal(episode);
+    fixture.detectChanges();
+    const pending = completedSnapshot({ state: 'processing', progress: 65, requested: ['episode', 'image'], available: ['episode'], missing: ['image'] });
+    apiService.startEpisodeArtifactJob.and.returnValue(of(pending));
+    apiService.getEpisodeArtifactJobStatus.and.returnValue(of(pending));
+    component.confirmArtifactJob();
+    component.confirmArtifactJob();
+    expect(apiService.startEpisodeArtifactJob).toHaveBeenCalledTimes(1);
+    expect(component.getArtifactStatusLabel()).toBe('Creating ZIP — 65%');
+    expect(component.getArtifactMissingLabels()).toEqual(['Cover art']);
+
+    const completed = completedSnapshot({ requested: ['episode', 'image'], available: ['episode'], missing: ['image'] });
+    (component as unknown as { storeArtifactJob: (snapshot: EpisodeArtifactJobSnapshot) => void }).storeArtifactJob(completed);
+    expect(component.getArtifactStage()).toBe('Archive ready');
+    expect(component.getArtifactMissingLabels()).toEqual(['Cover art']);
+    expect(component.artifactJob?.downloadUrl).toBe('/v1/episodes/42/artifacts/jobs/job-42/download');
+    expect(apiService.getEpisodeArtifactJobStatus).toHaveBeenCalled();
+  });
+
+  it('UI-06 traps Tab in both directions, closes on Escape, and restores invoker focus', fakeAsync(() => {
+    const downloadButton = fixture.nativeElement.querySelector('.episode-download-button') as HTMLButtonElement;
+    component.openArtifactModal(episode, downloadButton);
+    fixture.detectChanges();
+    tick();
+    const dialog = fixture.nativeElement.querySelector('[role="dialog"][aria-modal="true"]') as HTMLElement;
+    const focusable = Array.from(dialog.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled])'));
+
+    focusable[focusable.length - 1].focus();
+    const forward = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true });
+    dialog.dispatchEvent(forward);
+    expect(document.activeElement).toBe(focusable[0]);
+
+    focusable[0].focus();
+    const backward = new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true });
+    dialog.dispatchEvent(backward);
+    expect(document.activeElement).toBe(focusable[focusable.length - 1]);
+
+    dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    fixture.detectChanges();
+    tick();
+    expect(component.artifactModalOpen).toBeFalse();
+    expect(document.activeElement).toBe(downloadButton);
+  }));
 });
