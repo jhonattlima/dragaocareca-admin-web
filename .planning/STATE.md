@@ -5,12 +5,12 @@ milestone_name: Episode Artifact Downloads
 current_phase: 04
 current_phase_name: artifact-job-contract
 status: verifying
-stopped_at: Completed 04-03-PLAN.md
-last_updated: "2026-07-29T20:30:59.760Z"
+stopped_at: Phase 5 context gathered
+last_updated: "2026-07-31T02:37:56.707Z"
 last_activity: 2026-07-29
 last_activity_desc: Phase 04 execution started
 progress:
-  total_phases: 1
+  total_phases: 2
   completed_phases: 1
   total_plans: 3
   completed_plans: 3
@@ -98,6 +98,6 @@ None for v1.0. MNT-01 and MNT-02 carry forward to the next milestone.
 
 ## Session Continuity
 
-Last session: 2026-07-29T20:30:59.755Z
-Stopped at: Completed 04-03-PLAN.md
-Resume file: None
+Last session: 2026-07-31T02:37:56.698Z
+Stopped at: Phase 5 context gathered
+Resume file: .planning/phases/05-episode-download-modal/05-CONTEXT.md
