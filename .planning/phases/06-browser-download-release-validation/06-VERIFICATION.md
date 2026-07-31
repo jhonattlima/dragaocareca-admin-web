@@ -1,33 +1,71 @@
 ---
 phase: 06-browser-download-release-validation
-verified: 2026-07-31T14:43:30Z
-status: human_needed
+verified: 2026-07-31T14:51:49Z
+status: gaps_found
 score: 2/5 must-haves verified
 behavior_unverified: 1
 overrides_applied: 0
+re_verification:
+  previous_status: human_needed
+  previous_score: 2/5
+  gaps_closed:
+    - "Frontend artifact progress labels now mirror the API at <25% and <90% boundaries."
+  gaps_remaining:
+    - "Real-browser recovery matrix remains incomplete."
+    - "Full frontend Karma release gate is not green."
+  regressions: []
+gaps:
+  - truth: "Existing frontend tests and npm run build pass after the feature is integrated."
+    status: failed
+    reason: "The production build passes, but the fresh full ChromeHeadless Karma run is not green: UI-01 and UI-06 fail, polling cleanup throws undefined.subscribe, and Chrome disconnects after 22 of 28 tests."
+    artifacts:
+      - path: "src/app/pages/manage/manage.component.spec.ts"
+        issue: "UI-01 fails while locating the Downloads row markup and UI-06 fails invoker-focus restoration."
+      - path: "src/app/pages/manage/manage.component.ts"
+        issue: "The full run reports an existing polling cleanup error at ensureArtifactJobPolling()."
+    missing:
+      - "A clean full frontend Karma run, or explicit release-owner acceptance of these pre-existing failures."
+  - truth: "A partially fulfilled job downloads successfully while clearly warning which requested artifacts were unavailable; object URLs are cleaned up after delivery."
+    status: partial
+    reason: "The implementation and focused browser-backed Karma recovery spec cover the behavior, but the real DC334 Playwright recovery harness never reached partial availability or its subsequent scenarios."
+    artifacts:
+      - path: ".planning/phases/06-browser-download-release-validation/06-VALIDATION.md"
+        issue: "Only the full-selection DC334 browser download has a result artifact; partial browser evidence is absent."
+      - path: "src/app/pages/manage/phase6-validation.spec.ts"
+        issue: "Six mocked recovery assertions pass, but they do not replace the requested real-browser matrix."
+    missing:
+      - "Real-browser partial-availability download and missing-artifact warning evidence."
+  - truth: "Empty-selection, failed-job, network/authentication, reset, and retry states are visible and leave the operator able to try again safely."
+    status: partial
+    reason: "Source and focused specs are present, but the bounded real-browser harness stopped at the disabled empty-selection control; later retry, auth/network/expiry, reopen, reset, and repeated-completion cases were not executed."
+    artifacts:
+      - path: ".planning/phases/06-browser-download-release-validation/06-VALIDATION.md"
+        issue: "The recovery matrix is explicitly recorded as incomplete."
+    missing:
+      - "A completed real-browser recovery matrix with request-count evidence."
 behavior_unverified_items:
-  - truth: "Empty, partial, failed, reset, repeated-completion, reopen, network, authentication, and expired-download states remain understandable and recoverable in the existing modal."
-    test: "Exercise the complete recovery matrix in a browser, including empty selection, partial availability, failed preparation, network/401/403/404/409 delivery failures, reopen, reset, and same-job retry."
-    expected: "Each state remains visible and recoverable; delivery retry reuses the completed URL without another preparation POST; reset enables a new selection/job."
-    why_human: "The implementation and Jasmine specs are present, but the bounded Playwright recovery harness stopped at the disabled empty-selection control; the new Karma run does not replace the missing real-browser recovery matrix."
+  - truth: "Empty-selection, failed-job, network/authentication, reset, and retry states remain understandable and recoverable in the existing modal."
+    test: "Exercise empty selection, partial availability, failed preparation, network/401/403/404/409 delivery failures, reopen, reset, same-job retry, and repeated completion in the browser."
+    expected: "Each state remains visible and recoverable; delivery retry reuses the completed URL without another preparation POST; reset enables a new selection/job; repeated completion does not redownload."
+    why_human: "Presence and mocked Karma assertions cannot prove the complete live browser flow; the recorded Playwright harness stopped before these cases."
 human_verification:
-  - test: "Complete the browser recovery matrix for the artifact modal."
-    expected: "Empty selection is clear; partial downloads warn about missing selectors; failed/network/auth/expired states retain the completed or failed context and expose the correct retry/reset action; same-job delivery retry sends no new preparation POST; repeated completion/reopen does not redownload."
-    why_human: "The recorded Playwright harness timed out after confirming the disabled empty-selection state, so later scenarios have no evidence."
-  - test: "Run the frontend Karma suite in a browser-capable environment."
-    expected: "The full frontend test suite executes and passes, including the API and ManageComponent Phase 6 specs."
-    why_human: "The browser-qualified suite executes with the existing Chromium binary, but the full suite has pre-existing UI-01/UI-06 failures and an existing polling-spy afterAll error; it is not a clean release gate."
-  - test: "Review the real DC 334 flow as release approval, if required by release policy."
-    expected: "The full-selection ZIP evidence is accepted together with explicit acknowledgment that Creating ZIP/Finalizing ZIP were not observed and recovery remains incomplete."
-    why_human: "Visual/browser approval and release-policy acceptance are not inferable from source or a partial automated harness."
+  - test: "Complete the real-browser recovery matrix for the artifact modal."
+    expected: "Empty, partial, failed, network/authentication/expiry, reopen, reset, same-job retry, and repeated-completion states are usable and request counts show no duplicate preparation or download."
+    why_human: "The existing Playwright harness timed out after confirming the empty-selection button was correctly disabled; later scenarios have no browser result artifact."
+  - test: "Resolve or explicitly accept the full frontend Karma failures."
+    expected: "The full ChromeHeadless suite passes, or the release owner records acceptance of the UI-01/UI-06 failures and polling cleanup error."
+    why_human: "The failures are test/runtime evidence requiring developer or release-owner judgment; they cannot be reclassified as passing by source inspection."
+  - test: "Review DC334 release acceptance."
+    expected: "Accept the recorded full-selection ZIP and fixture cleanup evidence while acknowledging that Creating ZIP/Finalizing ZIP were not captured and recovery remains incomplete."
+    why_human: "Release-policy acceptance and visual browser approval are not inferable from code or the partial harness."
 ---
 
 # Phase 6: Browser Download & Release Validation Verification Report
 
 **Phase Goal:** Operators receive the completed ZIP in the browser and can understand and recover from partial, empty, and failed download outcomes using the DC 334 Season 3 fixture.
-**Verified:** 2026-07-31T14:12:00Z
-**Status:** human_needed
-**Re-verification:** Yes — 06-03 threshold correction and release-gate rerun
+**Verified:** 2026-07-31T14:51:49Z
+**Status:** gaps_found
+**Re-verification:** Yes — after 06-03 threshold gap closure
 
 ## Goal Achievement
 
@@ -35,90 +73,90 @@ human_verification:
 
 | # | Truth | Status | Evidence |
 |---|---|---|---|
-| 1 | A completed job triggers one native browser ZIP download with the backend-provided safe filename, without a ZIP or file-saver dependency. | ✓ VERIFIED | `ManageComponent.storeArtifactJob()` calls delivery only for completed snapshots; delivery is keyed by job and URL, parses `Content-Disposition`, activates one temporary anchor, and revokes the object URL in `finally`. The recorded Playwright run observed one preparation POST, one authenticated Blob GET, one native download, filename `episode-334-artifacts.zip`, one object URL, one activation, and one revoke. No package/lockfile changes. |
-| 2 | A partially fulfilled job downloads successfully while warning which requested artifacts were unavailable; object URLs are cleaned up after delivery. | ? UNCERTAIN — human needed | The template renders `missing` selector labels and the implementation cleans object URLs, but the real browser evidence covered only the full-selection case. Partial-availability behavior was not reached by the recovery harness. |
-| 3 | Empty-selection, failed-job, network/authentication, reset, and retry states are visible and leave the operator able to try again safely. | ⚠️ PRESENT_BEHAVIOR_UNVERIFIED | Source and focused specs cover disabled empty selection, failed preparation retry, delivery errors, 401/404/409 messaging, same-URL retry, reset, repeated completion, and reopen. The bounded Playwright recovery harness still stopped after the disabled empty-selection check; the new Karma run does not replace the missing real-browser recovery matrix. |
-| 4 | The DC 334 Season 3 mock episode and provided fixture produce a manually verified ZIP whose contents match selected available artifacts and visible progress. | ✓ VERIFIED for full-selection evidence; recovery approval outstanding | The validation record reports the real mounted fixture staged through the sibling API canonical layout, CORS-readable filename, one native download, and ZIP entries `episode-334/audio.mp3`, `trailer.mp3`, `transcript.txt`, `cover.jpeg`, and `cover.webp`; the destination and original row were restored. This does not prove the uncompleted recovery matrix or the short-lived Creating ZIP/Finalizing ZIP observations. |
-| 5 | Existing frontend tests and `npm run build` pass after integration. | ⚠️ PARTIAL — pre-existing test debt remains | The focused API suite passed 4/4 and the threshold suite passed 1/1 in Chrome Headless 149. The full browser-qualified suite executed all 28 assertions, with 26 passing and pre-existing UI-01/UI-06 failures plus the existing polling-spy `undefined.subscribe` afterAll error. `npm run build` exited 0 (hash `a4d773fb83093a85`) with only existing selector-parser and Angular budget warnings. |
+| 1 | A completed job triggers one native browser ZIP download with the backend-provided safe filename, without a ZIP or file-saver dependency. | ✓ VERIFIED | `api.service.ts` uses authenticated `HttpClient` Blob delivery; `manage.component.ts` parses the server `Content-Disposition`, activates one temporary anchor, and revokes the object URL. Recorded Playwright DC334 evidence shows one preparation POST, one Blob GET, one native download named `episode-334-artifacts.zip`, one object URL, one activation, and one revoke. Package and lockfile diff is clean. |
+| 2 | A partially fulfilled job downloads successfully while clearly warning which requested artifacts were unavailable; object URLs are cleaned up after delivery. | ⚠️ UNCERTAIN | Template/source wiring and the focused six-test recovery suite cover missing-artifact labels and cleanup, but the live recovery harness did not reach partial availability. |
+| 3 | Empty-selection, failed-job, network/authentication, reset, and retry states are visible and leave the operator able to try again safely. | ⚠️ PRESENT_BEHAVIOR_UNVERIFIED | Source and mocked browser-backed specs cover the states; the required real-browser matrix is incomplete. |
+| 4 | The DC334 Season 3 fixture produces a manually verified ZIP whose contents match the selected available artifacts and visible progress. | ✓ VERIFIED (full-selection path) | `06-VALIDATION.md` records the real mounted fixture, restored API row, removed destination, one native download, server filename, and ZIP entries `episode-334/audio.mp3`, `trailer.mp3`, `transcript.txt`, `cover.jpeg`, and `cover.webp`. Only `Preparing files` and `Archive ready` were observed; short-lived Creating/Finalizing states were not claimed. |
+| 5 | Existing frontend tests and `npm run build` pass after the feature is integrated. | ✗ FAILED | Fresh full Karma: exit 1; UI-06 and UI-01 fail, polling cleanup reports `undefined.subscribe`, and Chrome disconnects after 22/28 executed. Fresh `npm run build`: exit 0 with existing selector-parser and Angular budget warnings. |
 
-**Score:** 2/5 truths verified (1 present, behavior-unverified; 2 require human/release follow-up)
+**Score:** 2/5 truths verified (1 uncertain, 1 present-but-behavior-unverified)
+
+The phase is not ready for milestone audit: the failed full-test release gate and the incomplete live recovery matrix remain escalation-gate items.
 
 ## Required Artifacts
 
 | Artifact | Expected | Status | Details |
 |---|---|---|---|
-| `src/app/core/api.service.ts` | Authenticated typed Blob response with headers and API-origin URL normalization | ✓ VERIFIED | `downloadEpisodeArtifact()` returns `HttpResponse<Blob>`, uses `observe: 'response'`, `responseType: 'blob'`, and resolves relative URLs. |
-| `src/app/core/api.service.spec.ts` | HTTP contract coverage | ✓ VERIFIED | Tests assert route, GET, Blob response type, ZIP body, Content-Disposition, and absolute URL preservation. |
-| `src/app/pages/manage/manage.component.ts` | Exactly-once delivery, server filename, cleanup, retry/reset | ✓ VERIFIED | Completion guard, retry separation, filename validation, native anchor activation, and `finally` cleanup are implemented. |
-| `src/app/pages/manage/manage.component.html` | Ready, progress, missing, failure, retry, reset, empty-selection presentation | ✓ VERIFIED | Dynamic status/warning/error/action bindings are present and wired. |
-| `src/app/pages/manage/manage.component.spec.ts` | Delivery and recovery coverage | ⚠️ PARTIAL — two pre-existing failures | The focused/full browser run executes this suite, but UI-01 and UI-06 fail on existing DOM/fixture assumptions and the existing polling-spy afterAll error remains. |
-| `src/app/pages/manage/phase6-progress-threshold.spec.ts` | API/UI boundary coverage | ✓ VERIFIED | Chrome Headless executed 1/1 assertion for 24%, 25%, 89%, and 90% labels. |
+| `src/app/core/api.service.ts` | Authenticated typed Blob response with headers and URL normalization | ✓ VERIFIED | `downloadEpisodeArtifact()` returns `HttpResponse<Blob>`, observes the response, requests a Blob, and resolves relative URLs against the API origin. |
+| `src/app/core/api.service.spec.ts` | API Blob/header/auth-path coverage | ✓ VERIFIED | Focused ChromeHeadless run: 4/4 passed. |
+| `src/app/pages/manage/manage.component.ts` | Native delivery, server filename, cleanup, retry/reset | ✓ VERIFIED | Completion identity guard, same-job delivery retry, filename validation, anchor activation, and `finally` cleanup are implemented and wired. |
+| `src/app/pages/manage/manage.component.html` | Ready, progress, missing, failure, retry, reset, and empty states | ✓ VERIFIED | Dynamic bindings connect modal state to visible labels, warnings, errors, and actions. |
+| `src/app/pages/manage/manage.component.spec.ts` | Delivery and recovery regression coverage | ⚠️ PARTIAL | Full run fails UI-01/UI-06 and reports the polling cleanup error. |
+| `src/app/pages/manage/phase6-validation.spec.ts` | Focused recovery assertions | ✓ VERIFIED | Focused ChromeHeadless run: 6/6 passed; mocked coverage only. |
+| `src/app/pages/manage/phase6-progress-threshold.spec.ts` | API stage boundary coverage | ✓ VERIFIED | Focused ChromeHeadless run: 1/1 passed for 24%, 25%, 89%, and 90%. |
 
 ## Key Link Verification
 
 | From | To | Via | Status | Details |
 |---|---|---|---|---|
-| `ManageComponent` | `ApiService` | Completed snapshot `downloadUrl` invokes Blob method; delivery retry is separate from preparation retry | ✓ WIRED | `storeArtifactJob()` → `deliverCompletedArtifact()` → `downloadEpisodeArtifact()`; `retryArtifactDelivery()` does not call `startEpisodeArtifactJob()`. |
-| `ApiService` | `AuthInterceptor` | Injected `HttpClient` request | ✓ WIRED | `ApiService` injects `HttpClient`; download uses it rather than navigation/fetch. `AuthInterceptor` clones requests with `Authorization: Bearer`. |
-| `ManageComponent` | `Content-Disposition` | Header parse → anchor download name | ✓ WIRED | `activateArtifactDownload()` reads the response header and rejects missing/unsafe names; no client-derived fallback is used. |
-| Sibling API | Browser Angular client | CORS exposed response headers | ✓ VERIFIED | Validation evidence records `Access-Control-Expose-Headers: Content-Disposition,X-Missing-Artifacts` and Angular XHR-readable `Content-Disposition`. |
+| `ManageComponent` | `ApiService` | Completed `downloadUrl` invokes Blob delivery; delivery retry is separate from preparation retry | ✓ WIRED | `storeArtifactJob()` → `deliverCompletedArtifact()` → `downloadEpisodeArtifact()`; `retryArtifactDelivery()` reuses the URL and does not start a preparation job. |
+| `ApiService` | `AuthInterceptor` | Download uses injected Angular `HttpClient` | ✓ WIRED | The existing interceptor remains the bearer-token boundary. |
+| `ManageComponent` | `Content-Disposition` | Response header → temporary anchor filename | ✓ WIRED | Server filename is parsed and validated; no client-derived fallback is used. |
+| Sibling API | Angular browser | CORS exposed headers | ✓ VERIFIED from recorded evidence | `06-VALIDATION.md` records `Content-Disposition` and `X-Missing-Artifacts` exposure plus Angular-readable filename evidence. |
+| Sibling API | `ManageComponent` | Progress-stage vocabulary | ✓ VERIFIED | Source uses `<25` preparation, `<90` Creating ZIP, and `>=90` Finalizing ZIP; focused threshold test passes. |
 
 ## Data-Flow Trace (Level 4)
 
 | Artifact | Data variable | Source | Produces real data | Status |
 |---|---|---|---|---|
-| `manage.component.html` | `artifactJob`, progress, `missing`, delivery status | API start/status snapshots and completed Blob response | Yes in recorded DC 334 full-selection run; partial/recovery paths unexercised | ⚠️ FLOWING — recovery evidence incomplete |
-| `api.service.ts` | Blob and response headers | Authenticated API download endpoint | Yes; Playwright observed HTTP 200 ZIP and server filename | ✓ FLOWING |
+| `manage.component.html` | `artifactJob`, progress, missing labels, delivery status | API job snapshots and completed Blob response | Yes for the recorded full-selection DC334 flow; recovery paths are not live-verified | ⚠️ FLOWING — incomplete recovery evidence |
+| `api.service.ts` | Blob body and response headers | Authenticated completed-download endpoint | Yes; recorded browser response was HTTP 200 with ZIP and safe filename | ✓ FLOWING |
 
 ## Behavioral Spot-Checks
 
 | Behavior | Command | Result | Status |
 |---|---|---|---|
-| Production frontend build | `npm run build` | Exit 0; Angular build completed, existing selector and budget warnings reported | ✓ PASS |
-| Focused threshold suite | `CHROME_BIN=/home/jhonatt/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/pages/manage/phase6-progress-threshold.spec.ts'` | Exit 0; 1/1 boundary assertion passed | ✓ PASS |
-| Focused API suite | `CHROME_BIN=/home/jhonatt/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/core/api.service.spec.ts'` | Exit 0; 4/4 assertions passed | ✓ PASS |
-| Frontend Karma suite | `CHROME_BIN=/home/jhonatt/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome npm test -- --watch=false --browsers=ChromeHeadless` | Exit 1; 28 executed, 26 passed, pre-existing UI-01/UI-06 failures and polling-spy afterAll error | ? HUMAN NEEDED |
-| Real DC 334 full-selection browser flow | Playwright evidence recorded in `06-VALIDATION.md` | One POST, one Blob GET, one native download, CORS-readable filename, five ZIP entries, cleanup/restoration pass | ✓ PASS — recorded evidence |
+| Progress-stage thresholds | `CHROME_BIN=/home/jhonatt/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/pages/manage/phase6-progress-threshold.spec.ts'` | Exit 0; 1/1 passed in Chrome Headless 149 | ✓ PASS |
+| API Blob contract | `CHROME_BIN=/home/jhonatt/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/core/api.service.spec.ts'` | Exit 0; 4/4 passed | ✓ PASS |
+| Focused recovery behavior | `CHROME_BIN=/home/jhonatt/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/pages/manage/phase6-validation.spec.ts'` | Exit 0; 6/6 passed; mocked state/recovery coverage | ✓ PASS (scoped) |
+| Full frontend Karma | `CHROME_BIN=/home/jhonatt/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome npm test -- --watch=false --browsers=ChromeHeadless` | Exit 1; UI-06 and UI-01 failed, polling cleanup threw `undefined.subscribe`, Chrome disconnected after 22/28 | ✗ FAIL |
+| Production build | `npm run build` | Exit 0; existing selector-parser warnings and metrics/initial-bundle budget warnings | ✓ PASS with warnings |
+| Dependency immutability | `git diff --exit-code -- package.json package-lock.json` | Exit 0; no manifest or lockfile changes | ✓ PASS |
+| Real DC334 full-selection browser flow | Recorded in `06-VALIDATION.md` | One preparation POST, one Blob GET, one native download, five expected ZIP entries, CORS filename visibility, fixture cleanup | ✓ PASS for full-selection only |
 
 ## Probe Execution
 
-No phase-declared `probe-*.sh` or conventional project probe was found for this frontend validation phase.
+No phase-declared or conventional `probe-*.sh` was found for this frontend validation phase.
 
 ## Requirements Coverage
 
-| Requirement | Source Plan | Description | Status | Evidence |
-|---|---|---|---|---|
-| UI-07 | `06-01-PLAN.md` | Browser automatically downloads ZIP on completion | ✓ SATISFIED | Source wiring plus real Playwright one-download/full-selection evidence. |
-| UI-08 | `06-01-PLAN.md` | Clear empty, partial, failure, reset, retry states | ? NEEDS HUMAN | Source/spec coverage exists, but Karma and later browser recovery scenarios did not execute. |
-| VAL-01 | `06-02-PLAN.md` | DC 334 fixture configured through provided episode folder | ✓ SATISFIED | Real mounted source, canonical API destination, five files, row snapshot, and cleanup are recorded. |
-| VAL-02 | `06-02-PLAN.md` | Complete UI flow manually validated, including progress and ZIP contents | ? NEEDS HUMAN | Full-selection ZIP and filename/progress evidence passed, but partial/recovery matrix was explicitly incomplete; the requirement remains pending in `REQUIREMENTS.md`. |
-| VAL-03 | `06-01-PLAN.md`, `06-02-PLAN.md`, `06-03-PLAN.md` | Frontend tests and build remain passing | ? NEEDS HUMAN | Focused API (4/4) and threshold (1/1) suites passed; build passed; full Karma executed but retains pre-existing UI-01/UI-06 failures and an afterAll polling-spy error. |
+| Requirement | Source Plan | Status | Evidence |
+|---|---|---|---|
+| UI-07 | `06-01-PLAN.md` | ✓ SATISFIED | Native one-download implementation plus recorded real DC334 full-selection browser evidence. |
+| UI-08 | `06-01-PLAN.md` | ? NEEDS HUMAN | Focused six-test suite passes, but the live partial/error/retry/reset/reopen matrix is unexecuted. |
+| VAL-01 | `06-02-PLAN.md` | ✓ SATISFIED | Real provided DC334 fixture was staged, used, then the original row and destination were restored; source was not modified. |
+| VAL-02 | `06-02-PLAN.md` | ✗ BLOCKED | Full-selection ZIP contents are recorded, but complete manual UI/recovery validation is not complete. |
+| VAL-03 | `06-01/02/03-PLAN.md` | ✗ BLOCKED | Build and focused suites pass, but the full frontend Karma release gate fails in this verification run. |
 
-No Phase 6 requirement is orphaned: all five IDs are declared in the plans and mapped in `REQUIREMENTS.md`.
+The roadmap’s five Phase 6 success criteria were all checked. No Phase 6 requirement is orphaned in the plans; the checked requirement list in `REQUIREMENTS.md` is not treated as evidence where current validation contradicts it.
 
 ## Anti-Patterns Found
 
-| File | Line | Pattern | Severity | Impact |
-|---|---:|---|---|---|
-| — | — | No Phase 6 debt markers (`TBD`, `FIXME`, `XXX`) or placeholder implementation found in modified files. | ℹ️ Info | No blocker. Existing `return null` branches in unrelated ManageComponent helpers are normal optional-value handling and do not feed the Phase 6 delivery stub. |
+| File | Pattern | Severity | Impact |
+|---|---|---|---|
+| Phase-modified source files | No unreferenced `TBD`, `FIXME`, or `XXX`; no placeholder implementation found | ℹ️ Info | No new debt marker blocker. The full-suite polling cleanup error is recorded above as a test/release gap. |
 
 ## Human Verification Required
 
-1. **Complete recovery matrix:** Run empty selection, partial availability, failed preparation, network, 401/403, 404/409 expiry, reopen, reset, and same-job delivery retry. Confirm visible recovery and no duplicate preparation POST. The existing harness stopped after correctly finding the disabled empty-selection control.
-2. **Karma release gate:** Resolve or explicitly accept the pre-existing UI-01/UI-06 failures and polling-spy afterAll error before treating the full frontend suite as a clean release gate. The suite now executes with the configured Chromium binary.
-3. **Release acceptance:** Acknowledge the full-selection DC 334 result while preserving the fact that Creating ZIP and Finalizing ZIP were not observed and partial recovery is not approved.
+1. Complete the real-browser recovery matrix: empty selection, partial availability, failed preparation, network, 401/403, 404/409 expiry, reopen, reset, same-job delivery retry, and repeated completion. Record visible outcomes and preparation/download request counts.
+2. Resolve or explicitly accept the fresh full Karma failures (UI-01, UI-06, polling cleanup, and browser disconnect) before calling VAL-03 a release pass.
+3. Have the release owner accept the recorded full-selection DC334 result with the unobserved Creating/Finalizing stages and incomplete recovery evidence explicitly acknowledged.
 
-## Gaps / Release Blockers
+## Gaps Summary
 
-The implementation and full-selection delivery path are present and wired. Release completion is not fully verified because:
-
-- The browser recovery matrix is partial. Later partial, network/authentication, expiry, retry, reset, and repeated-completion scenarios have no result artifact and must not be marked passed.
-- The full Karma suite executes with the configured Chromium binary but is not green because of pre-existing UI-01/UI-06 failures and the polling-spy afterAll error. VAL-03 therefore remains human-needed despite the passing production build.
-- The API/frontend progress-stage mismatch is closed by the 25/90 threshold implementation and passing focused boundary suite.
-
-These are escalation-gate items for developer/release-owner decision, not fabricated failures of the source implementation.
+06-03 successfully closed the API/frontend progress-boundary mismatch: source and the 24/25/89/90 focused test now agree on the sibling API contract. Native Blob delivery, safe server filename handling, object-URL cleanup, same-job delivery retry, reset, and the real full-selection DC334 ZIP evidence are present. However, this re-verification cannot mark the phase complete. The required real-browser recovery matrix remains incomplete, and the fresh full frontend Karma run is not green. These are unresolved release gaps, so the phase is not ready for milestone audit.
 
 ---
 
-_Verified: 2026-07-31T14:12:00Z_
+_Verified: 2026-07-31T14:51:49Z_
 _Verifier: the agent (gsd-verifier)_
