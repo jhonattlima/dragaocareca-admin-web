@@ -5,15 +5,15 @@ milestone_name: Episode Artifact Downloads
 current_phase: 05
 current_phase_name: episode-download-modal
 status: verifying
-stopped_at: Completed 05-04-PLAN.md
-last_updated: "2026-07-31T03:22:42.657Z"
-last_activity: 2026-07-29
-last_activity_desc: Phase 04 execution started
+stopped_at: Completed 06-01-PLAN.md
+last_updated: "2026-07-31T13:45:31.465Z"
+last_activity: 2026-07-31
+last_activity_desc: Phase 05 gap closure completed
 progress:
-  total_phases: 2
+  total_phases: 3
   completed_phases: 2
-  total_plans: 7
-  completed_plans: 7
+  total_plans: 9
+  completed_plans: 8
 ---
 
 # Project State
@@ -31,7 +31,7 @@ Phase: 05 (episode-download-modal) — EXECUTING
 Plan: 4 of 4
 Status: Phase complete — ready for verification
 Last activity: 2026-07-31 — Phase 05 gap closure completed
-Progress: [██████████] 100%
+Progress: [█████████░] 89%
 
 ## Performance Metrics
 
@@ -64,6 +64,7 @@ Progress: [██████████] 100%
 | Phase 05 P02 | 10min | 2 tasks | 1 files |
 | Phase 05 P03 | 8min | 3 tasks | 4 files |
 | Phase 05-episode-download-modal P04 | 6min | 2 tasks | 2 files |
+| Phase 06 P01 | 8min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -92,6 +93,9 @@ Recent decisions affecting current work:
 - [Phase ?]: Phase 05-03: Use native controls with direct focus trapping, Escape close, and invoker restoration.
 - [Phase ?]: Use an episode-scoped Symbol token map so stale artifact-job start callbacks cannot clear newer requests.
 - [Phase ?]: Keep active pending/processing job protection and polling behavior unchanged.
+- [Phase ?]: Phase 06-01: Resolve relative completed artifact URLs against the configured API origin and keep Blob delivery on injected HttpClient/AuthInterceptor.
+- [Phase ?]: Phase 06-01: Guard native delivery by completed job identity and URL; delivery retry reuses the retained URL without starting preparation again.
+- [Phase ?]: Phase 06-01: Accept only validated server Content-Disposition filenames and revoke temporary object URLs in guaranteed cleanup.
 
 ### Pending Todos
 
@@ -110,6 +114,6 @@ None for v1.0. MNT-01 and MNT-02 carry forward to the next milestone.
 
 ## Session Continuity
 
-Last session: 2026-07-31T03:22:42.651Z
-Stopped at: Completed 05-04-PLAN.md
+Last session: 2026-07-31T13:45:31.460Z
+Stopped at: Completed 06-01-PLAN.md
 Resume file: None

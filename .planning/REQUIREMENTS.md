@@ -23,14 +23,14 @@ Requirements for milestone v1.1 Episode Artifact Downloads.
 - [x] **UI-04**: All available artifact options are checked by default, while unavailable options are clearly disabled or omitted.
 - [x] **UI-05**: The user can select or deselect artifacts before confirming the download.
 - [x] **UI-06**: After confirmation, the modal shows ZIP-generation progress and prevents duplicate submissions.
-- [ ] **UI-07**: The browser downloads the ZIP automatically when generation completes.
-- [ ] **UI-08**: The modal shows clear empty-selection, partial-download, failure, reset, and retry states.
+- [x] **UI-07**: The browser downloads the ZIP automatically when generation completes.
+- [x] **UI-08**: The modal shows clear empty-selection, partial-download, failure, reset, and retry states.
 
 ### Validation and Release Quality
 
 - [ ] **VAL-01**: API mock data is configured for the Season 3 DC 334 episode using the provided episode folder.
 - [ ] **VAL-02**: The complete UI flow is manually validated, including visible progress and ZIP contents.
-- [ ] **VAL-03**: Existing frontend tests and `npm run build` remain passing.
+- [x] **VAL-03**: Existing frontend tests and `npm run build` remain passing.
 - [x] **VAL-04**: API tests or equivalent verification cover job creation, progress transitions, completion, failure, and missing artifacts.
 
 ## v2 Requirements
@@ -69,11 +69,11 @@ Mapped to the v1.1 roadmap phases.
 | UI-04 | Phase 5 | Complete |
 | UI-05 | Phase 5 | Complete |
 | UI-06 | Phase 5 | Complete |
-| UI-07 | Phase 6 | Pending |
-| UI-08 | Phase 6 | Pending |
+| UI-07 | Phase 6 | Complete |
+| UI-08 | Phase 6 | Complete |
 | VAL-01 | Phase 6 | Pending |
 | VAL-02 | Phase 6 | Pending |
-| VAL-03 | Phase 6 | Pending |
+| VAL-03 | Phase 6 | Complete |
 | VAL-04 | Phase 4 | Complete |
 
 **Coverage:**

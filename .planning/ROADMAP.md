@@ -71,11 +71,13 @@ Plans:
   4. The DC 334 Season 3 mock episode, using the provided episode folder, produces a manually verified ZIP whose contents match the selected available artifacts and visible progress.
   5. Existing frontend tests and `npm run build` pass after the feature is integrated.
 
-**Plans**: 2 plans
+**Plans**: 1/2 plans executed
 
 Plans:
-- [ ] 06-01-PLAN.md — Implement authenticated native Blob delivery, server filename handling, cleanup, retry, reset, and modal recovery tests
+
+- [x] 06-01-PLAN.md — Implement authenticated native Blob delivery, server filename handling, cleanup, retry, reset, and modal recovery tests
 - [ ] 06-02-PLAN.md — Run full regression/build gates and manually validate the DC 334 browser download and ZIP fixture flow
+
 **UI hint**: yes
 
 ## Progress
@@ -87,4 +89,4 @@ Plans:
 | 1-3 | v1.0 Transcript Summary Integration | 6/6 | Complete | 2026-07-29 |
 | 4. Artifact Job Contract | v1.1 | 3/3 | In Progress|  |
 | 5. Episode Download Modal | v1.1 | 4/4 | Complete | 2026-07-31 |
-| 6. Browser Download & Release Validation | v1.1 | 0/TBD | Not started | - |
+| 6. Browser Download & Release Validation | v1.1 | 1/2 | In Progress|  |
