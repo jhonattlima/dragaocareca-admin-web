@@ -41,14 +41,18 @@ describe('Phase 6 API/UI progress-stage contract', () => {
     component.openArtifactModal(episode);
   });
 
-  it('uses API assembly-stage boundaries: 25% and 85% remain Creating ZIP', () => {
+  it('uses API progress-stage boundaries at 24%, 25%, 89%, and 90%', () => {
     const store = (progress: number): void => {
       (component as unknown as { storeArtifactJob: (value: EpisodeArtifactJobSnapshot) => void }).storeArtifactJob(snapshot(progress));
     };
 
+    store(24);
+    expect(component.getArtifactStatusLabel()).toBe('Preparing files — 24%');
     store(25);
     expect(component.getArtifactStatusLabel()).toBe('Creating ZIP — 25%');
-    store(85);
-    expect(component.getArtifactStatusLabel()).toBe('Creating ZIP — 85%');
+    store(89);
+    expect(component.getArtifactStatusLabel()).toBe('Creating ZIP — 89%');
+    store(90);
+    expect(component.getArtifactStatusLabel()).toBe('Finalizing ZIP — 90%');
   });
 });
