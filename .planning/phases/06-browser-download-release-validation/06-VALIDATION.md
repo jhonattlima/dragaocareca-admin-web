@@ -1,6 +1,6 @@
 # Phase 6 Validation Record
 
-Status: VALIDATED WITH RECOVERY LIMITATIONS — CLEANUP COMPLETE
+Status: PARTIAL — RECOVERY TESTS EXECUTED; PROGRESS THRESHOLD ESCALATED
 
 This artifact is the evidence record for Phase 6. Task 1 and Task 2 populate the automated and fixture sections. Task 3 is the blocking human checkpoint; it must be explicitly approved only after the real browser, CORS, ZIP, recovery, and cleanup checks pass.
 
@@ -117,3 +117,45 @@ Approval signal: `approved` only after every step passes. Otherwise record the e
 - CORS configuration and header exposure proof: PASS — source, response exposure, and Angular XHR-readable header observed
 - Recovery matrix: PARTIAL — exact harness blocker recorded; untested scenarios remain unapproved
 - Fixture pre-state and restore result: PASS — original row restored and destination removed
+
+## Retroactive Nyquist audit — 2026-07-31
+
+The original ChromeHeadless command was environment-blocked because Karma could not find a
+ChromeHeadless binary (and the sandbox could not bind port 9876). The repository already
+contains Playwright and a usable Chromium binary, so no dependency or application change was
+needed. Setting Karma's existing launcher hook to that binary executed real browser assertions:
+
+`CHROME_BIN=/home/jhonatt/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome`
+
+| Gap | Test file | Executed command | Actual result | Classification |
+|---|---|---|---|---|
+| Browser runner unavailable | `src/app/core/api.service.spec.ts` | `CHROME_BIN=/home/jhonatt/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/core/api.service.spec.ts'` | 4/4 assertions passed in Chrome Headless 149 | FILLED |
+| Recovery matrix incomplete | `src/app/pages/manage/phase6-validation.spec.ts` | `CHROME_BIN=/home/jhonatt/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/pages/manage/phase6-validation.spec.ts'` | 6/6 assertions passed: empty, partial, failed preparation, network/401/403/404/409, same-job delivery retry without a preparation POST, reset, and repeated completion | FILLED |
+| API/UI progress-stage threshold mismatch | `src/app/pages/manage/phase6-progress-threshold.spec.ts` | `CHROME_BIN=/home/jhonatt/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/pages/manage/phase6-progress-threshold.spec.ts'` | 1 test failed: actual `Preparing files — 25%` vs expected `Creating ZIP — 25%`; actual `Finalizing ZIP — 85%` vs expected `Creating ZIP — 85%` | BLOCKER — ESCALATE |
+
+The threshold failure is an implementation issue, not a test-fixture issue. The sibling API
+uses `<25` for preparation, `<90` for archive assembly, and `>=90` for finalization in
+`../dragaocareca-admin-api/src/services/episode-artifact-preparation.service.ts`; the frontend
+uses `<35` and `<85` in `src/app/pages/manage/manage.component.ts`. The frontend should align
+its displayed stage boundaries with the API contract (or the contract must be deliberately
+changed and tested on both sides). Application source was not modified during this audit.
+
+The full browser-backed frontend command was also run:
+
+`CHROME_BIN=/home/jhonatt/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome npm test -- --watch=false --browsers=ChromeHeadless`
+
+It executed all 28 assertions but failed 3 existing tests: two stale/fixture failures in
+`src/app/pages/manage/manage.component.spec.ts` (UI-01 and UI-06) and the new threshold
+escalation; it also reported an afterAll `undefined.subscribe` from an existing incomplete
+polling spy. The production build remains green via `npm run build` (exit 0, existing selector
+parser and Angular budget warnings only). The original full Karma command without `CHROME_BIN`
+still remains non-runnable in this environment; the explicit binary-qualified command above is
+the safe browser-capable validation command.
+
+### Audit classification
+
+| Gap | Status | Debug iterations | Notes |
+|---|---|---:|---|
+| Karma ChromeHeadless cannot run | FILLED | 0 | Existing Playwright Chromium supplied through `CHROME_BIN`; no install/dependency change |
+| Browser recovery scenarios incomplete | FILLED | 1 | Test fixture corrected to mock the retry polling observable; rerun green |
+| API/frontend progress-stage mismatch | ESCALATED (BLOCKER) | 1 | Boundary test fails at both 25% and 85%; implementation fix is out of scope and prohibited |
