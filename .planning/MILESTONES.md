@@ -1,5 +1,25 @@
 # Project Milestones: Dragao Careca Admin Web
 
+## v1.1 Episode Artifact Downloads (Shipped: 2026-07-31)
+
+**Phases completed:** 3 phases, 11 plans, 25 tasks
+
+**Key accomplishments:**
+
+- SQLite-persisted artifact jobs with a strict four-state lifecycle, stage-weighted progress, restart recovery, and deterministic archive-failure cleanup.
+- Authenticated asynchronous artifact-job routes and a synchronized OpenAPI contract for safe partial ZIP downloads.
+- Deterministic direct-router verification for the authenticated artifact ZIP lifecycle, with duplicate and restart cleanup hardening.
+- Typed Angular artifact-job orchestration with canonical selectors, exact Phase 4 routes, and focused HTTP boundary coverage
+- Per-episode artifact picker state and guarded asynchronous ZIP-job orchestration in ManageComponent
+- Episodes-tab artifact picker with accessible native controls, modal-local job progress, recoverable partial/failure states, and keyboard focus lifecycle
+- Episode-scoped artifact-job start guarding with asynchronous duplicate-confirmation regression coverage
+- Authenticated native ZIP delivery with server-authoritative filenames, exactly-once activation, cleanup, and same-job recovery
+- Real DC 334 browser ZIP delivery validated with CORS-readable server filename, canonical archive entries, and reversible fixture cleanup; recovery matrix remains explicitly partial.
+- ManageComponent artifact progress labels now mirror the authoritative API's 25% preparation and 90% finalization boundaries, with browser-qualified evidence reconciled without changing download or recovery behavior.
+- Green full ChromeHeadless regression gates plus a bounded fail-closed real-DC334 recovery harness, with live unsupported scenarios preserved as release evidence.
+
+---
+
 ## v1.0 Transcript Summary Integration (Shipped: 2026-07-29)
 
 **Delivered:** Backend-generated episode summaries are now tracked from transcript completion through UI progress, automatic Summary textarea population, manual editing, and visible failure states.
