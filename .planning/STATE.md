@@ -5,15 +5,15 @@ milestone_name: Episode Artifact Downloads
 current_phase: 04
 current_phase_name: artifact-job-contract
 status: verifying
-stopped_at: Completed 05-02-PLAN.md
-last_updated: "2026-07-31T03:05:21.402Z"
+stopped_at: Completed 05-03-PLAN.md
+last_updated: "2026-07-31T03:11:41.466Z"
 last_activity: 2026-07-29
 last_activity_desc: Phase 04 execution started
 progress:
   total_phases: 2
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 6
-  completed_plans: 5
+  completed_plans: 6
 ---
 
 # Project State
@@ -31,7 +31,7 @@ Phase: 04 (artifact-job-contract) — EXECUTING
 Plan: 3 of 3
 Status: Phase complete — ready for verification
 Last activity: 2026-07-29 — Phase 04 execution started
-Progress: [████████░░] 83%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -62,6 +62,7 @@ Progress: [████████░░] 83%
 | Phase 04 P03 | 18min | 2 tasks | 3 files |
 | Phase 05 P01 | 6min | 2 tasks | 2 files |
 | Phase 05 P02 | 10min | 2 tasks | 1 files |
+| Phase 05 P03 | 8min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -86,6 +87,8 @@ Recent decisions affecting current work:
 - [Phase ?]: Phase 05-01: Expose downloadUrl through the status snapshot as opaque state data; native ZIP delivery remains deferred to Phase 6.
 - [Phase ?]: Phase 05-02: Keep artifact state separate from Add episode editor and existing upload/transcription/summary timers.
 - [Phase ?]: Phase 05-02: Submit only canonical artifact selectors and retain active jobs across modal close/reopen; native delivery remains deferred to Phase 6.
+- [Phase ?]: Phase 05-03: Keep Downloads action and artifact modal scoped to Episodes; native ZIP delivery remains deferred to Phase 6.
+- [Phase ?]: Phase 05-03: Use native controls with direct focus trapping, Escape close, and invoker restoration.
 
 ### Pending Todos
 
@@ -104,6 +107,6 @@ None for v1.0. MNT-01 and MNT-02 carry forward to the next milestone.
 
 ## Session Continuity
 
-Last session: 2026-07-31T03:05:21.395Z
-Stopped at: Completed 05-02-PLAN.md
+Last session: 2026-07-31T03:11:41.459Z
+Stopped at: Completed 05-03-PLAN.md
 Resume file: None

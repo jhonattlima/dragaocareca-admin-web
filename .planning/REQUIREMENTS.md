@@ -17,7 +17,7 @@ Requirements for milestone v1.1 Episode Artifact Downloads.
 
 ### Episode List and Download Modal
 
-- [ ] **UI-01**: The user can see an artifact-download action on each episode row.
+- [x] **UI-01**: The user can see an artifact-download action on each episode row.
 - [x] **UI-02**: The user can open a download modal for the selected episode.
 - [x] **UI-03**: The modal offers episode file, trailer, cover art, low cover art (`.webp`), and transcript options.
 - [x] **UI-04**: All available artifact options are checked by default, while unavailable options are clearly disabled or omitted.
@@ -63,7 +63,7 @@ Mapped to the v1.1 roadmap phases.
 | API-03 | Phase 4 | Complete |
 | API-04 | Phase 4 | Complete |
 | API-05 | Phase 4 | Complete |
-| UI-01 | Phase 5 | Pending |
+| UI-01 | Phase 5 | Complete |
 | UI-02 | Phase 5 | Complete |
 | UI-03 | Phase 5 | Complete |
 | UI-04 | Phase 5 | Complete |
