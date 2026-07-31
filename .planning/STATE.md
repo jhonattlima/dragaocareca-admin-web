@@ -5,15 +5,15 @@ milestone_name: Episode Artifact Downloads
 current_phase: 05
 current_phase_name: episode-download-modal
 status: verifying
-stopped_at: Completed 06-01-PLAN.md
-last_updated: "2026-07-31T13:45:31.465Z"
+stopped_at: Completed 06-02-PLAN.md with documented browser recovery limitations
+last_updated: "2026-07-31T14:07:42.431Z"
 last_activity: 2026-07-31
 last_activity_desc: Phase 05 gap closure completed
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 9
-  completed_plans: 8
+  completed_plans: 9
 ---
 
 # Project State
@@ -31,7 +31,7 @@ Phase: 05 (episode-download-modal) — EXECUTING
 Plan: 4 of 4
 Status: Phase complete — ready for verification
 Last activity: 2026-07-31 — Phase 05 gap closure completed
-Progress: [█████████░] 89%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -65,6 +65,7 @@ Progress: [█████████░] 89%
 | Phase 05 P03 | 8min | 3 tasks | 4 files |
 | Phase 05-episode-download-modal P04 | 6min | 2 tasks | 2 files |
 | Phase 06 P01 | 8min | 2 tasks | 5 files |
+| Phase 06-browser-download-release-validation P02 | 31min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -96,6 +97,7 @@ Recent decisions affecting current work:
 - [Phase ?]: Phase 06-01: Resolve relative completed artifact URLs against the configured API origin and keep Blob delivery on injected HttpClient/AuthInterceptor.
 - [Phase ?]: Phase 06-01: Guard native delivery by completed job identity and URL; delivery retry reuses the retained URL without starting preparation again.
 - [Phase ?]: Phase 06-01: Accept only validated server Content-Disposition filenames and revoke temporary object URLs in guaranteed cleanup.
+- [Phase ?]: Phase 06-02: expose Content-Disposition and X-Missing-Artifacts through sibling API CORS; record real DC334 browser ZIP evidence while leaving incomplete recovery scenarios unapproved.
 
 ### Pending Todos
 
@@ -114,6 +116,6 @@ None for v1.0. MNT-01 and MNT-02 carry forward to the next milestone.
 
 ## Session Continuity
 
-Last session: 2026-07-31T13:45:31.460Z
-Stopped at: Completed 06-01-PLAN.md
+Last session: 2026-07-31T14:07:42.425Z
+Stopped at: Completed 06-02-PLAN.md with documented browser recovery limitations
 Resume file: None

@@ -1,6 +1,6 @@
 # Phase 6 Validation Record
 
-Status: AUTOMATED PREPARATION COMPLETE — HUMAN CHECKPOINT BLOCKED
+Status: VALIDATED WITH RECOVERY LIMITATIONS — CLEANUP COMPLETE
 
 This artifact is the evidence record for Phase 6. Task 1 and Task 2 populate the automated and fixture sections. Task 3 is the blocking human checkpoint; it must be explicitly approved only after the real browser, CORS, ZIP, recovery, and cleanup checks pass.
 
@@ -16,11 +16,11 @@ This artifact is the evidence record for Phase 6. Task 1 and Task 2 populate the
 
 | Requirement | Automated evidence | Manual evidence | Result |
 |---|---|---|---|
-| UI-07 | `src/app/core/api.service.spec.ts` and `src/app/pages/manage/manage.component.spec.ts`; focused Karma command | One authenticated Blob request, one native download, server filename, CORS-readable `Content-Disposition`, object URL cleanup | AUTOMATED COMPILED; MANUAL PENDING |
-| UI-08 | ManageComponent state/recovery specs for empty, partial, failed, network/auth, expired, retry, reset, and reopen; focused suite compiled | Browser recovery matrix with request counts proving same-job delivery retry and no duplicate preparation POST | AUTOMATED COMPILED; MANUAL PENDING |
-| VAL-01 | Sibling API build and configured media-layout inspection | Episode 334 row plus real source fixture copied to effective `MEDIA_STORAGE_ROOT/episodes/334/`, with selector availability recorded | PREPARED; BROWSER PENDING |
-| VAL-02 | Existing Angular tests cover state/wiring but cannot prove OS download or ZIP contents | Browser progress plus archive listing matches selected available selectors and visible omissions | PENDING — NO BROWSER EVIDENCE |
-| VAL-03 | Full Karma suite, sibling API build, `npm run build`, package diff check | Human checkpoint confirms release evidence is complete | AUTOMATED BUILD PASS; KARMA BLOCKED |
+| UI-07 | `src/app/core/api.service.spec.ts` and `src/app/pages/manage/manage.component.spec.ts`; focused Karma command | One authenticated Blob request, one native download, server filename, CORS-readable `Content-Disposition`, object URL cleanup | PASS — Playwright evidence below |
+| UI-08 | ManageComponent state/recovery specs for empty, partial, failed, network/auth, expired, retry, reset, and reopen; focused suite compiled | Browser recovery matrix with request counts proving same-job delivery retry and no duplicate preparation POST | PARTIAL — bounded recovery harness blocked after empty-selection check |
+| VAL-01 | Sibling API build and configured media-layout inspection | Episode 334 row plus real source fixture copied to effective `MEDIA_STORAGE_ROOT/episodes/334/`, with selector availability recorded | PASS — real fixture resolved; restored afterward |
+| VAL-02 | Existing Angular tests cover state/wiring but cannot prove OS download or ZIP contents | Browser progress plus archive listing matches selected available selectors and visible omissions | PASS for full-selection archive; intermediate-stage/recovery limitations recorded |
+| VAL-03 | Full Karma suite, sibling API build, `npm run build`, package diff check | Human checkpoint confirms release evidence is complete | BUILD PASS; Karma remains environment-blocked |
 
 ## Automated checks
 
@@ -43,7 +43,7 @@ Target: `../dragaocareca-admin-api/src/app.ts` and any deployment layer that ove
 
 Required change before approval: the API response includes `Access-Control-Expose-Headers: Content-Disposition` for the Angular origin. If `X-Missing-Artifacts` is read by the client, expose that header too. A curl response showing `Content-Disposition` is insufficient.
 
-Preparation evidence: `../dragaocareca-admin-api/src/app.ts` now configures `cors({ exposedHeaders: ["Content-Disposition", "X-Missing-Artifacts"] })`; the sibling build passed and the change is committed as `dd8dfbd`. No deployment-specific CORS override was found in the checked-in API configuration. Browser Network and Angular `HttpResponse.headers.get('Content-Disposition')` evidence remain PENDING because no Chrome/Chromium binary is installed.
+Preparation and browser evidence: `../dragaocareca-admin-api/src/app.ts` configures `cors({ exposedHeaders: ["Content-Disposition", "X-Missing-Artifacts"] })`; the sibling build passed and the change is committed as `dd8dfbd`. Playwright Chromium observed `Access-Control-Expose-Headers: Content-Disposition,X-Missing-Artifacts` on the API responses. An instrumented browser XHR `getAllResponseHeaders()` observed `content-disposition: attachment; filename="episode-334-artifacts.zip"` on the Angular-origin Blob request, proving JavaScript-readable exposure. No deployment-specific CORS override was found in the checked-in API configuration.
 
 Evidence to record:
 
@@ -71,15 +71,15 @@ The executor must resolve the actual configured value and record it here. The so
 
 | Canonical selector | Destination filename | Exists in source | API row field | Included in ZIP | Evidence |
 |---|---|---|---|---|---|
-| audio | `audio.mp3` | YES — mounted Windows source | `file_name=audio.mp3` | PENDING — browser/archive unavailable | Source copy size 30,178,566 bytes |
-| trailer | `trailer.mp3` | YES — mounted Windows source | `trailer_file_name=trailer.mp3` | PENDING — browser/archive unavailable | Source copy size 399,503 bytes |
-| cover | `cover.jpeg` | YES — mounted Windows source | `cover_file_name=cover.jpeg` | PENDING — browser/archive unavailable | Source copy size 2,419,847 bytes |
-| coverLow | `cover.webp` | YES — mounted Windows source | `cover_low_file_name=cover.webp` | PENDING — browser/archive unavailable | Source copy size 2,037,918 bytes |
-| transcript | `transcript.txt` | YES — mounted Windows source | `transcript_file_name=transcript.txt` | PENDING — browser/archive unavailable | Source copy size 2,614 bytes |
+| audio | `audio.mp3` | YES — mounted Windows source | `file_name=audio.mp3` | YES | Source copy size 30,178,566 bytes; ZIP entry `episode-334/audio.mp3` |
+| trailer | `trailer.mp3` | YES — mounted Windows source | `trailer_file_name=trailer.mp3` | YES | Source copy size 399,503 bytes; ZIP entry `episode-334/trailer.mp3` |
+| cover | `cover.jpeg` | YES — mounted Windows source | `cover_file_name=cover.jpeg` | YES | Source copy size 2,419,847 bytes; ZIP entry `episode-334/cover.jpeg` |
+| coverLow | `cover.webp` | YES — mounted Windows source | `cover_low_file_name=cover.webp` | YES | Source copy size 2,037,918 bytes; ZIP entry `episode-334/cover.webp` |
+| transcript | `transcript.txt` | YES — mounted Windows source | `transcript_file_name=transcript.txt` | YES | Source copy size 2,614 bytes; ZIP entry `episode-334/transcript.txt` |
 
 Fixture preparation evidence: the immutable Windows source was accessible through the mounted equivalent `/mnt/e/.../DC 334 - Leitura de Pergaminhos - O pergaminho rebote dos caras`; the source folder was not modified. The effective development destination resolved to `../dragaocareca-admin-api/data/media/episodes/334/` from `MEDIA_STORAGE_ROOT=data/media`. Episode 334 existed before staging with title `DC 319 - Rapidinhas do Careca - Músicas plásticas para sentimentos bons e ruins`, `file_name=episode_334.mp3`, `cover_file_name=episode_334.jpeg`, and remaining artifact fields null. A row snapshot and destination pre-state were recorded under the sibling API's ignored `data/.phase6-dc334-prestate/`. The staged row now points to the five canonical names above and all five destination files exist. No synthetic data was used.
 
-Restore procedure: stop the sibling API, restore the saved episode-334 row from `data/.phase6-dc334-prestate/episode-334-row.json` using the API database tooling, remove `data/media/episodes/334/` because it was absent before staging, verify the original source folder is unchanged, then remove the ignored `data/.phase6-dc334-prestate/` backup after verification. Cleanup result: PENDING until the human checkpoint is either completed or explicitly abandoned.
+Restore procedure: stop the sibling API, restore the saved episode-334 row from `data/.phase6-dc334-prestate/episode-334-row.json` using the API database tooling, remove `data/media/episodes/334/` because it was absent before staging, verify the original source folder is unchanged, then remove the ignored `data/.phase6-dc334-prestate/` backup after verification. Cleanup result: PASS — API stopped, original row restored exactly, destination removed, validation artifact/archive rows removed, and source was never modified.
 
 ## Manual checkpoint — blocking human approval
 
@@ -93,15 +93,27 @@ This is a human verification checkpoint, not an automated substitute. Do not mar
 6. Confirm repeated completed status emissions do not create another Blob request/download and object URLs are revoked after successful and thrown activation.
 7. Restore the API row/configuration/media destination and record cleanup evidence.
 
-Human checkpoint result: BLOCKED — no Chrome/Chromium binary is available for Karma or real browser validation in this environment. VAL-01/VAL-02 remain unapproved; no browser, CORS-readable-header, request-count, progress, ZIP, recovery, or cleanup approval is claimed.
+Human checkpoint result: PARTIAL PASS — Playwright-managed Chromium completed the real DC 334 full-selection browser download and cleanup checks. The bounded recovery harness did not complete the full matrix: after unchecking all options, the application correctly disabled `Prepare archive`, but the harness waited for a clickable button and timed out; no later recovery scenarios are claimed. Karma remains blocked by the separate missing ChromeHeadless binary.
+
+### Playwright browser evidence — 2026-07-31
+
+- Browser: Playwright 1.61.0 package with `/home/jhonatt/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome`, headless.
+- Auth/config: frontend and API development `authBypass=true`; API ran with workers enabled. No tokens were recorded.
+- Real UI: Episodes search found episode ID 334 and all five canonical options checked/available from the staged real fixture.
+- Request counts: one `POST /v1/episodes/334/artifacts/jobs` (202), seven status GETs before completion, and one authenticated Blob `GET /v1/episodes/334/artifacts/jobs/{jobId}/download` (200). No second preparation POST occurred in the successful flow.
+- Visible states captured: `Preparing files` and `Archive ready — 100%`. `Creating ZIP` and `Finalizing ZIP` were not observed because the real API transitioned through those short-lived stages between browser polling observations; they are not claimed as captured.
+- Header evidence: download response contained `Content-Disposition: attachment; filename="episode-334-artifacts.zip"`; Playwright’s native download suggested filename was `episode-334-artifacts.zip`; the instrumented Angular XHR header collection saw the same value.
+- Browser delivery: one native download, no download failure, one `URL.createObjectURL`, one anchor activation, and one `URL.revokeObjectURL`.
+- ZIP listing: `episode-334/audio.mp3`, `episode-334/trailer.mp3`, `episode-334/transcript.txt`, `episode-334/cover.jpeg`, `episode-334/cover.webp`. Python standard-library ZIP inspection was used because `unzip`/`zipinfo` are not installed; no package was added.
+- Recovery limitation: `/tmp/phase6-recovery.js` reached the empty-selection scenario, where the real UI disabled `Prepare archive` after all five checkboxes were unchecked. The harness then timed out waiting for a clickable disabled control at line 18; later retry, 401/403, 404/409, network-failure, partial-availability, and repeated-completed-emission scenarios have no result artifact and remain unapproved.
 
 Approval signal: `approved` only after every step passes. Otherwise record the exact failing scenario or blocker and leave VAL-01/VAL-02 unapproved.
 
 ## Evidence index
 
-- Screenshots / browser Network capture: BLOCKED — Chrome/Chromium unavailable
-- ZIP listing: BLOCKED — no real browser download
-- Request counts: BLOCKED — no browser execution
-- CORS configuration and header exposure proof: SOURCE/build PASS; browser readability PENDING
-- Recovery matrix: BLOCKED — no browser execution
-- Fixture pre-state and restore result: pre-state recorded; cleanup PENDING
+- Screenshots / browser Network capture: Playwright headless evidence recorded; screenshots not captured
+- ZIP listing: PASS — five canonical `episode-334/` entries recorded
+- Request counts: PASS for full-selection flow; recovery counts incomplete
+- CORS configuration and header exposure proof: PASS — source, response exposure, and Angular XHR-readable header observed
+- Recovery matrix: PARTIAL — exact harness blocker recorded; untested scenarios remain unapproved
+- Fixture pre-state and restore result: PASS — original row restored and destination removed
