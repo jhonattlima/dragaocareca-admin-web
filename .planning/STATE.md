@@ -5,15 +5,15 @@ milestone_name: Episode Artifact Downloads
 current_phase: 04
 current_phase_name: artifact-job-contract
 status: verifying
-stopped_at: Completed 05-01-PLAN.md
-last_updated: "2026-07-31T02:59:49.327Z"
+stopped_at: Completed 05-02-PLAN.md
+last_updated: "2026-07-31T03:05:21.402Z"
 last_activity: 2026-07-29
 last_activity_desc: Phase 04 execution started
 progress:
   total_phases: 2
   completed_phases: 1
   total_plans: 6
-  completed_plans: 4
+  completed_plans: 5
 ---
 
 # Project State
@@ -31,7 +31,7 @@ Phase: 04 (artifact-job-contract) — EXECUTING
 Plan: 3 of 3
 Status: Phase complete — ready for verification
 Last activity: 2026-07-29 — Phase 04 execution started
-Progress: [███████░░░] 67%
+Progress: [████████░░] 83%
 
 ## Performance Metrics
 
@@ -61,6 +61,7 @@ Progress: [███████░░░] 67%
 | Phase 04 P02 | 10min | 2 tasks | 3 files |
 | Phase 04 P03 | 18min | 2 tasks | 3 files |
 | Phase 05 P01 | 6min | 2 tasks | 2 files |
+| Phase 05 P02 | 10min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -83,6 +84,8 @@ Recent decisions affecting current work:
 - [Phase ?]: 04-03: concurrent starts are serialized and cleanup uses server-derived job paths only.
 - [Phase ?]: Phase 05-01: Keep artifact selectors as a closed TypeScript union and send only canonical selector strings to the backend.
 - [Phase ?]: Phase 05-01: Expose downloadUrl through the status snapshot as opaque state data; native ZIP delivery remains deferred to Phase 6.
+- [Phase ?]: Phase 05-02: Keep artifact state separate from Add episode editor and existing upload/transcription/summary timers.
+- [Phase ?]: Phase 05-02: Submit only canonical artifact selectors and retain active jobs across modal close/reopen; native delivery remains deferred to Phase 6.
 
 ### Pending Todos
 
@@ -101,6 +104,6 @@ None for v1.0. MNT-01 and MNT-02 carry forward to the next milestone.
 
 ## Session Continuity
 
-Last session: 2026-07-31T02:59:49.321Z
-Stopped at: Completed 05-01-PLAN.md
+Last session: 2026-07-31T03:05:21.395Z
+Stopped at: Completed 05-02-PLAN.md
 Resume file: None
