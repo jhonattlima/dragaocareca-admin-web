@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Episode Artifact Downloads
-current_phase: 05
-current_phase_name: episode-download-modal
-status: verifying
+current_phase: 06
+current_phase_name: browser-download-release-validation
+status: ready_for_verification
 stopped_at: Completed 06-04-PLAN.md
 last_updated: "2026-07-31T15:18:10.355Z"
 last_activity: 2026-07-31
-last_activity_desc: Phase 05 gap closure completed
+last_activity_desc: Phase 06 Plan 04 gap closure completed; live recovery matrix remains partial
 progress:
   total_phases: 3
   completed_phases: 3
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-29)
 
 **Core value:** Keep the admin workflow reliable, legible, and backend-driven so operators can manage episodes and inspect system state without fighting the UI.
-**Current focus:** Phase 05 — episode-download-modal
+**Current focus:** Phase 06 — browser-download-release-validation
 
 ## Current Position
 
-Phase: 05 (episode-download-modal) — EXECUTING
+Phase: 06 (browser-download-release-validation) — VERIFYING
 Plan: 4 of 4
-Status: Phase complete — ready for verification
-Last activity: 2026-07-31 — Phase 05 gap closure completed
+Status: Plan complete — ready for verification
+Last activity: 2026-07-31 — Phase 06 Plan 04 gap closure completed; live recovery matrix remains partial
 Progress: [██████████] 100%
 
 ## Performance Metrics
