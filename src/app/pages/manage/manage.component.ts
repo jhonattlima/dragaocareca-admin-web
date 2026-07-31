@@ -1,5 +1,5 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
-import { HttpEventType } from '@angular/common/http';
+import { HttpEventType, HttpResponse } from '@angular/common/http';
 import { finalize } from 'rxjs';
 import {
   ApiService,
@@ -152,6 +152,10 @@ export class ManageComponent implements OnInit, OnDestroy {
   private artifactJobPollEpisodeId: number | null = null;
   private artifactJobPollId: string | null = null;
   private readonly artifactJobStartInFlight = new Map<number, symbol>();
+  private readonly artifactDeliveryAttempts = new Set<string>();
+  private readonly artifactDeliveryStatus = new Map<number, 'idle' | 'downloading' | 'delivered' | 'error'>();
+  private readonly artifactDeliveryErrors = new Map<number, string>();
+  private readonly artifactObjectUrls = new Set<string>();
   private transcriptionClockTimer: number | null = null;
   transcriptionClockTick = Date.now();
   private readonly structuredEntrySuggestionCache: Record<'guests' | 'musicCredits', StructuredEntrySuggestion[]> = {
@@ -313,13 +317,15 @@ export class ManageComponent implements OnInit, OnDestroy {
 
     this.clearEpisodeGenerationPolling();
     this.clearArtifactJobPolling();
+    this.artifactObjectUrls.forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
+    this.artifactObjectUrls.clear();
   }
 
   openArtifactModal(episode: Episode, invoker?: HTMLButtonElement): void {
     this.artifactModalEpisode = episode;
     this.artifactModalOpen = true;
     this.artifactModalInvoker = invoker ?? null;
-    this.artifactModalMessage = '';
+    this.artifactModalMessage = this.artifactDeliveryErrors.get(episode.episodeId) ?? '';
     this.artifactPollingError = '';
 
     const existingJob = this.artifactJobs[episode.episodeId];
@@ -370,6 +376,23 @@ export class ManageComponent implements OnInit, OnDestroy {
 
   isArtifactRetryAvailable(): boolean {
     return this.artifactJob?.state === 'failed' && !this.isArtifactJobActive(this.artifactJob);
+  }
+
+  isArtifactDeliveryRetryAvailable(): boolean {
+    return this.artifactJob?.state === 'completed'
+      && Boolean(this.artifactJob.downloadUrl)
+      && this.artifactDeliveryStatus.get(this.artifactJob.episodeId) === 'error';
+  }
+
+  getArtifactDeliveryStatus(): string {
+    const status = this.artifactJob ? this.artifactDeliveryStatus.get(this.artifactJob.episodeId) : undefined;
+    if (status === 'downloading') {
+      return 'Downloading archive…';
+    }
+    if (status === 'delivered') {
+      return 'Download started.';
+    }
+    return '';
   }
 
   getArtifactStage(): string {
@@ -482,6 +505,33 @@ export class ManageComponent implements OnInit, OnDestroy {
       delete this.artifactJobs[this.artifactModalEpisode.episodeId];
     }
     this.confirmArtifactJob();
+  }
+
+  retryArtifactDelivery(): void {
+    if (!this.artifactJob?.downloadUrl || !this.isArtifactDeliveryRetryAvailable()) {
+      return;
+    }
+    this.artifactDeliveryAttempts.delete(this.getArtifactDeliveryKey(this.artifactJob));
+    this.artifactDeliveryErrors.delete(this.artifactJob.episodeId);
+    this.artifactModalMessage = '';
+    this.deliverCompletedArtifact(this.artifactJob);
+  }
+
+  resetArtifactFlow(): void {
+    if (!this.artifactModalEpisode) {
+      return;
+    }
+    const episodeId = this.artifactModalEpisode.episodeId;
+    if (this.artifactJob?.downloadUrl) {
+      this.artifactDeliveryAttempts.delete(this.getArtifactDeliveryKey(this.artifactJob));
+    }
+    delete this.artifactJobs[episodeId];
+    this.artifactJob = null;
+    this.artifactDeliveryStatus.set(episodeId, 'idle');
+    this.artifactDeliveryErrors.delete(episodeId);
+    this.artifactModalMessage = '';
+    this.artifactPollingError = '';
+    this.artifactOptions = this.buildArtifactOptions(this.artifactModalEpisode);
   }
 
   onArtifactModalKeydown(event: KeyboardEvent): void {
@@ -1586,6 +1636,9 @@ export class ManageComponent implements OnInit, OnDestroy {
     if (snapshot.state === 'completed' || snapshot.state === 'failed') {
       this.clearArtifactJobPolling(snapshot.episodeId, snapshot.jobId);
     }
+    if (snapshot.state === 'completed') {
+      this.deliverCompletedArtifact(snapshot);
+    }
   }
 
   isArtifactJobActive(snapshot: EpisodeArtifactJobSnapshot | null | undefined): boolean {
@@ -1652,6 +1705,122 @@ export class ManageComponent implements OnInit, OnDestroy {
   private getArtifactErrorMessage(error: unknown, fallback: string): string {
     const candidate = error as { message?: string; error?: { message?: string } } | null;
     return candidate?.error?.message ?? candidate?.message ?? fallback;
+  }
+
+  private deliverCompletedArtifact(snapshot: EpisodeArtifactJobSnapshot): void {
+    if (snapshot.state !== 'completed' || !snapshot.downloadUrl) {
+      if (snapshot.state === 'completed' && this.artifactModalEpisode?.episodeId === snapshot.episodeId) {
+        this.setArtifactDeliveryError(snapshot.episodeId, 'The completed archive does not include a download URL.');
+      }
+      return;
+    }
+
+    const deliveryKey = this.getArtifactDeliveryKey(snapshot);
+    if (this.artifactDeliveryAttempts.has(deliveryKey)) {
+      return;
+    }
+    this.artifactDeliveryAttempts.add(deliveryKey);
+    this.artifactDeliveryErrors.delete(snapshot.episodeId);
+    this.artifactDeliveryStatus.set(snapshot.episodeId, 'downloading');
+
+    this.apiService.downloadEpisodeArtifact(snapshot.downloadUrl).subscribe({
+      next: (response) => this.activateArtifactDownload(snapshot, response),
+      error: (error) => this.setArtifactDeliveryError(snapshot.episodeId, this.getArtifactDeliveryErrorMessage(error)),
+    });
+  }
+
+  private activateArtifactDownload(snapshot: EpisodeArtifactJobSnapshot, response: HttpResponse<Blob>): void {
+    let objectUrl: string | null = null;
+    let anchor: HTMLAnchorElement | null = null;
+    try {
+      const filename = this.getArtifactFilename(response.headers.get('Content-Disposition'));
+      if (!response.body) {
+        throw new Error('The archive response was empty.');
+      }
+      objectUrl = URL.createObjectURL(response.body);
+      this.artifactObjectUrls.add(objectUrl);
+      anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.download = filename;
+      anchor.style.display = 'none';
+      document.body.appendChild(anchor);
+      anchor.click();
+      this.artifactDeliveryStatus.set(snapshot.episodeId, 'delivered');
+      this.artifactDeliveryErrors.delete(snapshot.episodeId);
+    } catch (error) {
+      this.setArtifactDeliveryError(snapshot.episodeId, error instanceof Error ? error.message : 'Could not start the archive download.');
+    } finally {
+      anchor?.remove();
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+        this.artifactObjectUrls.delete(objectUrl);
+      }
+    }
+  }
+
+  private getArtifactFilename(contentDisposition: string | null): string {
+    if (!contentDisposition) {
+      throw new Error('The server did not provide a safe archive filename.');
+    }
+
+    const filenameStarMatch = contentDisposition.match(/(?:^|;)\s*filename\*\s*=\s*([^;]+)/i);
+    if (filenameStarMatch) {
+      const encoded = filenameStarMatch[1].trim();
+      const extendedValue = encoded.match(/^([^']*)'[^']*'(.*)$/);
+      if (extendedValue && extendedValue[1].toLowerCase() !== 'utf-8') {
+        throw new Error('The server provided an invalid archive filename.');
+      }
+      const value = extendedValue?.[2] ?? encoded;
+      try {
+        return this.validateArtifactFilename(decodeURIComponent(value.replace(/^"|"$/g, '')));
+      } catch {
+        throw new Error('The server provided an invalid archive filename.');
+      }
+    }
+
+    const filenameMatch = contentDisposition.match(/(?:^|;)\s*filename\s*=\s*("(?:[^"\\]|\\.)*"|[^;]+)/i);
+    if (!filenameMatch) {
+      throw new Error('The server did not provide a safe archive filename.');
+    }
+    const rawFilename = filenameMatch[1].trim();
+    if (rawFilename.startsWith('"') && !rawFilename.endsWith('"')) {
+      throw new Error('The server provided an invalid archive filename.');
+    }
+    if (!rawFilename.startsWith('"') && rawFilename.includes('"')) {
+      throw new Error('The server provided an invalid archive filename.');
+    }
+    return this.validateArtifactFilename(rawFilename.replace(/^"|"$/g, '').replace(/\\"/g, '"'));
+  }
+
+  private validateArtifactFilename(filename: string): string {
+    if (!filename || /[\u0000-\u001f\u007f]/.test(filename) || /[\\/]/.test(filename) || filename === '.' || filename === '..') {
+      throw new Error('The server provided an invalid archive filename.');
+    }
+    return filename;
+  }
+
+  private getArtifactDeliveryKey(snapshot: EpisodeArtifactJobSnapshot): string {
+    return `${snapshot.jobId}|${snapshot.downloadUrl}`;
+  }
+
+  private setArtifactDeliveryError(episodeId: number, message: string): void {
+    this.artifactDeliveryStatus.set(episodeId, 'error');
+    this.artifactDeliveryErrors.set(episodeId, message);
+    if (this.artifactModalEpisode?.episodeId === episodeId) {
+      this.artifactModalMessage = message;
+    }
+  }
+
+  private getArtifactDeliveryErrorMessage(error: unknown): string {
+    const candidate = error as { status?: number; error?: { status?: number; message?: string }; message?: string } | null;
+    const status = candidate?.status ?? candidate?.error?.status;
+    if (status === 401 || status === 403) {
+      return 'Archive download requires an authenticated session. Retry after signing in again.';
+    }
+    if (status === 404 || status === 409) {
+      return 'This archive has expired or is no longer available. Reset and prepare a new archive.';
+    }
+    return candidate?.error?.message ?? candidate?.message ?? 'The archive could not be downloaded. Retry this completed archive.';
   }
 
   private focusArtifactModal(): void {

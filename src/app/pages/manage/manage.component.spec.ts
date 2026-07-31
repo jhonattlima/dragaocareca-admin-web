@@ -1,4 +1,5 @@
 import { CommonModule } from '@angular/common';
+import { HttpHeaders, HttpResponse } from '@angular/common/http';
 import { fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { of, Subject, throwError } from 'rxjs';
@@ -16,9 +17,14 @@ describe('ManageComponent summary flow', () => {
       'getEpisodeGeneratedSummaryStatus',
       'startEpisodeArtifactJob',
       'getEpisodeArtifactJobStatus',
+      'downloadEpisodeArtifact',
       'listEpisodes',
     ]);
     apiService.listEpisodes.and.returnValue(of([]));
+    apiService.downloadEpisodeArtifact.and.returnValue(of(new HttpResponse<Blob>({
+      body: new Blob(['zip'], { type: 'application/zip' }),
+      headers: new HttpHeaders({ 'Content-Disposition': 'attachment; filename="episode-42-artifacts.zip"' }),
+    })));
     component = new ManageComponent(apiService);
   });
 
@@ -213,9 +219,14 @@ describe('ManageComponent artifact download modal', () => {
       'getEpisodeGeneratedSummaryStatus',
       'startEpisodeArtifactJob',
       'getEpisodeArtifactJobStatus',
+      'downloadEpisodeArtifact',
       'listEpisodes',
     ]);
     apiService.listEpisodes.and.returnValue(of([]));
+    apiService.downloadEpisodeArtifact.and.returnValue(of(new HttpResponse<Blob>({
+      body: new Blob(['zip'], { type: 'application/zip' }),
+      headers: new HttpHeaders({ 'Content-Disposition': 'attachment; filename="episode-42-artifacts.zip"' }),
+    })));
     await TestBed.configureTestingModule({
       declarations: [ManageComponent, EpisodeFormComponent],
       imports: [CommonModule, FormsModule],
@@ -327,4 +338,88 @@ describe('ManageComponent artifact download modal', () => {
     expect(component.artifactModalOpen).toBeFalse();
     expect(document.activeElement).toBe(downloadButton);
   }));
+
+  it('UI-07 delivers a completed archive once with the server filename and revokes its object URL', () => {
+    const createObjectUrl = spyOn(URL, 'createObjectURL').and.returnValue('blob:artifact-42');
+    const revokeObjectUrl = spyOn(URL, 'revokeObjectURL');
+    const click = spyOn(HTMLAnchorElement.prototype, 'click');
+    const appendChild = spyOn(document.body, 'appendChild').and.callThrough();
+    const snapshot = completedSnapshot();
+
+    component.openArtifactModal(episode);
+    (component as unknown as { storeArtifactJob: (value: EpisodeArtifactJobSnapshot) => void }).storeArtifactJob(snapshot);
+    (component as unknown as { storeArtifactJob: (value: EpisodeArtifactJobSnapshot) => void }).storeArtifactJob(snapshot);
+    component.closeArtifactModal();
+    component.openArtifactModal(episode);
+
+    expect(apiService.downloadEpisodeArtifact).toHaveBeenCalledOnceWith(snapshot.downloadUrl as string);
+    expect(createObjectUrl).toHaveBeenCalledOnceWith(jasmine.any(Blob));
+    expect(click).toHaveBeenCalledOnceWith();
+    expect((appendChild.calls.mostRecent().args[0] as HTMLAnchorElement).download).toBe('episode-42-artifacts.zip');
+    expect(revokeObjectUrl).toHaveBeenCalledOnceWith('blob:artifact-42');
+    expect(component.getArtifactDeliveryStatus()).toBe('Download started.');
+  });
+
+  it('UI-07 revokes the object URL when native activation throws', () => {
+    const revokeObjectUrl = spyOn(URL, 'revokeObjectURL');
+    spyOn(URL, 'createObjectURL').and.returnValue('blob:artifact-42');
+    spyOn(HTMLAnchorElement.prototype, 'click').and.throwError('activation failed');
+    const snapshot = completedSnapshot();
+
+    component.openArtifactModal(episode);
+    (component as unknown as { storeArtifactJob: (value: EpisodeArtifactJobSnapshot) => void }).storeArtifactJob(snapshot);
+
+    expect(revokeObjectUrl).toHaveBeenCalledOnceWith('blob:artifact-42');
+    expect(component.artifactModalMessage).toContain('activation failed');
+    expect(component.isArtifactDeliveryRetryAvailable()).toBeTrue();
+  });
+
+  it('UI-08 rejects missing or unsafe server filenames and retries the same completed URL without starting a job', () => {
+    spyOn(URL, 'createObjectURL').and.returnValue('blob:artifact-42');
+    spyOn(URL, 'revokeObjectURL');
+    spyOn(HTMLAnchorElement.prototype, 'click');
+    const snapshot = completedSnapshot();
+    apiService.downloadEpisodeArtifact.and.returnValues(
+      of(new HttpResponse<Blob>({ body: new Blob(['zip']), headers: new HttpHeaders() })),
+      of(new HttpResponse<Blob>({
+        body: new Blob(['zip']),
+        headers: new HttpHeaders({ 'Content-Disposition': "attachment; filename*=UTF-8''episode%2042.zip" }),
+      })),
+    );
+
+    component.openArtifactModal(episode);
+    (component as unknown as { storeArtifactJob: (value: EpisodeArtifactJobSnapshot) => void }).storeArtifactJob(snapshot);
+    expect(component.artifactModalMessage).toContain('safe archive filename');
+    expect(component.isArtifactDeliveryRetryAvailable()).toBeTrue();
+    expect(() => (component as unknown as { getArtifactFilename: (value: string) => string })
+      .getArtifactFilename('attachment; filename="../unsafe.zip"')).toThrowError(/invalid archive filename/);
+
+    component.retryArtifactDelivery();
+
+    expect(apiService.downloadEpisodeArtifact).toHaveBeenCalledTimes(2);
+    expect(apiService.downloadEpisodeArtifact.calls.allArgs()).toEqual([[snapshot.downloadUrl as string], [snapshot.downloadUrl as string]]);
+    expect(apiService.startEpisodeArtifactJob).not.toHaveBeenCalled();
+    expect(component.getArtifactDeliveryStatus()).toBe('Download started.');
+  });
+
+  it('UI-08 preserves completed state for network, authentication, and expired-download failures', () => {
+    const snapshot = completedSnapshot();
+    const cases = [
+      [{ status: 0 }, 'could not be downloaded'],
+      [{ status: 401 }, 'authenticated session'],
+      [{ status: 404 }, 'expired or is no longer available'],
+      [{ status: 409 }, 'expired or is no longer available'],
+    ] as const;
+
+    cases.forEach(([error, expected]) => {
+      apiService.downloadEpisodeArtifact.and.returnValue(throwError(() => error));
+      component.openArtifactModal(episode);
+      (component as unknown as { storeArtifactJob: (value: EpisodeArtifactJobSnapshot) => void }).storeArtifactJob(snapshot);
+      expect(component.artifactJob?.state).toBe('completed');
+      expect(component.artifactModalMessage).toContain(expected);
+      expect(component.isArtifactDeliveryRetryAvailable()).toBeTrue();
+      component.resetArtifactFlow();
+      expect(component.artifactJob).toBeNull();
+    });
+  });
 });

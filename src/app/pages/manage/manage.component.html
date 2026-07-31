@@ -163,6 +163,7 @@
       <div class="artifact-ready" *ngIf="artifactJob?.state === 'completed'">
         <strong>Archive ready</strong>
         <span>{{ artifactJob?.downloadUrl }}</span>
+        <span class="artifact-delivery-status" *ngIf="getArtifactDeliveryStatus()">{{ getArtifactDeliveryStatus() }}</span>
       </div>
       <p class="artifact-inline-message" *ngIf="artifactModalMessage">{{ artifactModalMessage }}</p>
     </div>
@@ -170,6 +171,8 @@
     <div class="artifact-modal-actions d-flex justify-content-end gap-2">
       <button class="btn btn-outline-secondary" type="button" (click)="closeArtifactModal()">Close</button>
       <button class="btn btn-outline-primary" type="button" *ngIf="isArtifactRetryAvailable()" (click)="retryArtifactJob()">Retry</button>
+      <button class="btn btn-outline-primary" type="button" *ngIf="isArtifactDeliveryRetryAvailable()" (click)="retryArtifactDelivery()">Retry download</button>
+      <button class="btn btn-outline-secondary" type="button" *ngIf="artifactJob?.state === 'completed'" (click)="resetArtifactFlow()">Start new archive</button>
       <button class="btn btn-primary" type="button" [disabled]="isArtifactConfirmDisabled()" (click)="confirmArtifactJob()">Prepare archive</button>
     </div>
   </div>
