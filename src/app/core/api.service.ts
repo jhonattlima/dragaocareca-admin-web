@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { HttpEvent, HttpParams } from '@angular/common/http';
+import { HttpEvent, HttpParams, HttpResponse } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 
@@ -328,6 +328,20 @@ export class ApiService {
 
   getEpisodeArtifactJobStatus(episodeId: number, jobId: string): Observable<EpisodeArtifactJobSnapshot> {
     return this.http.get<EpisodeArtifactJobSnapshot>(`${environment.apiBaseUrl}/episodes/${episodeId}/artifacts/jobs/${jobId}`);
+  }
+
+  downloadEpisodeArtifact(downloadUrl: string): Observable<HttpResponse<Blob>> {
+    const apiBaseUrl = environment.apiBaseUrl.replace(/\/$/, '');
+    const resolvedUrl = /^https?:\/\//i.test(downloadUrl)
+      ? downloadUrl
+      : downloadUrl.startsWith('/')
+        ? `${new URL(apiBaseUrl).origin}${downloadUrl}`
+        : `${apiBaseUrl}/${downloadUrl.replace(/^\/+/, '')}`;
+
+    return this.http.get(resolvedUrl, {
+      observe: 'response',
+      responseType: 'blob',
+    });
   }
 
   getSpotifyMetrics(days = 30): Observable<SpotifyMetricsSnapshot | SpotifyMetricsErrorResponse> {

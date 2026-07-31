@@ -1,6 +1,7 @@
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { environment } from '../../environments/environment';
+import { HttpResponse } from '@angular/common/http';
 import { ApiService, EpisodeArtifactJobSnapshot, EpisodeArtifactSelector } from './api.service';
 
 describe('ApiService artifact jobs', () => {
@@ -57,6 +58,36 @@ describe('ApiService artifact jobs', () => {
 
     expect(response?.state).toBe('completed');
     expect(response?.downloadUrl).toBe('/v1/episodes/42/artifacts/jobs/job-42/download');
+  });
+
+  it('downloads a relative completed URL from the API origin as an authenticated Blob response with headers', () => {
+    const archive = new Blob(['zip bytes'], { type: 'application/zip' });
+    const headers = {
+      'Content-Type': 'application/zip',
+      'Content-Disposition': 'attachment; filename="episode-42-artifacts.zip"',
+    };
+    let response: HttpResponse<Blob> | undefined;
+
+    apiService.downloadEpisodeArtifact('/v1/episodes/42/artifacts/jobs/job-42/download').subscribe((value) => {
+      response = value;
+    });
+
+    const request = httpTestingController.expectOne('http://localhost:3000/v1/episodes/42/artifacts/jobs/job-42/download');
+    expect(request.request.method).toBe('GET');
+    expect(request.request.responseType).toBe('blob');
+    request.flush(archive, { headers });
+
+    expect(response?.body).toBe(archive);
+    expect(response?.headers.get('Content-Disposition')).toBe(headers['Content-Disposition']);
+    expect(response?.headers.get('Content-Type')).toBe('application/zip');
+  });
+
+  it('preserves an already-absolute API download URL', () => {
+    apiService.downloadEpisodeArtifact('https://api.example.test/v1/episodes/42/download').subscribe();
+
+    const request = httpTestingController.expectOne('https://api.example.test/v1/episodes/42/download');
+    expect(request.request.responseType).toBe('blob');
+    request.flush(new Blob(['zip bytes'], { type: 'application/zip' }));
   });
 });
 
