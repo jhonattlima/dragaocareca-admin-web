@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { ApiService, Episode, EpisodeArtifactJobSnapshot, EpisodeGeneratedSummaryStatus, EpisodeTranscriptionStatus } from '../../core/api.service';
 import { EpisodeFormComponent } from './episode-form.component';
 import { ManageComponent } from './manage.component';
@@ -280,15 +280,18 @@ describe('ManageComponent artifact download modal', () => {
     expect(apiService.startEpisodeArtifactJob).toHaveBeenCalledOnceWith(42, ['episode', 'image']);
   });
 
-  it('UI-06 renders local progress, prevents duplicate starts, and retains terminal partial results', () => {
+  it('UI-06 prevents duplicate starts while the first request is deferred and retains terminal partial results', () => {
     component.openArtifactModal(episode);
     fixture.detectChanges();
     const pending = completedSnapshot({ state: 'processing', progress: 65, requested: ['episode', 'image'], available: ['episode'], missing: ['image'] });
-    apiService.startEpisodeArtifactJob.and.returnValue(of(pending));
+    const deferredStart = new Subject<EpisodeArtifactJobSnapshot>();
+    apiService.startEpisodeArtifactJob.and.returnValue(deferredStart.asObservable());
     apiService.getEpisodeArtifactJobStatus.and.returnValue(of(pending));
     component.confirmArtifactJob();
     component.confirmArtifactJob();
     expect(apiService.startEpisodeArtifactJob).toHaveBeenCalledTimes(1);
+
+    deferredStart.next(pending);
     expect(component.getArtifactStatusLabel()).toBe('Creating ZIP — 65%');
     expect(component.getArtifactMissingLabels()).toEqual(['Cover art']);
 
