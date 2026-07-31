@@ -361,7 +361,10 @@ export class ManageComponent implements OnInit, OnDestroy {
   }
 
   isArtifactConfirmDisabled(): boolean {
-    return !this.hasSelectedArtifacts() || this.isArtifactJobActive(this.artifactJob) || this.artifactJob?.state === 'completed';
+    return !this.hasSelectedArtifacts()
+      || this.isArtifactJobActive(this.artifactJob)
+      || this.artifactJob?.state === 'completed'
+      || this.artifactJob?.state === 'failed';
   }
 
   isArtifactRetryAvailable(): boolean {
@@ -487,7 +490,7 @@ export class ManageComponent implements OnInit, OnDestroy {
       : document.querySelector<HTMLElement>('[role="dialog"][aria-modal="true"]');
     const focusable = dialog
       ? Array.from(dialog.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'))
-        .filter((element) => element.offsetParent !== null)
+        .filter((element) => !element.hasAttribute('hidden') && element.getAttribute('aria-hidden') !== 'true')
       : [];
     if (focusable.length === 0) {
       event.preventDefault();
@@ -1562,6 +1565,10 @@ export class ManageComponent implements OnInit, OnDestroy {
     if (this.artifactModalEpisode?.episodeId === snapshot.episodeId) {
       this.artifactJob = snapshot;
       this.artifactPollingError = '';
+      if (snapshot.requested.length > 0 && snapshot.available.length === 0 && snapshot.missing.length >= snapshot.requested.length) {
+        this.markArtifactOptionsUnavailable();
+        this.artifactModalMessage = 'No selected files are currently available. Review the options and retry.';
+      }
     }
     if (snapshot.state === 'completed' || snapshot.state === 'failed') {
       this.clearArtifactJobPolling(snapshot.episodeId, snapshot.jobId);
