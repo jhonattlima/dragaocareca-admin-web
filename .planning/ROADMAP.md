@@ -25,7 +25,7 @@
   3. After completion, an authenticated request returns the ZIP with a safe filename and identifies requested artifacts omitted because they were unavailable.
   4. API verification demonstrates job creation, progress transitions, completion, failure, missing artifacts, and invalid selector/path rejection.
 
-**Plans**: 3/3 plans executed
+**Plans**: 4 plans total (3 executed, 1 gap-closure planned)
 
 Plans:
 
@@ -78,6 +78,7 @@ Plans:
 - [x] 06-01-PLAN.md — Implement authenticated native Blob delivery, server filename handling, cleanup, retry, reset, and modal recovery tests
 - [x] 06-02-PLAN.md — Run full regression/build gates and manually validate the DC 334 browser download and ZIP fixture flow
 - [x] 06-03-PLAN.md — Align frontend progress-stage thresholds with the authoritative API and reconcile release evidence
+- [ ] 06-04-PLAN.md — Close full Karma failures, complete bounded DC334 browser recovery evidence, and reconcile release audit
 
 **UI hint**: yes
 
