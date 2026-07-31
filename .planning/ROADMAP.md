@@ -8,7 +8,7 @@
 ## Phases
 
 - [ ] **Phase 4: Artifact Job Contract** - Establish and verify the backend-owned asynchronous ZIP job, progress, validation, and download contract.
-- [ ] **Phase 5: Episode Download Modal** - Add the row action, accessible artifact-selection modal, and thin Angular orchestration.
+- [x] **Phase 5: Episode Download Modal** - Add the row action, accessible artifact-selection modal, and thin Angular orchestration.
 - [ ] **Phase 6: Browser Download & Release Validation** - Complete native ZIP delivery and validate full, partial, failure, and DC 334 flows.
 
 ## Phase Details
@@ -46,9 +46,11 @@ Plans:
   4. The operator can select or deselect choices, and confirming with no selections produces a clear validation message without starting a job.
   5. Once confirmed, the modal shows asynchronous job progress and prevents duplicate submissions while retaining clear cancel/retry boundaries.
 
-**Plans**: 3/3 plans executed
+**Plans**: 4/4 plans executed
 
 Plans:
+
+- [x] 05-04-PLAN.md
 
 - [x] 05-01-PLAN.md — Define and test the typed Angular artifact-job API contract
 - [x] 05-02-PLAN.md — Implement ManageComponent artifact selection and async orchestration
@@ -80,5 +82,5 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 1-3 | v1.0 Transcript Summary Integration | 6/6 | Complete | 2026-07-29 |
 | 4. Artifact Job Contract | v1.1 | 3/3 | In Progress|  |
-| 5. Episode Download Modal | v1.1 | 3/3 | In Progress|  |
+| 5. Episode Download Modal | v1.1 | 4/4 | Complete | 2026-07-31 |
 | 6. Browser Download & Release Validation | v1.1 | 0/TBD | Not started | - |
