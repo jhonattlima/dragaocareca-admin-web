@@ -1,7 +1,14 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { HttpEventType } from '@angular/common/http';
 import { finalize } from 'rxjs';
-import { ApiService, Episode, EpisodeWriteInput, StructuredEntryCatalogResponse } from '../../core/api.service';
+import {
+  ApiService,
+  Episode,
+  EpisodeArtifactJobSnapshot,
+  EpisodeArtifactSelector,
+  EpisodeWriteInput,
+  StructuredEntryCatalogResponse,
+} from '../../core/api.service';
 
 type EpisodeListField = 'coverCredits' | 'tags';
 type UploadKind = 'audio' | 'trailer' | 'cover' | 'coverLow';
@@ -45,6 +52,23 @@ interface UploadDefinition {
   accept: string;
   displayName: (episodeId: number) => string;
   fileField: 'fileName' | 'coverFileName' | 'coverLowFileName' | 'trailerFileName';
+}
+
+export interface EpisodeArtifactOption {
+  selector: EpisodeArtifactSelector;
+  label: string;
+  formatHint: string;
+  fileName: string;
+  available: boolean;
+  checked: boolean;
+  tooltip: string;
+}
+
+interface ArtifactDefinition {
+  selector: EpisodeArtifactSelector;
+  label: string;
+  formatHint: string;
+  fileField: 'fileName' | 'trailerFileName' | 'coverFileName' | 'coverLowFileName' | 'transcriptFileName';
 }
 
 interface EpisodeFormState extends Omit<EpisodeWriteInput, 'guests' | 'musicCredits' | 'citations'> {
@@ -124,6 +148,9 @@ export class ManageComponent implements OnInit, OnDestroy {
   private transcriptionStatusPollEpisodeId: number | null = null;
   private summaryStatusPollTimer: number | null = null;
   private summaryStatusPollEpisodeId: number | null = null;
+  private artifactJobPollTimer: number | null = null;
+  private artifactJobPollEpisodeId: number | null = null;
+  private artifactJobPollId: string | null = null;
   private transcriptionClockTimer: number | null = null;
   transcriptionClockTick = Date.now();
   private readonly structuredEntrySuggestionCache: Record<'guests' | 'musicCredits', StructuredEntrySuggestion[]> = {
@@ -135,6 +162,21 @@ export class ManageComponent implements OnInit, OnDestroy {
   private suggestedNextEpisodeNumber = 1;
   readonly addEditorState: EpisodeEditorState = this.buildEditorState();
   readonly episodesEditorState: EpisodeEditorState = this.buildEditorState();
+  readonly artifactDefinitions: ArtifactDefinition[] = [
+    { selector: 'episode', label: 'Episode audio', formatHint: '.mp3', fileField: 'fileName' },
+    { selector: 'trailer', label: 'Trailer', formatHint: '.mp3', fileField: 'trailerFileName' },
+    { selector: 'image', label: 'Cover art', formatHint: '.jpg/.jpeg', fileField: 'coverFileName' },
+    { selector: 'image-low', label: 'Low cover art', formatHint: '.webp', fileField: 'coverLowFileName' },
+    { selector: 'transcript', label: 'Transcript', formatHint: '.txt', fileField: 'transcriptFileName' },
+  ];
+  artifactModalOpen = false;
+  artifactModalEpisode: Episode | null = null;
+  artifactOptions: EpisodeArtifactOption[] = [];
+  artifactJob: EpisodeArtifactJobSnapshot | null = null;
+  artifactJobs: Record<number, EpisodeArtifactJobSnapshot> = {};
+  artifactModalMessage = '';
+  artifactPollingError = '';
+  private artifactModalInvoker: HTMLButtonElement | null = null;
   uploadStates: Record<UploadKind, UploadState> = {
     audio: { busy: false, deleting: false, dragOver: false, progress: 0 },
     trailer: { busy: false, deleting: false, dragOver: false, progress: 0 },
@@ -269,6 +311,194 @@ export class ManageComponent implements OnInit, OnDestroy {
     }
 
     this.clearEpisodeGenerationPolling();
+    this.clearArtifactJobPolling();
+  }
+
+  openArtifactModal(episode: Episode, invoker?: HTMLButtonElement): void {
+    this.artifactModalEpisode = episode;
+    this.artifactModalOpen = true;
+    this.artifactModalInvoker = invoker ?? null;
+    this.artifactModalMessage = '';
+    this.artifactPollingError = '';
+
+    const existingJob = this.artifactJobs[episode.episodeId];
+    const activeJob = existingJob && this.isArtifactJobActive(existingJob) ? existingJob : null;
+    this.artifactJob = existingJob ?? null;
+    this.artifactOptions = this.buildArtifactOptions(episode, activeJob?.requested);
+
+    if (activeJob) {
+      this.ensureArtifactJobPolling(episode.episodeId, activeJob.jobId);
+    }
+
+    window.setTimeout(() => this.focusArtifactModal(), 0);
+  }
+
+  closeArtifactModal(): void {
+    if (!this.artifactModalOpen) {
+      return;
+    }
+
+    this.artifactModalOpen = false;
+    this.artifactModalEpisode = null;
+    this.artifactOptions = [];
+    this.artifactModalMessage = '';
+    this.artifactPollingError = '';
+    const invoker = this.artifactModalInvoker;
+    window.setTimeout(() => invoker?.focus(), 0);
+    this.artifactModalInvoker = null;
+  }
+
+  isArtifactOptionAvailable(option: EpisodeArtifactOption): boolean {
+    return option.available;
+  }
+
+  hasAvailableArtifacts(): boolean {
+    return this.artifactOptions.some((option) => option.available);
+  }
+
+  hasSelectedArtifacts(): boolean {
+    return this.artifactOptions.some((option) => option.available && option.checked);
+  }
+
+  isArtifactConfirmDisabled(): boolean {
+    return !this.hasSelectedArtifacts() || this.isArtifactJobActive(this.artifactJob) || this.artifactJob?.state === 'completed';
+  }
+
+  isArtifactRetryAvailable(): boolean {
+    return this.artifactJob?.state === 'failed' && !this.isArtifactJobActive(this.artifactJob);
+  }
+
+  getArtifactStage(): string {
+    if (!this.artifactJob) {
+      return '';
+    }
+    if (this.artifactJob.state === 'completed') {
+      return 'Archive ready';
+    }
+    if (this.artifactJob.state === 'failed') {
+      return 'Archive preparation failed';
+    }
+    if (this.artifactJob.state === 'pending') {
+      return 'Preparing files';
+    }
+    const progress = this.getArtifactProgress();
+    if (progress === null || progress < 35) {
+      return 'Preparing files';
+    }
+    if (progress < 85) {
+      return 'Creating ZIP';
+    }
+    return 'Finalizing ZIP';
+  }
+
+  getArtifactStatusLabel(): string {
+    const stage = this.getArtifactStage();
+    const progress = this.getArtifactProgress();
+    return stage && progress !== null && this.artifactJob?.state !== 'failed'
+      ? `${stage} — ${progress}%`
+      : stage;
+  }
+
+  getArtifactProgress(): number | null {
+    const progress = this.artifactJob?.progress;
+    return typeof progress === 'number' && Number.isFinite(progress) && progress >= 0 && progress <= 100
+      ? Math.round(progress)
+      : null;
+  }
+
+  isArtifactProgressDeterminate(): boolean {
+    return this.getArtifactProgress() !== null;
+  }
+
+  getArtifactMissingLabels(): string[] {
+    return (this.artifactJob?.missing ?? []).map((selector) =>
+      this.artifactDefinitions.find((definition) => definition.selector === selector)?.label ?? 'Requested artifact'
+    );
+  }
+
+  toggleArtifactOption(option: EpisodeArtifactOption): void {
+    if (option.available && !this.isArtifactJobActive(this.artifactJob)) {
+      option.checked = !option.checked;
+    }
+  }
+
+  confirmArtifactJob(): void {
+    if (!this.artifactModalEpisode || this.isArtifactConfirmDisabled()) {
+      if (!this.hasSelectedArtifacts()) {
+        this.artifactModalMessage = 'Select at least one available artifact.';
+      }
+      return;
+    }
+
+    const episodeId = this.artifactModalEpisode.episodeId;
+    const artifacts = this.artifactOptions
+      .filter((option) => option.available && option.checked)
+      .map((option) => option.selector);
+    if (artifacts.length === 0) {
+      this.artifactModalMessage = 'Select at least one available artifact.';
+      return;
+    }
+
+    this.artifactModalMessage = '';
+    this.artifactPollingError = '';
+    this.apiService.startEpisodeArtifactJob(episodeId, artifacts).subscribe({
+      next: (snapshot) => {
+        this.storeArtifactJob(snapshot);
+        this.ensureArtifactJobPolling(episodeId, snapshot.jobId);
+      },
+      error: (error) => {
+        if (this.isArtifactUnavailableResponse(error)) {
+          this.markArtifactOptionsUnavailable();
+          this.artifactModalMessage = 'No selected files are currently available. Review the options and retry.';
+          return;
+        }
+        this.artifactModalMessage = this.getArtifactErrorMessage(error, 'Could not prepare the selected artifacts.');
+      },
+    });
+  }
+
+  retryArtifactJob(): void {
+    if (!this.isArtifactRetryAvailable()) {
+      return;
+    }
+    this.artifactJob = null;
+    if (this.artifactModalEpisode) {
+      delete this.artifactJobs[this.artifactModalEpisode.episodeId];
+    }
+    this.confirmArtifactJob();
+  }
+
+  onArtifactModalKeydown(event: KeyboardEvent): void {
+    if (!this.artifactModalOpen) {
+      return;
+    }
+    event.stopPropagation();
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      this.closeArtifactModal();
+      return;
+    }
+    if (event.key !== 'Tab') {
+      return;
+    }
+
+    const dialog = event.currentTarget instanceof HTMLElement
+      ? event.currentTarget
+      : document.querySelector<HTMLElement>('[role="dialog"][aria-modal="true"]');
+    const focusable = dialog
+      ? Array.from(dialog.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'))
+        .filter((element) => element.offsetParent !== null)
+      : [];
+    if (focusable.length === 0) {
+      event.preventDefault();
+      return;
+    }
+    const currentIndex = focusable.indexOf(document.activeElement as HTMLElement);
+    const nextIndex = event.shiftKey
+      ? (currentIndex <= 0 ? focusable.length - 1 : currentIndex - 1)
+      : (currentIndex === focusable.length - 1 ? 0 : currentIndex + 1);
+    event.preventDefault();
+    focusable[nextIndex].focus();
   }
 
   startEdit(episode: Episode): void {
@@ -1308,6 +1538,109 @@ export class ManageComponent implements OnInit, OnDestroy {
   private clearEpisodeGenerationPolling(): void {
     this.clearTranscriptionStatusPolling();
     this.clearSummaryStatusPolling();
+  }
+
+  private buildArtifactOptions(episode: Episode, activeSelection?: EpisodeArtifactSelector[]): EpisodeArtifactOption[] {
+    const selected = new Set(activeSelection ?? []);
+    return this.artifactDefinitions.map((definition) => {
+      const fileName = String(episode[definition.fileField] ?? '').trim();
+      const available = fileName.length > 0;
+      return {
+        selector: definition.selector,
+        label: definition.label,
+        formatHint: definition.formatHint,
+        fileName,
+        available,
+        checked: available && (activeSelection ? selected.has(definition.selector) : true),
+        tooltip: available ? fileName : 'Unavailable — file not uploaded.',
+      };
+    });
+  }
+
+  private storeArtifactJob(snapshot: EpisodeArtifactJobSnapshot): void {
+    this.artifactJobs[snapshot.episodeId] = snapshot;
+    if (this.artifactModalEpisode?.episodeId === snapshot.episodeId) {
+      this.artifactJob = snapshot;
+      this.artifactPollingError = '';
+    }
+    if (snapshot.state === 'completed' || snapshot.state === 'failed') {
+      this.clearArtifactJobPolling(snapshot.episodeId, snapshot.jobId);
+    }
+  }
+
+  private isArtifactJobActive(snapshot: EpisodeArtifactJobSnapshot | null | undefined): boolean {
+    return snapshot?.state === 'pending' || snapshot?.state === 'processing';
+  }
+
+  private ensureArtifactJobPolling(episodeId: number, jobId: string): void {
+    if (this.artifactJobPollEpisodeId === episodeId && this.artifactJobPollId === jobId && this.artifactJobPollTimer !== null) {
+      return;
+    }
+
+    this.clearArtifactJobPolling();
+    this.artifactJobPollEpisodeId = episodeId;
+    this.artifactJobPollId = jobId;
+    const refresh = (): void => {
+      this.apiService.getEpisodeArtifactJobStatus(episodeId, jobId).subscribe({
+        next: (snapshot) => {
+          if (this.artifactJobs[episodeId]?.jobId !== jobId) {
+            return;
+          }
+          this.storeArtifactJob(snapshot);
+        },
+        error: (error) => {
+          if (this.artifactJobs[episodeId]?.jobId === jobId) {
+            this.artifactPollingError = this.getArtifactErrorMessage(error, 'Could not refresh archive progress. Retrying…');
+          }
+        },
+      });
+    };
+
+    this.artifactJobPollTimer = window.setInterval(refresh, 2000);
+    refresh();
+  }
+
+  private clearArtifactJobPolling(episodeId?: number, jobId?: string): void {
+    if (episodeId !== undefined && this.artifactJobPollEpisodeId !== episodeId) {
+      return;
+    }
+    if (jobId !== undefined && this.artifactJobPollId !== jobId) {
+      return;
+    }
+    if (this.artifactJobPollTimer !== null) {
+      clearInterval(this.artifactJobPollTimer);
+      this.artifactJobPollTimer = null;
+    }
+    this.artifactJobPollEpisodeId = null;
+    this.artifactJobPollId = null;
+  }
+
+  private markArtifactOptionsUnavailable(): void {
+    this.artifactOptions = this.artifactOptions.map((option) => ({
+      ...option,
+      available: false,
+      checked: false,
+      tooltip: 'Unavailable — file not uploaded.',
+    }));
+  }
+
+  private isArtifactUnavailableResponse(error: unknown): boolean {
+    const candidate = error as { status?: number; error?: { status?: number } } | null;
+    return candidate?.status === 404 || candidate?.error?.status === 404;
+  }
+
+  private getArtifactErrorMessage(error: unknown, fallback: string): string {
+    const candidate = error as { message?: string; error?: { message?: string } } | null;
+    return candidate?.error?.message ?? candidate?.message ?? fallback;
+  }
+
+  private focusArtifactModal(): void {
+    const heading = document.querySelector<HTMLElement>('[data-artifact-modal-heading]');
+    if (heading) {
+      heading.focus();
+      return;
+    }
+    document.querySelector<HTMLElement>('[role="dialog"][aria-modal="true"] input:not([disabled])')?.focus();
   }
 
   uploadMedia(editor: EpisodeEditorState, kind: UploadKind, file: File): void {
