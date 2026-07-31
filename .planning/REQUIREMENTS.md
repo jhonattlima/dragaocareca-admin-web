@@ -79,6 +79,14 @@ Mapped to the v1.1 roadmap phases.
 **Coverage:**
 
 - v1 requirements: 17 total
+
+## Phase 6 evidence reconciliation — 2026-07-31
+
+- UI-01/UI-06 and polling cleanup: satisfied by the final 22/22 focused and 28/28 full ChromeHeadless runs after test-lifecycle repair (`9dd8c15`).
+- UI-08: implementation and focused recovery tests pass, but the bounded real-browser harness only observed empty-selection and modal focus/cleanup; remaining live recovery scenarios are unsupported and remain needs-human.
+- VAL-01: prior staged-fixture evidence is retained, while the 06-04 live preflight found the current API ID-334 row is DC 319 metadata and does not match the supplied source; no mutation was attempted.
+- VAL-02: remains pending because complete live recovery and ZIP evidence for the current matched fixture were not produced.
+- VAL-03: satisfied by 22/22 focused Karma, 28/28 full Karma, `npm run build` exit 0, clean package/lockfile diff, and `npm ls --depth=0` exit 0. Existing selector-parser and Angular budget warnings are recorded as non-blocking.
 - Mapped to phases: 17
 - Unmapped: 0 ✓
 

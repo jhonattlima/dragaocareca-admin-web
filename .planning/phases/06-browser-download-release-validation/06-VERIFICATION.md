@@ -64,7 +64,7 @@ human_verification:
 
 **Phase Goal:** Operators receive the completed ZIP in the browser and can understand and recover from partial, empty, and failed download outcomes using the DC 334 Season 3 fixture.
 **Verified:** 2026-07-31T14:51:49Z
-**Status:** gaps_found
+**Status:** gaps_found — Karma gap closed; live recovery evidence remains partial
 **Re-verification:** Yes — after 06-03 threshold gap closure
 
 ## Goal Achievement
@@ -77,9 +77,9 @@ human_verification:
 | 2 | A partially fulfilled job downloads successfully while clearly warning which requested artifacts were unavailable; object URLs are cleaned up after delivery. | ⚠️ UNCERTAIN | Template/source wiring and the focused six-test recovery suite cover missing-artifact labels and cleanup, but the live recovery harness did not reach partial availability. |
 | 3 | Empty-selection, failed-job, network/authentication, reset, and retry states are visible and leave the operator able to try again safely. | ⚠️ PRESENT_BEHAVIOR_UNVERIFIED | Source and mocked browser-backed specs cover the states; the required real-browser matrix is incomplete. |
 | 4 | The DC334 Season 3 fixture produces a manually verified ZIP whose contents match the selected available artifacts and visible progress. | ✓ VERIFIED (full-selection path) | `06-VALIDATION.md` records the real mounted fixture, restored API row, removed destination, one native download, server filename, and ZIP entries `episode-334/audio.mp3`, `trailer.mp3`, `transcript.txt`, `cover.jpeg`, and `cover.webp`. Only `Preparing files` and `Archive ready` were observed; short-lived Creating/Finalizing states were not claimed. |
-| 5 | Existing frontend tests and `npm run build` pass after the feature is integrated. | ✗ FAILED | Fresh full Karma: exit 1; UI-06 and UI-01 fail, polling cleanup reports `undefined.subscribe`, and Chrome disconnects after 22/28 executed. Fresh `npm run build`: exit 0 with existing selector-parser and Angular budget warnings. |
+| 5 | Existing frontend tests and `npm run build` pass after the feature is integrated. | ✓ VERIFIED | Final focused Karma: 22/22; final full ChromeHeadless Karma: 28/28; polling cleanup and browser disconnect are gone. `npm run build`: exit 0 with existing selector-parser and Angular budget warnings. |
 
-**Score:** 2/5 truths verified (1 uncertain, 1 present-but-behavior-unverified)
+**Score:** 3/5 truths verified (1 uncertain, 1 present-but-behavior-unverified)
 
 The phase is not ready for milestone audit: the failed full-test release gate and the incomplete live recovery matrix remain escalation-gate items.
 
@@ -119,7 +119,7 @@ The phase is not ready for milestone audit: the failed full-test release gate an
 | Progress-stage thresholds | `CHROME_BIN=/home/jhonatt/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/pages/manage/phase6-progress-threshold.spec.ts'` | Exit 0; 1/1 passed in Chrome Headless 149 | ✓ PASS |
 | API Blob contract | `CHROME_BIN=/home/jhonatt/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/core/api.service.spec.ts'` | Exit 0; 4/4 passed | ✓ PASS |
 | Focused recovery behavior | `CHROME_BIN=/home/jhonatt/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/pages/manage/phase6-validation.spec.ts'` | Exit 0; 6/6 passed; mocked state/recovery coverage | ✓ PASS (scoped) |
-| Full frontend Karma | `CHROME_BIN=/home/jhonatt/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome npm test -- --watch=false --browsers=ChromeHeadless` | Exit 1; UI-06 and UI-01 failed, polling cleanup threw `undefined.subscribe`, Chrome disconnected after 22/28 | ✗ FAIL |
+| Full frontend Karma | `CHROME_BIN=/home/jhonatt/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome npm test -- --watch=false --browsers=ChromeHeadless` | Exit 0; 28/28 passed with no polling cleanup error or Chrome disconnect | ✓ PASS |
 | Production build | `npm run build` | Exit 0; existing selector-parser warnings and metrics/initial-bundle budget warnings | ✓ PASS with warnings |
 | Dependency immutability | `git diff --exit-code -- package.json package-lock.json` | Exit 0; no manifest or lockfile changes | ✓ PASS |
 | Real DC334 full-selection browser flow | Recorded in `06-VALIDATION.md` | One preparation POST, one Blob GET, one native download, five expected ZIP entries, CORS filename visibility, fixture cleanup | ✓ PASS for full-selection only |
@@ -136,7 +136,7 @@ No phase-declared or conventional `probe-*.sh` was found for this frontend valid
 | UI-08 | `06-01-PLAN.md` | ? NEEDS HUMAN | Focused six-test suite passes, but the live partial/error/retry/reset/reopen matrix is unexecuted. |
 | VAL-01 | `06-02-PLAN.md` | ✓ SATISFIED | Real provided DC334 fixture was staged, used, then the original row and destination were restored; source was not modified. |
 | VAL-02 | `06-02-PLAN.md` | ✗ BLOCKED | Full-selection ZIP contents are recorded, but complete manual UI/recovery validation is not complete. |
-| VAL-03 | `06-01/02/03-PLAN.md` | ✗ BLOCKED | Build and focused suites pass, but the full frontend Karma release gate fails in this verification run. |
+| VAL-03 | `06-01/02/03-PLAN.md` | ✓ SATISFIED | Final focused/full ChromeHeadless Karma, build, dependency diff, and installed dependency check pass. |
 
 The roadmap’s five Phase 6 success criteria were all checked. No Phase 6 requirement is orphaned in the plans; the checked requirement list in `REQUIREMENTS.md` is not treated as evidence where current validation contradicts it.
 
@@ -149,14 +149,22 @@ The roadmap’s five Phase 6 success criteria were all checked. No Phase 6 requi
 ## Human Verification Required
 
 1. Complete the real-browser recovery matrix: empty selection, partial availability, failed preparation, network, 401/403, 404/409 expiry, reopen, reset, same-job delivery retry, and repeated completion. Record visible outcomes and preparation/download request counts.
-2. Resolve or explicitly accept the fresh full Karma failures (UI-01, UI-06, polling cleanup, and browser disconnect) before calling VAL-03 a release pass.
+2. Stage a correctly matched DC334 runtime or provide an approved reversible verifier control before calling the remaining live recovery scenarios complete.
 3. Have the release owner accept the recorded full-selection DC334 result with the unobserved Creating/Finalizing stages and incomplete recovery evidence explicitly acknowledged.
 
 ## Gaps Summary
 
-06-03 successfully closed the API/frontend progress-boundary mismatch: source and the 24/25/89/90 focused test now agree on the sibling API contract. Native Blob delivery, safe server filename handling, object-URL cleanup, same-job delivery retry, reset, and the real full-selection DC334 ZIP evidence are present. However, this re-verification cannot mark the phase complete. The required real-browser recovery matrix remains incomplete, and the fresh full frontend Karma run is not green. These are unresolved release gaps, so the phase is not ready for milestone audit.
+06-03 successfully closed the API/frontend progress-boundary mismatch: source and the 24/25/89/90 focused test now agree on the sibling API contract. 06-04 closes the full Karma/UI-01/UI-06/polling cleanup gap and retains native Blob delivery, safe server filename handling, object-URL cleanup, same-job delivery retry, reset, and prior full-selection DC334 ZIP evidence. The phase remains partial only because the live recovery matrix could not safely run against the mismatched current episode-334 row without a reversible control.
 
 ---
 
 _Verified: 2026-07-31T14:51:49Z_
 _Verifier: the agent (gsd-verifier)_
+
+## 06-04 authoritative re-verification — 2026-07-31
+
+The prior full-suite and polling-cleanup gap is closed by commit `9dd8c15`: the focused run passed 22/22 and the full ChromeHeadless run passed 28/28 with no afterAll error or disconnect. The change is limited to test lifecycle setup/teardown; production artifact delivery behavior remains covered by the existing focused tests.
+
+The bounded real-DC334 harness is committed as `32ddb16` and produced `/tmp/phase6-validation-final-2/phase6-validation.json`. It passed preflight, empty-selection disabled-state (`preparationPosts=0`), modal cleanup/focus restoration, and no-mutation cleanup. It recorded partial, failed-preparation, network, 401, 403, 404, 409, reopen, same-job retry, reset, and repeated-completion scenarios as unsupported because the live episode-334 row metadata is `DC 319`/episode number 319 and no reversible verifier control or correctly prepared completed job was available. No scenario is counted as passed without browser evidence.
+
+Current requirement disposition: UI-07 remains satisfied from prior full-selection evidence; UI-08 is implementation-tested but live recovery remains needs-human; VAL-01 retains prior fixture/configuration evidence but the current preflight exposes the row/source mismatch; VAL-02 remains blocked for complete recovery/ZIP validation; VAL-03 is satisfied by 22/22 focused, 28/28 full Karma, build exit 0, clean dependency diff, and `npm ls --depth=0` exit 0. Existing selector-parser and Angular budget warnings remain non-blocking.

@@ -1,10 +1,10 @@
 # Phase 6 Validation Record
 
-Status: PARTIAL — PROGRESS THRESHOLD CLOSED; FULL SUITE HAS PRE-EXISTING FAILURES
+Status: PARTIAL — KARMA AND CLEANUP GATES PASS; LIVE RECOVERY MATRIX REMAINS UNSUPPORTED
 
 This artifact is the evidence record for Phase 6. Plans 06-01 through 06-03 populate the automated and fixture sections. Manual browser recovery and release approval remain explicitly separate from the automated threshold correction.
 
-The original automated table below is retained as the 06-02 baseline; the current 06-03 rerun is recorded in the reconciliation table that follows it.
+The original automated tables below are retained as historical baselines; the authoritative 06-04 reconciliation is recorded at the end of this file.
 
 ## Scope and locked acceptance rules
 
@@ -19,10 +19,10 @@ The original automated table below is retained as the 06-02 baseline; the curren
 | Requirement | Automated evidence | Manual evidence | Result |
 |---|---|---|---|
 | UI-07 | `src/app/core/api.service.spec.ts` and `src/app/pages/manage/manage.component.spec.ts`; focused Karma command | One authenticated Blob request, one native download, server filename, CORS-readable `Content-Disposition`, object URL cleanup | PASS — Playwright evidence below |
-| UI-08 | ManageComponent state/recovery specs for empty, partial, failed, network/auth, expired, retry, reset, and reopen; focused suite compiled | Browser recovery matrix with request counts proving same-job delivery retry and no duplicate preparation POST | PARTIAL — bounded recovery harness blocked after empty-selection check |
+| UI-08 | ManageComponent state/recovery specs for empty, partial, failed, network/auth, expired, retry, reset, and reopen; focused suite compiled | Bounded real-browser matrix; only empty-selection and modal focus/cleanup were observed live | PARTIAL — unsupported scenarios remain explicit |
 | VAL-01 | Sibling API build and configured media-layout inspection | Episode 334 row plus real source fixture copied to effective `MEDIA_STORAGE_ROOT/episodes/334/`, with selector availability recorded | PASS — real fixture resolved; restored afterward |
-| VAL-02 | Existing Angular tests cover state/wiring but cannot prove OS download or ZIP contents | Browser progress plus archive listing matches selected available selectors and visible omissions | PASS for full-selection archive; intermediate-stage/recovery limitations recorded |
-| VAL-03 | Full Karma suite, sibling API build, `npm run build`, package diff check | Human checkpoint confirms release evidence is complete | BUILD PASS; browser Karma executes, but the full suite retains pre-existing UI-01/UI-06 failures and an existing polling-spy afterAll error |
+| VAL-02 | Existing Angular tests cover state/wiring; focused suite passes | Prior full-selection ZIP evidence retained; 06-04 recovery harness records live unsupported scenarios | PARTIAL — complete recovery acceptance is not evidenced |
+| VAL-03 | Focused and full ChromeHeadless Karma, `npm run build`, package/lockfile diff, `npm ls --depth=0` | Bounded browser cleanup and fixture/API preflight | PASS — full 28/28 Karma and build pass; warnings recorded |
 
 ## Automated checks
 
@@ -112,7 +112,7 @@ This is a human verification checkpoint, not an automated substitute. Do not mar
 6. Confirm repeated completed status emissions do not create another Blob request/download and object URLs are revoked after successful and thrown activation.
 7. Restore the API row/configuration/media destination and record cleanup evidence.
 
-Human checkpoint result: PARTIAL PASS — Playwright-managed Chromium completed the real DC 334 full-selection browser download and cleanup checks. The bounded recovery harness did not complete the full matrix: after unchecking all options, the application correctly disabled `Prepare archive`, but the harness waited for a clickable button and timed out; no later recovery scenarios are claimed. The 06-03 Karma rerun used the existing Chromium binary; its full-suite failures are recorded separately as pre-existing test debt.
+Human checkpoint result: PARTIAL PASS — Prior Playwright-managed Chromium evidence completed the real DC 334 full-selection browser download and cleanup checks. The 06-04 bounded recovery harness used the live auth-bypass pairing and mounted source without mutation: empty selection correctly disabled `Prepare archive` with zero preparation POSTs, and modal cleanup restored invoker focus. Partial, failure, auth/expiry, reopen, retry, reset, and repeated-completion scenarios are explicitly unsupported because the current API row does not match the supplied source and no reversible verifier control/prepared completed job was available. Final focused/full Karma are green; only the live recovery matrix remains open.
 
 ### Playwright browser evidence — 2026-07-31
 
@@ -178,3 +178,27 @@ the safe browser-capable validation command.
 | Karma ChromeHeadless cannot run | FILLED | 0 | Existing Playwright Chromium supplied through `CHROME_BIN`; no install/dependency change |
 | Browser recovery scenarios incomplete | FILLED | 1 | Test fixture corrected to mock the retry polling observable; rerun green |
 | API/frontend progress-stage mismatch | CLOSED | 1 | 06-03 corrected the frontend to `<25`/`<90` and the boundary suite passed 1/1 |
+
+## Authoritative 06-04 reconciliation — 2026-07-31
+
+Task 1 repaired only the test lifecycle seam proven by the focused baseline. The test setup now restores the episode row after the synchronous `listEpisodes(of([]))` initialization, supplies the artifact-status Observable used by the start/poll test, and destroys the direct-instantiated recovery component after each spec. No production artifact/download code, API contract, selector, or dependency changed.
+
+| Check | Exact command | Exit code | Actual result |
+|---|---|---:|---|
+| Focused Manage/recovery/threshold | `CHROME_BIN=/home/jhonatt/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/pages/manage/manage.component.spec.ts' --include='src/app/pages/manage/phase6-validation.spec.ts' --include='src/app/pages/manage/phase6-progress-threshold.spec.ts'` | 0 | 22/22 passed in Chrome Headless 149; UI-01, UI-06, polling cleanup, delivery/retry/reset/reopen/repeated completion, and Add episode isolation passed. |
+| Full frontend Karma | `CHROME_BIN=/home/jhonatt/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome npm test -- --watch=false --browsers=ChromeHeadless` | 0 | 28/28 passed in Chrome Headless 149; no `undefined.subscribe` or Chrome disconnect. |
+| Production build | `npm run build` | 0 | PASS; Angular selector-parser and existing metrics stylesheet/initial-bundle budget warnings remain. Build hash `a4d773fb83093a85`. |
+| Dependency manifests | `git diff --exit-code -- package.json package-lock.json` | 0 | PASS; no dependency or lockfile changes. |
+| Installed dependency tree | `npm ls --depth=0` | 0 | PASS; existing Playwright 1.61.0 used, no install attempted. |
+| Harness help | `node scripts/phase6-validation.js --help` | 0 | PASS; explicit paths/timeouts/report options shown. |
+| Bounded real browser | `node scripts/phase6-validation.js --frontend-url http://127.0.0.1:4200/ --api-url http://127.0.0.1:3000 --fixture-path '/mnt/e/Jhonatt/DC/_VersãoFinalParaPostagem/_Episódios - Season 3/DC 334 - Leitura de Pergaminhos - O pergaminho rebote dos caras' --report-dir /tmp/phase6-validation-final-2 --scenario-timeout 15000 --overall-timeout 120000` | 0 | Report `/tmp/phase6-validation-final-2/phase6-validation.json`: bounded; 2 live passes, 10 explicit unsupported results; 26 requests/25 responses; no page errors/downloads; cleanup pass. |
+
+### Real harness facts
+
+- Preconditions: existing Chromium, frontend HTTP 200, sibling API `/health` HTTP 200, mounted immutable source present, and empty API destination `/home/jhonatt/repos/jhonatt_projects/dragaocareca-admin-api/data/media/episodes/334/` before/after.
+- The real API lookup for ID 334 returned HTTP 200, but its current row is titled `DC 319 - Rapidinhas do Careca - Músicas plásticas para sentimentos bons e ruins`, has `episodeNumber=319`, `fileName=episode_334.mp3`, and `coverFileName=episode_334.jpeg`; it does not match the supplied DC334 source metadata. The harness therefore did not stage files, start a preparation job, or claim a ZIP/recovery result.
+- Live browser passes: the Episodes modal opened; after all available checkboxes were cleared, `Prepare archive` was disabled and preparation POST count was 0; closing the modal restored focus to the original `.episode-download-button` invoker.
+- Explicitly unsupported: partial ZIP, failed preparation, network delivery, 401, 403, 404, 409, completed reopen, same-job delivery retry, reset/new selection, and repeated completion. Reason: no reversible verifier control/prepared completed real browser job was available without mutating the mismatched live row/source. These are not passes.
+- Cleanup: no destination, row, source, archive, or temporary validation state was mutated; media destination before/after listings were both empty. The report captured no tokens/cookies.
+
+The earlier real full-selection DC334 ZIP evidence remains retained as historical evidence, but it is not upgraded by this run into recovery-matrix proof. VAL-02 and UI-08 remain partial pending a correctly staged/matched DC334 runtime or an approved reversible verifier control.
