@@ -46,7 +46,13 @@ Plans:
   4. The operator can select or deselect choices, and confirming with no selections produces a clear validation message without starting a job.
   5. Once confirmed, the modal shows asynchronous job progress and prevents duplicate submissions while retaining clear cancel/retry boundaries.
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+
+- [ ] 05-01-PLAN.md — Define and test the typed Angular artifact-job API contract
+- [ ] 05-02-PLAN.md — Implement ManageComponent artifact selection and async orchestration
+- [ ] 05-03-PLAN.md — Add the Episodes-tab modal UI, styling, and UI-01–UI-06 coverage
 **UI hint**: yes
 
 ### Phase 6: Browser Download & Release Validation
