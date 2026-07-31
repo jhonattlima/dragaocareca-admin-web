@@ -223,6 +223,7 @@ describe('ManageComponent artifact download modal', () => {
       'listEpisodes',
     ]);
     apiService.listEpisodes.and.returnValue(of([]));
+    apiService.getEpisodeArtifactJobStatus.and.returnValue(of(completedSnapshot()));
     apiService.downloadEpisodeArtifact.and.returnValue(of(new HttpResponse<Blob>({
       body: new Blob(['zip'], { type: 'application/zip' }),
       headers: new HttpHeaders({ 'Content-Disposition': 'attachment; filename="episode-42-artifacts.zip"' }),
@@ -235,6 +236,10 @@ describe('ManageComponent artifact download modal', () => {
     fixture = TestBed.createComponent(ManageComponent);
     component = fixture.componentInstance;
     component.activeTab = 'episodes';
+    component.episodes = [episode];
+    fixture.detectChanges();
+    // ngOnInit loads the list synchronously in this test, so restore the row used
+    // by the DOM/focus contract after exercising that lifecycle path.
     component.episodes = [episode];
     fixture.detectChanges();
   });

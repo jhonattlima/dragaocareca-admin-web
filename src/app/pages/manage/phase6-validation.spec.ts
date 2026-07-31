@@ -59,6 +59,10 @@ describe('Phase 6 artifact recovery behavior', () => {
     component.openArtifactModal(episode);
   });
 
+  afterEach(() => {
+    component.ngOnDestroy();
+  });
+
   it('keeps empty selection local and reports that a file must be selected', () => {
     component.artifactOptions.forEach((option) => option.checked = false);
 
