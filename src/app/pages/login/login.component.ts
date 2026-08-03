@@ -15,7 +15,7 @@ declare global {
   styleUrls: ['./login.component.scss']
 })
 export class LoginComponent implements AfterViewInit {
-  @ViewChild('googleButtonHost', { static: true })
+  @ViewChild('googleButtonHost')
   googleButtonHost!: ElementRef<HTMLDivElement>;
 
   idToken = '';
@@ -61,6 +61,15 @@ export class LoginComponent implements AfterViewInit {
         return;
       }
       this.errorMessage = 'Google Identity script not available. Reload and try again.';
+      return;
+    }
+
+    if (!this.googleButtonHost?.nativeElement) {
+      if (attempt < 50) {
+        window.setTimeout(() => this.setupGoogleButton(attempt + 1), 100);
+        return;
+      }
+      this.errorMessage = 'Google Sign-In button host is not available. Reload and try again.';
       return;
     }
 

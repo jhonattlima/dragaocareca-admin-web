@@ -4,7 +4,7 @@
     <p class="text-muted mb-4" *ngIf="!authBypassEnabled">Use your Google account to access the admin panel.</p>
     <p class="text-muted mb-4" *ngIf="authBypassEnabled">Auth bypass is enabled for this environment. Redirecting...</p>
 
-    <div #googleButtonHost class="google-button mb-4" *ngIf="!authBypassEnabled"></div>
+    <div #googleButtonHost class="google-button mb-4" [hidden]="authBypassEnabled"></div>
 
     <details *ngIf="!authBypassEnabled">
       <summary>Manual token fallback</summary>
