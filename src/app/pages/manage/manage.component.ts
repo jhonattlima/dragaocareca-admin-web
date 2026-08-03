@@ -122,7 +122,7 @@ export class ManageComponent implements OnInit, OnDestroy {
     { name: 'Diego Broniszak', character: 'Troah' },
     { name: 'Eric Farias', character: 'Bron' },
     { name: 'Diogo Truylio', character: 'Aurin' },
-    { name: 'Galdrim', character: 'Galdrim' },
+    { name: 'Gabriel Moraes', character: 'Galdrim' },
   ];
 
   episodes: Episode[] = [];
