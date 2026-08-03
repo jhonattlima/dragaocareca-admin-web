@@ -832,6 +832,9 @@ export class ManageComponent implements OnInit, OnDestroy {
     if (tab === 'episodes') {
       this.clearTranscriptionStatusPolling();
       this.currentPage = 1;
+      // Reload when opening the list so a transient API restart cannot leave the
+      // already-open admin screen with an empty in-memory collection.
+      this.loadEpisodes();
       return;
     }
 
