@@ -7,7 +7,7 @@
 }
 
 .app-mosaic {
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 0;
   pointer-events: none;
@@ -15,7 +15,7 @@
   grid-template-columns: repeat(auto-fill, 220px);
   grid-auto-rows: 220px;
   justify-content: center;
-  align-content: center;
+  align-content: start;
   gap: 10px;
   padding: 20px;
   opacity: 0.22;
