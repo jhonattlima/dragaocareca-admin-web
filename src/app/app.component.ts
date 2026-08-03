@@ -1,4 +1,4 @@
-import { AfterViewInit, ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { ChangeDetectorRef, Component, HostListener, OnInit } from '@angular/core';
 import { environment } from '../environments/environment';
 
 @Component({
@@ -6,17 +6,11 @@ import { environment } from '../environments/environment';
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss']
 })
-export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
-  @ViewChild('appContent', { static: true }) appContent?: ElementRef<HTMLElement>;
-
+export class AppComponent implements OnInit {
   mosaicTiles: string[] = [];
   private mosaicSourceTiles: string[] = [];
-  private mosaicResizeObserver: ResizeObserver | null = null;
 
-  constructor(
-    private readonly changeDetectorRef: ChangeDetectorRef,
-    private readonly hostElement: ElementRef<HTMLElement>,
-  ) {}
+  constructor(private readonly changeDetectorRef: ChangeDetectorRef) {}
 
   async ngOnInit(): Promise<void> {
     try {
@@ -39,14 +33,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  ngAfterViewInit(): void {
-    this.mosaicResizeObserver = new ResizeObserver(() => this.refreshMosaicTiles());
-    this.mosaicResizeObserver.observe(this.hostElement.nativeElement);
-  }
-
-  ngOnDestroy(): void {
-    this.mosaicResizeObserver?.disconnect();
-    this.mosaicResizeObserver = null;
+  @HostListener('window:resize')
+  onWindowResize(): void {
+    this.refreshMosaicTiles();
   }
 
   private refreshMosaicTiles(): void {
@@ -57,9 +46,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const tileSize = window.innerWidth <= 700 ? 148 : 230;
     const columns = Math.max(1, Math.ceil(window.innerWidth / tileSize));
-    const contentHeight = Math.max(this.appContent?.nativeElement.scrollHeight ?? 0, window.innerHeight);
-    const rows = Math.max(1, Math.ceil(contentHeight / tileSize));
-    const requiredTiles = columns * rows;
+    const rows = Math.max(1, Math.ceil(window.innerHeight / tileSize));
+    // One extra row and column prevent gaps caused by centering and browser zoom.
+    const requiredTiles = (columns + 1) * (rows + 1);
 
     this.mosaicTiles = Array.from(
       { length: requiredTiles },
