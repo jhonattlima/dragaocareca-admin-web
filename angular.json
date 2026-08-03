@@ -35,7 +35,13 @@
             "scripts": []
           },
           "configurations": {
-            "production": {
+    "production": {
+      "fileReplacements": [
+        {
+          "replace": "src/environments/environment.ts",
+          "with": "src/environments/environment.prod.ts"
+        }
+      ],
               "budgets": [
                 {
                   "type": "initial",
@@ -48,8 +54,17 @@
                   "maximumError": "4kb"
                 }
               ],
-              "outputHashing": "all"
-            },
+      "outputHashing": "all"
+    },
+    "staging": {
+      "fileReplacements": [
+        {
+          "replace": "src/environments/environment.ts",
+          "with": "src/environments/environment.staging.ts"
+        }
+      ],
+      "outputHashing": "all"
+    },
             "development": {
               "buildOptimizer": false,
               "optimization": false,
