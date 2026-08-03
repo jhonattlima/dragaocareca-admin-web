@@ -48,7 +48,7 @@ export class LoginComponent implements AfterViewInit {
     this.exchangeGoogleToken(this.idToken.trim());
   }
 
-  private setupGoogleButton(): void {
+  private setupGoogleButton(attempt = 0): void {
     if (!environment.googleClientId) {
       this.errorMessage = 'Set googleClientId in environment.ts to use Google Sign-In button.';
       return;
@@ -56,6 +56,10 @@ export class LoginComponent implements AfterViewInit {
 
     const google = window.google;
     if (!google?.accounts?.id) {
+      if (attempt < 50) {
+        window.setTimeout(() => this.setupGoogleButton(attempt + 1), 100);
+        return;
+      }
       this.errorMessage = 'Google Identity script not available. Reload and try again.';
       return;
     }
