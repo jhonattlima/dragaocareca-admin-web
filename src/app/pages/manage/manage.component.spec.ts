@@ -521,3 +521,57 @@ describe('ManageComponent trailer video lifecycle', () => {
     component.ngOnDestroy();
   });
 });
+
+describe('EpisodeFormComponent trailer video card', () => {
+  let apiService: jasmine.SpyObj<ApiService>;
+  let manage: ManageComponent;
+  let fixture: ReturnType<typeof TestBed.createComponent<EpisodeFormComponent>>;
+
+  beforeEach(async () => {
+    apiService = jasmine.createSpyObj<ApiService>('ApiService', [
+      'listEpisodes', 'reserveEpisodeDraft', 'uploadEpisodeTrailerVideo', 'createEpisode',
+      'getEpisodeTranscriptionStatus', 'getEpisodeGeneratedSummaryStatus', 'startEpisodeArtifactJob',
+      'getEpisodeArtifactJobStatus', 'downloadEpisodeArtifact',
+    ]);
+    apiService.listEpisodes.and.returnValue(of([]));
+    manage = new ManageComponent(apiService);
+    await TestBed.configureTestingModule({
+      declarations: [EpisodeFormComponent],
+      imports: [CommonModule, FormsModule],
+    }).compileComponents();
+    fixture = TestBed.createComponent(EpisodeFormComponent);
+    fixture.componentInstance.controller = manage;
+    fixture.componentInstance.editor = manage.addEditorState;
+    fixture.detectChanges();
+  });
+
+  it('renders a dedicated MP4 card with lifecycle status and no provider controls', () => {
+    const cards = Array.from(fixture.nativeElement.querySelectorAll('.upload-card')) as HTMLElement[];
+    const card = cards.find((candidate) => Boolean(candidate.textContent?.includes('Trailer video')));
+    expect(card).not.toBeNull();
+    if (!card) {
+      fail('Trailer video card was not rendered.');
+    }
+    const renderedCard = card as HTMLElement;
+    expect(renderedCard.textContent).toContain('.mp4');
+    expect(renderedCard.querySelector('input')?.getAttribute('accept')).toBe('.mp4,video/mp4');
+    expect(fixture.nativeElement.textContent).not.toContain('YouTube');
+    expect(fixture.nativeElement.textContent).not.toContain('Publish');
+  });
+
+  it('keeps the last-known-good filename visible while a replacement uploads', () => {
+    const editor = manage.addEditorState;
+    editor.formModel.episodeId = 42;
+    editor.formModel.trailerVideoFileName = 'episodes/42/old.mp4';
+    const upload = new Subject<any>();
+    apiService.reserveEpisodeDraft.and.returnValue(of({ draftId: 'draft-42', episodeId: 42, state: 'reserved' as const, expiresAt: '2026-08-05T00:00:00Z' }));
+    apiService.uploadEpisodeTrailerVideo.and.returnValue(upload.asObservable());
+    manage.uploadMedia(editor, 'trailerVideo', new File(['new'], 'new.mp4', { type: 'video/mp4' }));
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('old.mp4');
+    upload.next({ type: HttpEventType.UploadProgress, loaded: 1, total: 2 });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Uploading trailer video');
+    expect(fixture.nativeElement.textContent).toContain('old.mp4');
+  });
+});

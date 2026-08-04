@@ -22,9 +22,9 @@
           <button
             class="btn btn-sm btn-outline-primary mt-2"
             type="button"
-            [disabled]="controller.isUploadBusy(upload.kind)"
+            [disabled]="upload.kind === 'trailerVideo' ? controller.isTrailerVideoBusy(editor) : controller.isUploadBusy(upload.kind)"
             (click)="fileInput.click()">
-            {{ controller.isUploadBusy(upload.kind) ? 'Uploading...' : 'Choose or drop file' }}
+            {{ upload.kind === 'trailerVideo' ? (controller.isTrailerVideoBusy(editor) ? 'Uploading...' : 'Choose or replace MP4') : (controller.isUploadBusy(upload.kind) ? 'Uploading...' : 'Choose or drop file') }}
           </button>
           <button
             class="btn btn-sm btn-outline-danger mt-2 ms-2"
@@ -44,6 +44,34 @@
               aria-valuemax="100">
               {{ controller.getUploadProgress(upload.kind) }}%
             </div>
+          </div>
+          <div *ngIf="upload.kind === 'trailerVideo'" class="mt-2" aria-live="polite">
+            <div class="small text-info" data-trailer-video-status>{{ controller.getTrailerVideoStatusLabel(editor) }}</div>
+            <div class="progress upload-progress mt-2" *ngIf="controller.getTrailerVideoProgress(editor) > 0 || controller.isTrailerVideoBusy(editor)">
+              <div
+                class="progress-bar"
+                role="progressbar"
+                [style.width.%]="controller.getTrailerVideoProgress(editor)"
+                [attr.aria-valuenow]="controller.getTrailerVideoProgress(editor)"
+                aria-valuemin="0"
+                aria-valuemax="100">
+                {{ controller.getTrailerVideoProgress(editor) }}%
+              </div>
+            </div>
+            <button
+              *ngIf="controller.canCancelTrailerVideo(editor)"
+              class="btn btn-sm btn-outline-warning mt-2"
+              type="button"
+              (click)="controller.cancelTrailerVideo(editor)">
+              Cancel upload
+            </button>
+            <button
+              *ngIf="controller.canRetryTrailerVideo(editor)"
+              class="btn btn-sm btn-outline-secondary mt-2"
+              type="button"
+              (click)="controller.retryTrailerVideo(editor)">
+              Retry upload
+            </button>
           </div>
           <div class="alert alert-info py-1 px-2 mt-2 mb-0 small" *ngIf="upload.kind === 'audio' && controller.getGenerationStatus(editor)">
             {{ controller.getGenerationStatus(editor) }}
