@@ -55,10 +55,11 @@
 **Episode Management Flow:**
 1. `ManageComponent` loads episodes from `GET /v1/episodes`.
 2. Local editor state stages add/edit forms, structured people/link entries, uploads, and pagination.
-3. Save/update uses `POST /v1/episodes` or `PUT /v1/episodes/:episodeId`.
-4. Media upload/delete flows call the matching episode media endpoints and patch local file-name state from the response.
-5. After draft transcription reaches `done`, the manage page polls `GET /v1/episodes/:episodeId/episodes-generated-summary` and fills the summary field when generated text is available.
-6. Delete episode uses `DELETE /v1/episodes/:episodeId` and refreshes the list.
+3. For a new trailer video, `ManageComponent` requests an authenticated `POST /v1/episodes/drafts` reservation immediately before upload, then `ApiService` sends multipart field `file` plus `X-Episode-Draft-Id` to `POST /v1/episodes/:episodeId/trailer-video` with progress events.
+4. The API validates the authenticated owner, reservation, MP4 MIME/extension/size, and server-derived staging path. It returns `state: "staged"` for a new episode; Angular keeps the selected `File` and prior finalized filename through cancel/failure/retry and only claims finalization after a successful Save/create response.
+5. Save/create sends the same `draftId` to `POST /v1/episodes`. The API consumes the reservation and promotes staged bytes atomically to `episodes/{episodeId}/trailer.mp4`, preserving/restoring the last-known-good final file on failure. Persisted replacements use the same rollback-safe promotion boundary and return `state: "finalized"`.
+6. Other media upload/delete flows call their matching episode endpoints and patch local file-name state from the response. After draft transcription reaches `done`, the manage page polls `GET /v1/episodes/:episodeId/episodes-generated-summary` and fills the summary field when generated text is available.
+7. Delete episode uses `DELETE /v1/episodes/:episodeId` and refreshes the list.
 
 **Operational Views:**
 1. `FeedComponent` loads preview XML and feed status in parallel.
@@ -100,6 +101,8 @@
 - Responsibilities: Issue backend requests and encode the API contract
 
 The transcript-to-summary flow remains backend-owned: the frontend only polls the two status endpoints and presents progress, errors, and generated text.
+
+Trailer-video responsibilities are split at the HTTP boundary: Angular orchestrates selection, progress, cancellation, retry, replacement-generation guards, and state labels; the API owns validation, authenticated ownership, staging, bounded draft cleanup, canonical naming, promotion, rollback, and persistence. Phase 7 does not include YouTube upload/processing/publishing, hashtags, title generation, or trailer artifact downloads; those remain later-phase surfaces.
 
 ## Error Handling
 

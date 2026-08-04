@@ -57,8 +57,10 @@ The frontend expects the backend to expose:
 - `GET /v1/feed/preview`
 - `GET /v1/episodes/:episodeId/transcription`
 - `GET /v1/episodes/:episodeId/episodes-generated-summary`
+- `POST /v1/episodes/drafts` — authenticated `{episodeId}` reservation returning `{draftId, episodeId, state, expiresAt}`
 - `POST /v1/episodes/:episodeId/audio`
 - `POST /v1/episodes/:episodeId/trailer`
+- `POST /v1/episodes/:episodeId/trailer-video` — authenticated multipart `file` with `X-Episode-Draft-Id`
 - `POST /v1/episodes/:episodeId/cover`
 - `POST /v1/episodes/:episodeId/cover-webp`
 - `DELETE /v1/episodes/:episodeId/audio`
@@ -69,6 +71,14 @@ The frontend expects the backend to expose:
 - `GET /v1/assets/cover-mosaic.json`
 - `GET /v1/metrics/spotify`
 - `GET /v1/metrics/youtube`
+
+### Trailer-video contract
+
+The local MP4 lifecycle is API-owned. Before a new-episode upload, the frontend reserves a positive episode ID with `POST /v1/episodes/drafts`; the server binds the opaque UUID `draftId` to the normalized authenticated email and applies a bounded 24-hour expiry. The upload uses multipart field `file` and `X-Episode-Draft-Id`; the API, not the browser `accept` hint, enforces MP4 extension/MIME and `EPISODE_TRAILER_VIDEO_MAX_BYTES`.
+
+The new-episode upload returns `state: "staged"` with no finalized filename. `POST /v1/episodes` must carry the same `episodeId` and `draftId`; successful creation consumes the reservation and promotes the staged bytes to `episodes/{episodeId}/trailer.mp4`. Persisted replacement and create failure paths preserve or restore the last-known-good final file, and expired/abandoned staging is cleaned up server-side. Angular only owns selection, byte progress, cancel/retry/replacement display, and save orchestration.
+
+`authBypass=true` remains a local frontend/backend development mode and does not change the contract or remove server-side validation. Phase 7 intentionally has no YouTube transfer, processing, private/public publishing, hashtag lookup, title generation, or trailer artifact-download controls; those belong to later phases.
 
 ## Login and Session
 

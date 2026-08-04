@@ -48,7 +48,7 @@ The frontend stays thin:
 - `src/app/pages/manage/*`
   - sectioned admin layout
   - episode form + table
-  - file staging cards for audio, trailer, and covers
+  - file staging cards for audio, trailer, trailer video, and covers
   - upload progress bars
   - delete controls only when a file is present or staged
   - guest search filter
@@ -117,8 +117,10 @@ Expected endpoints include:
 - `GET /v1/feed/preview`
 - `GET /v1/episodes/:episodeId/transcription`
 - `GET /v1/episodes/:episodeId/episodes-generated-summary`
+- `POST /v1/episodes/drafts` — authenticated trailer-video draft reservation
 - `POST /v1/episodes/:episodeId/audio`
 - `POST /v1/episodes/:episodeId/trailer`
+- `POST /v1/episodes/:episodeId/trailer-video` — authenticated multipart MP4 staging
 - `POST /v1/episodes/:episodeId/cover`
 - `POST /v1/episodes/:episodeId/cover-webp`
 - `DELETE /v1/episodes/:episodeId/audio`
@@ -132,9 +134,12 @@ Expected endpoints include:
 
 Media flow:
 
-- uploads are staged first
-- save/update applies staged media to the selected episode
-- delete removes the staged or existing media file for that episode ID
+- The Angular client requests `POST /v1/episodes/drafts` with `{episodeId}` immediately before the first new-episode trailer-video upload. The API returns `{draftId, episodeId, state: "reserved", expiresAt}`; the opaque reservation is bound to the authenticated, normalized owner and expires after a bounded 24-hour window.
+- The client sends the MP4 as multipart field `file` to `POST /v1/episodes/:episodeId/trailer-video` with `X-Episode-Draft-Id`. The API is authoritative for positive-ID, owner, reservation, MP4 MIME/extension, and configured size validation. A new-episode response is `{episodeId, draftId, state: "staged", trailerVideoFileName: null, message}`; persisted replacements return `state: "finalized"`.
+- `POST /v1/episodes` consumes the same `draftId` and episode ID. On successful create, the API promotes staged bytes to the canonical server-owned `episodes/{episodeId}/trailer.mp4`, then returns the finalized response. Failed or canceled replacement attempts retain the last-known-good final file; expired/abandoned draft staging is cleaned up by the API.
+- Angular owns file selection, byte progress, cancel/retry state, and display. The API owns validation, authentication/ownership, storage paths, staging, cleanup, promotion, rollback, and persistence. `authBypass` remains a local development login toggle; it does not move these lifecycle rules into the browser.
+
+Phase 7 is local trailer-video upload only. YouTube transfer or processing, private/public publishing, hashtag lookup, title generation, and trailer artifact-download integration are later-phase contracts and are intentionally not exposed by this workflow.
 
 ## UI Direction
 
