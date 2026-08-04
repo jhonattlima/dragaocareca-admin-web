@@ -1,17 +1,20 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { HttpEventType, HttpResponse } from '@angular/common/http';
-import { finalize } from 'rxjs';
+import { finalize, Subscription } from 'rxjs';
 import {
   ApiService,
   Episode,
   EpisodeArtifactJobSnapshot,
   EpisodeArtifactSelector,
   EpisodeWriteInput,
+  EpisodeTrailerVideoDraftReservation,
+  EpisodeTrailerVideoUploadResponse,
   StructuredEntryCatalogResponse,
 } from '../../core/api.service';
 
 type EpisodeListField = 'coverCredits' | 'tags';
-type UploadKind = 'audio' | 'trailer' | 'cover' | 'coverLow';
+type UploadKind = 'audio' | 'trailer' | 'trailerVideo' | 'cover' | 'coverLow';
+type TrailerVideoLifecycle = 'selected' | 'uploading' | 'canceled' | 'failed' | 'staged' | 'promoting' | 'finalized';
 type ManageTab = 'add' | 'episodes';
 
 interface MemberOption {
@@ -45,13 +48,25 @@ interface UploadState {
   progress: number;
 }
 
+interface TrailerVideoState {
+  file: File | null;
+  status: TrailerVideoLifecycle;
+  progress: number;
+  error: string;
+  subscription: Subscription | null;
+  generation: number;
+  episodeId: number | null;
+  draftId: string | null;
+  priorFinalFileName: string;
+}
+
 interface UploadDefinition {
   kind: UploadKind;
   label: string;
   description: string;
   accept: string;
   displayName: (episodeId: number) => string;
-  fileField: 'fileName' | 'coverFileName' | 'coverLowFileName' | 'trailerFileName';
+  fileField: 'fileName' | 'coverFileName' | 'coverLowFileName' | 'trailerFileName' | 'trailerVideoFileName';
 }
 
 export interface EpisodeArtifactOption {
@@ -94,6 +109,7 @@ export interface EpisodeEditorState {
   selectedMembers: string[];
   listDrafts: Record<EpisodeListField, string>;
   editingEpisodeId: number | null;
+  trailerVideoDraftId?: string | null;
 }
 
 @Component({
@@ -167,6 +183,8 @@ export class ManageComponent implements OnInit, OnDestroy {
   private suggestedNextEpisodeNumber = 1;
   readonly addEditorState: EpisodeEditorState = this.buildEditorState();
   readonly episodesEditorState: EpisodeEditorState = this.buildEditorState();
+  private readonly trailerVideoStates = new WeakMap<EpisodeEditorState, TrailerVideoState>();
+  private readonly trailerVideoReservations = new WeakMap<EpisodeEditorState, Subscription>();
   readonly artifactDefinitions: ArtifactDefinition[] = [
     { selector: 'episode', label: 'Episode audio', formatHint: '.mp3', fileField: 'fileName' },
     { selector: 'trailer', label: 'Trailer', formatHint: '.mp3', fileField: 'trailerFileName' },
@@ -185,6 +203,7 @@ export class ManageComponent implements OnInit, OnDestroy {
   uploadStates: Record<UploadKind, UploadState> = {
     audio: { busy: false, deleting: false, dragOver: false, progress: 0 },
     trailer: { busy: false, deleting: false, dragOver: false, progress: 0 },
+    trailerVideo: { busy: false, deleting: false, dragOver: false, progress: 0 },
     cover: { busy: false, deleting: false, dragOver: false, progress: 0 },
     coverLow: { busy: false, deleting: false, dragOver: false, progress: 0 },
   };
@@ -204,6 +223,14 @@ export class ManageComponent implements OnInit, OnDestroy {
       accept: '.mp3,audio/mpeg',
       displayName: (episodeId) => `trailer_${episodeId}.mp3`,
       fileField: 'trailerFileName',
+    },
+    {
+      kind: 'trailerVideo',
+      label: 'Trailer video',
+      description: 'Drop or choose the .mp4 trailer video.',
+      accept: '.mp4,video/mp4',
+      displayName: (episodeId) => `trailer_${episodeId}.mp4`,
+      fileField: 'trailerVideoFileName',
     },
     {
       kind: 'cover',
@@ -317,6 +344,8 @@ export class ManageComponent implements OnInit, OnDestroy {
 
     this.clearEpisodeGenerationPolling();
     this.clearArtifactJobPolling();
+    this.cancelTrailerVideoWork(this.addEditorState, 'canceled');
+    this.cancelTrailerVideoWork(this.episodesEditorState, 'canceled');
     this.artifactObjectUrls.forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
     this.artifactObjectUrls.clear();
   }
@@ -593,6 +622,7 @@ export class ManageComponent implements OnInit, OnDestroy {
       coverFileName: episode.coverFileName,
       coverLowFileName: episode.coverLowFileName,
       trailerFileName: episode.trailerFileName,
+      trailerVideoFileName: episode.trailerVideoFileName,
       transcriptFileName: episode.transcriptFileName,
       transcriptStatus: episode.transcriptStatus,
       transcriptUpdatedAt: episode.transcriptUpdatedAt,
@@ -608,6 +638,11 @@ export class ManageComponent implements OnInit, OnDestroy {
     };
     editor.selectedMembers = [...(episode.authors ?? [])];
     editor.formModel.episodeNumber = episode.episodeNumber ?? episode.episodeId;
+    this.setTrailerVideoState(editor, {
+      priorFinalFileName: episode.trailerVideoFileName ?? '',
+      status: episode.trailerVideoFileName ? 'finalized' : 'selected',
+      episodeId: episode.episodeId,
+    });
   }
 
   resetForm(): void {
@@ -638,12 +673,25 @@ export class ManageComponent implements OnInit, OnDestroy {
     }
 
     const payload = this.buildPayload(editor);
+    const videoState = this.getTrailerVideoState(editor);
+    if (!editor.editingEpisodeId && editor.trailerVideoDraftId && videoState.file) {
+      videoState.status = 'promoting';
+    }
     const request = editor.editingEpisodeId
       ? this.apiService.updateEpisode(editor.editingEpisodeId, payload)
-      : this.apiService.createEpisode(payload);
+      : this.apiService.createEpisode(payload, editor.trailerVideoDraftId ?? undefined);
 
     request.subscribe({
-      next: () => {
+      next: (episode) => {
+        const videoState = this.getTrailerVideoState(editor);
+        if (videoState.file && editor.trailerVideoDraftId && videoState.episodeId === editor.formModel.episodeId) {
+          videoState.status = episode.trailerVideoFileName ? 'finalized' : videoState.status;
+          if (episode.trailerVideoFileName) {
+            editor.formModel.trailerVideoFileName = episode.trailerVideoFileName;
+            videoState.priorFinalFileName = episode.trailerVideoFileName;
+          }
+          videoState.error = '';
+        }
         this.successMessage = editor.editingEpisodeId ? 'Episode updated.' : 'Episode saved.';
         if (editor === this.addEditorState) {
           this.resetEditor(this.addEditorState);
@@ -653,6 +701,10 @@ export class ManageComponent implements OnInit, OnDestroy {
         this.loadEpisodes();
       },
       error: (error) => {
+        if (!editor.editingEpisodeId && videoState.file && editor.trailerVideoDraftId) {
+          videoState.status = 'staged';
+          videoState.error = error?.error?.message ?? 'Could not finalize the trailer video.';
+        }
         this.errorMessage = error?.error?.message ?? 'Could not save episode.';
       },
     });
@@ -929,6 +981,13 @@ export class ManageComponent implements OnInit, OnDestroy {
       return '';
     }
 
+    if (kind === 'trailerVideo') {
+      const videoState = this.getTrailerVideoState(editor);
+      return editor.formModel.trailerVideoFileName
+        || videoState.file?.name
+        || definition.displayName(editor.formModel.episodeId || this.suggestedNextEpisodeId);
+    }
+
     const currentFileName = editor.formModel[definition.fileField];
     if (currentFileName) {
       return currentFileName;
@@ -1155,6 +1214,52 @@ export class ManageComponent implements OnInit, OnDestroy {
     return this.uploadStates[kind].busy || this.uploadStates[kind].deleting;
   }
 
+  getTrailerVideoStatus(editor: EpisodeEditorState): TrailerVideoLifecycle {
+    return this.getTrailerVideoState(editor).status;
+  }
+
+  getTrailerVideoStatusLabel(editor: EpisodeEditorState): string {
+    const state = this.getTrailerVideoState(editor);
+    switch (state.status) {
+      case 'selected': return state.file ? 'Selected — ready to upload.' : '';
+      case 'uploading': return `Uploading trailer video… ${state.progress}%`;
+      case 'staged': return 'Trailer video staged; save the episode to finalize it.';
+      case 'promoting': return 'Finalizing trailer video…';
+      case 'finalized': return 'Trailer video finalized.';
+      case 'canceled': return 'Upload canceled. Retry or choose a replacement.';
+      case 'failed': return state.error ? `Upload failed: ${state.error}` : 'Upload failed. Retry or choose a replacement.';
+    }
+  }
+
+  getTrailerVideoProgress(editor: EpisodeEditorState): number {
+    return this.getTrailerVideoState(editor).progress;
+  }
+
+  canCancelTrailerVideo(editor: EpisodeEditorState): boolean {
+    return this.getTrailerVideoState(editor).status === 'uploading';
+  }
+
+  isTrailerVideoBusy(editor: EpisodeEditorState): boolean {
+    const status = this.getTrailerVideoState(editor).status;
+    return status === 'uploading' || status === 'promoting';
+  }
+
+  canRetryTrailerVideo(editor: EpisodeEditorState): boolean {
+    const status = this.getTrailerVideoState(editor).status;
+    return Boolean(this.getTrailerVideoState(editor).file) && (status === 'canceled' || status === 'failed');
+  }
+
+  cancelTrailerVideo(editor: EpisodeEditorState): void {
+    this.cancelTrailerVideoWork(editor, 'canceled');
+  }
+
+  retryTrailerVideo(editor: EpisodeEditorState): void {
+    const file = this.getTrailerVideoState(editor).file;
+    if (file) {
+      this.uploadMedia(editor, 'trailerVideo', file);
+    }
+  }
+
   hasUploadedFile(editor: EpisodeEditorState, kind: UploadKind): boolean {
     const definition = this.uploadDefinitions.find((item) => item.kind === kind);
     if (!definition) {
@@ -1165,6 +1270,9 @@ export class ManageComponent implements OnInit, OnDestroy {
   }
 
   canDeleteUpload(editor: EpisodeEditorState, kind: UploadKind): boolean {
+    if (kind === 'trailerVideo') {
+      return false;
+    }
     return this.hasUploadedFile(editor, kind) && !this.isEpisodeEditorLive(editor);
   }
 
@@ -1260,6 +1368,7 @@ export class ManageComponent implements OnInit, OnDestroy {
       selectedMembers: [],
       listDrafts: this.buildEmptyListDrafts(),
       editingEpisodeId: null,
+      trailerVideoDraftId: null,
     };
   }
 
@@ -1271,6 +1380,8 @@ export class ManageComponent implements OnInit, OnDestroy {
   }
 
   resetEditor(editor: EpisodeEditorState): void {
+    this.cancelTrailerVideoWork(editor, 'canceled');
+    editor.trailerVideoDraftId = null;
     if (editor === this.addEditorState) {
       this.clearEpisodeGenerationPolling();
     }
@@ -1835,6 +1946,127 @@ export class ManageComponent implements OnInit, OnDestroy {
     document.querySelector<HTMLElement>('[role="dialog"][aria-modal="true"] input:not([disabled])')?.focus();
   }
 
+  private getTrailerVideoState(editor: EpisodeEditorState): TrailerVideoState {
+    let state = this.trailerVideoStates.get(editor);
+    if (!state) {
+      state = {
+        file: null,
+        status: 'selected',
+        progress: 0,
+        error: '',
+        subscription: null,
+        generation: 0,
+        episodeId: editor.formModel.episodeId,
+        draftId: editor.trailerVideoDraftId ?? null,
+        priorFinalFileName: editor.formModel.trailerVideoFileName ?? '',
+      };
+      this.trailerVideoStates.set(editor, state);
+    }
+    return state;
+  }
+
+  private setTrailerVideoState(editor: EpisodeEditorState, updates: Partial<TrailerVideoState>): TrailerVideoState {
+    const state = this.getTrailerVideoState(editor);
+    Object.assign(state, updates);
+    return state;
+  }
+
+  private cancelTrailerVideoWork(editor: EpisodeEditorState, status: TrailerVideoLifecycle): void {
+    const state = this.getTrailerVideoState(editor);
+    this.trailerVideoReservations.get(editor)?.unsubscribe();
+    this.trailerVideoReservations.delete(editor);
+    state.subscription?.unsubscribe();
+    state.subscription = null;
+    state.generation += 1;
+    if (status === 'canceled') {
+      state.status = state.file ? 'canceled' : 'selected';
+    } else {
+      state.status = status;
+    }
+    state.progress = 0;
+  }
+
+  private reserveTrailerVideoDraft(editor: EpisodeEditorState, generation: number, file: File): void {
+    const state = this.getTrailerVideoState(editor);
+    const episodeId = editor.formModel.episodeId;
+    const existing = editor.trailerVideoDraftId;
+    if (existing) {
+      this.startTrailerVideoUpload(editor, episodeId, existing, file, generation);
+      return;
+    }
+    this.trailerVideoReservations.get(editor)?.unsubscribe();
+    const reservation = this.apiService.reserveEpisodeDraft(episodeId).subscribe({
+      next: (value: EpisodeTrailerVideoDraftReservation) => {
+        if (state.generation !== generation || state.file !== file || editor.formModel.episodeId !== episodeId) {
+          return;
+        }
+        editor.trailerVideoDraftId = value.draftId;
+        state.draftId = value.draftId;
+        this.startTrailerVideoUpload(editor, episodeId, value.draftId, file, generation);
+      },
+      error: (error) => {
+        if (state.generation !== generation || state.file !== file) {
+          return;
+        }
+        state.status = 'failed';
+        state.error = error?.error?.message ?? 'Could not reserve the trailer video draft.';
+      },
+    });
+    this.trailerVideoReservations.set(editor, reservation);
+  }
+
+  private startTrailerVideoUpload(editor: EpisodeEditorState, episodeId: number, draftId: string, file: File, generation: number): void {
+    const state = this.getTrailerVideoState(editor);
+    state.subscription?.unsubscribe();
+    state.subscription = null;
+    state.status = 'uploading';
+    state.progress = 0;
+    state.error = '';
+    state.episodeId = episodeId;
+    state.draftId = draftId;
+    state.subscription = this.apiService.uploadEpisodeTrailerVideo(episodeId, draftId, file).pipe(
+      finalize(() => {
+        if (state.generation === generation) {
+          state.subscription = null;
+        }
+      }),
+    ).subscribe({
+      next: (event) => {
+        if (state.generation !== generation || state.file !== file || state.episodeId !== editor.formModel.episodeId) {
+          return;
+        }
+        if (event.type === HttpEventType.UploadProgress) {
+          const total = event.total ?? file.size;
+          state.progress = total > 0 ? Math.round((100 * event.loaded) / total) : 0;
+          return;
+        }
+        if (event.type !== HttpEventType.Response || !event.body) {
+          return;
+        }
+        const response = event.body as EpisodeTrailerVideoUploadResponse;
+        if (response.state === 'staged') {
+          state.status = 'staged';
+          state.progress = 100;
+        } else {
+          state.status = 'finalized';
+          state.progress = 100;
+          editor.formModel.trailerVideoFileName = response.trailerVideoFileName ?? editor.formModel.trailerVideoFileName;
+          state.priorFinalFileName = editor.formModel.trailerVideoFileName ?? state.priorFinalFileName;
+        }
+        this.successMessage = response.message || 'Trailer video staged.';
+      },
+      error: (error) => {
+        if (state.generation !== generation || state.file !== file) {
+          return;
+        }
+        state.status = 'failed';
+        state.progress = 0;
+        state.error = error?.error?.message ?? 'Could not upload trailer video.';
+        this.errorMessage = state.error;
+      },
+    });
+  }
+
   uploadMedia(editor: EpisodeEditorState, kind: UploadKind, file: File): void {
     this.errorMessage = '';
     this.successMessage = '';
@@ -1853,6 +2085,19 @@ export class ManageComponent implements OnInit, OnDestroy {
     const definition = this.uploadDefinitions.find((item) => item.kind === kind);
     if (!definition) {
       this.errorMessage = 'Invalid upload type.';
+      return;
+    }
+
+    if (kind === 'trailerVideo') {
+      const state = this.getTrailerVideoState(editor);
+      this.cancelTrailerVideoWork(editor, 'canceled');
+      state.file = file;
+      state.status = 'selected';
+      state.error = '';
+      state.episodeId = episodeId;
+      state.priorFinalFileName = editor.formModel.trailerVideoFileName ?? state.priorFinalFileName;
+      const generation = state.generation;
+      this.reserveTrailerVideoDraft(editor, generation, file);
       return;
     }
 
@@ -1892,7 +2137,10 @@ export class ManageComponent implements OnInit, OnDestroy {
             if (!episode) {
               return;
             }
-            editor.formModel[definition.fileField] = episode[definition.fileField] ?? editor.formModel[definition.fileField];
+            const returnedFileName = episode[definition.fileField];
+            if (typeof returnedFileName === 'string') {
+              editor.formModel[definition.fileField] = returnedFileName;
+            }
             if (typeof episode.transcriptStatus !== 'undefined') {
               editor.formModel.transcriptStatus = episode.transcriptStatus;
             }
@@ -1978,6 +2226,8 @@ export class ManageComponent implements OnInit, OnDestroy {
         return this.apiService.uploadEpisodeAudio(episodeId, file);
       case 'trailer':
         return this.apiService.uploadEpisodeTrailer(episodeId, file);
+      case 'trailerVideo':
+        throw new Error('Trailer video uploads use the draft-aware upload flow.');
       case 'cover':
         return this.apiService.uploadEpisodeCover(episodeId, file);
       case 'coverLow':
@@ -1986,6 +2236,9 @@ export class ManageComponent implements OnInit, OnDestroy {
   }
 
   private getDeleteRequest(kind: UploadKind, episodeId: number) {
+    if (kind === 'trailerVideo') {
+      throw new Error('Trailer video replacement does not use the legacy delete flow.');
+    }
     switch (kind) {
       case 'audio':
         return this.apiService.deleteEpisodeAudio(episodeId);
