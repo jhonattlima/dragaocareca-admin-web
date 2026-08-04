@@ -1,65 +1,78 @@
 ---
 phase: 07
 slug: final-trailer-video-upload
-status: draft
+status: evidence-recorded
 nyquist_compliant: false
-wave_0_complete: false
+wave_0_complete: true
 created: 2026-08-03
+updated: 2026-08-04
 ---
 
 # Phase 07 — Validation Strategy
 
-> Per-phase validation contract for the local trailer-video upload lifecycle.
+> Validation matrix for the authenticated local trailer-video lifecycle. Phase 7 stops at local MP4 staging/finalization; YouTube transfer, processing, publishing, hashtags, title generation, and trailer artifact-download integration are explicitly out of scope.
 
 ## Test Infrastructure
 
 | Property | Value |
 |----------|-------|
-| **Framework** | Karma 6 + Jasmine 4; Angular CLI 15 test target |
-| **Config file** | `angular.json` |
-| **Quick run command** | `npm test -- --watch=false --browsers=ChromeHeadless` |
-| **Full suite command** | `npm test -- --watch=false --browsers=ChromeHeadless` |
-| **Estimated runtime** | ~60 seconds; verify in the target environment |
+| **Frontend framework** | Karma 6 + Jasmine 4; Angular CLI 15 test target |
+| **Frontend config** | `angular.json` |
+| **Focused service command** | `npm test -- --watch=false --browsers=ChromeHeadless --include src/app/core/api.service.spec.ts` |
+| **Focused component command** | `npm test -- --watch=false --browsers=ChromeHeadless --include src/app/pages/manage/manage.component.spec.ts` |
+| **Full frontend command** | `npm test -- --watch=false --browsers=ChromeHeadless` |
+| **Sibling API build** | `cd /home/jhonatt/repos/jhonatt_projects/dragaocareca-admin-api && npm run build` |
+| **Sibling API lifecycle verifier** | `cd /home/jhonatt/repos/jhonatt_projects/dragaocareca-admin-api && npm run verify:trailer-video-upload-lifecycle` |
+| **Frontend build** | `npm run build` |
+| **Watch mode** | None of the validation commands use watch mode. |
 
-## Sampling Rate
+## Final Gate Results (2026-08-04)
 
-- **After every task commit:** Run the focused or full Karma suite for changed behavior.
-- **After every plan wave:** Run the full Karma suite.
-- **Before `$gsd-verify-work`:** Full suite and `npm run build` must be green.
-- **Max feedback latency:** 60 seconds where ChromeHeadless is available.
+| Gate | Command | Result | Evidence / limitation |
+|------|---------|--------|-----------------------|
+| API build | `npm run build` in sibling API | **PASS** | TypeScript build completed. |
+| API lifecycle/security | `npm run verify:trailer-video-upload-lifecycle` in sibling API | **PASS** | Verifier reported reservation, auth, staging, create promotion, validation, rollback, expiry cleanup, and no-YouTube route boundary. |
+| Focused Angular service | Focused service command above | **UNAVAILABLE** | Angular bundles compiled, but ChromeHeadless could not launch: `No binary for ChromeHeadless browser on your platform. Please, set "CHROME_BIN" env variable.` |
+| Focused Angular component | Focused component command above | **UNAVAILABLE** | Angular bundles compiled, but ChromeHeadless could not launch; no Jasmine assertions executed. |
+| Full Angular Karma | Full frontend command above | **UNAVAILABLE** | Angular bundles compiled and Karma started, but no ChromeHeadless binary was available; no browser assertions executed. |
+| Angular production build | `npm run build` | **PASS WITH WARNINGS** | Build completed. Existing warnings: metrics stylesheet budget (3.96 kB vs 2.00 kB) and initial bundle budget (687.16 kB vs 500.00 kB); Angular selector-parser warnings for `legend+*` and `.form-floating>~label`. |
 
-## Per-Task Verification Map
+The unavailable-browser results are environmental and remain open. Install/provide a ChromeHeadless binary or set `CHROME_BIN`, then rerun both focused commands and the full command before release sign-off. Bundle compilation passing is recorded separately and is not treated as test assertion success.
 
-The final task IDs are assigned by the phase planner; every task must map to one or more rows below.
+## Requirement-to-Evidence Matrix
 
-| Task area | Requirement | Test Type | Automated Verification |
-|-----------|-------------|-----------|------------------------|
-| Draft reservation issuance | TRAILER-01, TRAILER-02, TRAILER-03 | backend contract/security | `POST /v1/episodes/drafts` issues opaque draftId; missing, expired, reused, mismatched, other-owner, and unreserved IDs are rejected |
-| API staged upload contract | TRAILER-02, TRAILER-03 | backend contract/integration | New-ID staging, auth/ownership, MP4/size/missing-file errors, cancellation cleanup, and last-known-good preservation |
-| API promotion lifecycle and Save consumption | TRAILER-03, TRAILER-04 | backend integration | Select-before-Save staged response, create with same episodeId/draftId, reservation consumption, final promotion, create failure rollback/retained retry state, and replacement rollback |
-| API service/reservation wrappers | TRAILER-02, TRAILER-03 | Angular service unit | Exact draft reservation URL/DTO, trailer upload URL/header/multipart `file`, create draftId wiring, and progress-enabled event request |
-| Trailer video card | TRAILER-01, TRAILER-05 | Angular component/template | Dedicated card, MP4 hint, selected/uploading/staged-promoting/finalized/failed/canceled states, no publish controls |
-| Progress and terminal success | TRAILER-02, TRAILER-05 | Angular component unit | Byte progress is rendered; 100% transfer alone does not finalize; staged response and matching successful Save response transition state |
-| Cancel/retry/replacement | TRAILER-03, TRAILER-04, TRAILER-05 | Angular component/DOM unit | Unsubscribe on cancel, retain selected file and prior final filename/asset while B uploads, retry same file, replacement generation ignores stale responses, and only matching B success replaces A |
-| Reset/destroy teardown | TRAILER-03, TRAILER-04 | Angular component unit | Active upload is torn down and late events cannot mutate a new editor |
+| Requirement | Automated evidence | Manual / remaining evidence | Status |
+|-------------|--------------------|-----------------------------|--------|
+| **TRAILER-01** Select an MP4 in New Episode File Management | `manage.component.spec.ts`: dedicated Trailer video card, MP4 hint, input/drop dispatch; sibling lifecycle verifier validates MP4 route boundary | Real browser: choose a valid MP4 and confirm the card shows the selected file | Browser execution unavailable; implementation and source coverage present |
+| **TRAILER-02** Upload through backend and show byte progress | `api.service.spec.ts`: `POST /episodes/:episodeId/trailer-video`, multipart `file`, `X-Episode-Draft-Id`, progress event; `manage.component.spec.ts`: byte progress and terminal-response boundary; API verifier validates authenticated staging | Real MP4: observe visible progress through staged response | Browser execution unavailable; API verifier passed |
+| **TRAILER-03** Cancel upload while retaining prior final asset | `manage.component.spec.ts`: unsubscribe/cancel, retained `File`, retained prior final filename; API verifier validates staging cleanup, failure preservation, and rollback | Real browser: cancel an active transfer and confirm prior finalized video remains represented | Browser execution unavailable; API verifier passed |
+| **TRAILER-04** Retry or replace without stale-response corruption | `manage.component.spec.ts`: retry same `File`, replacement generations, stale A response ignored, teardown; API verifier validates expired/reused/mismatched/other-owner draft rejection and create failure recovery | Real browser: retry canceled/failed upload and replace with a different MP4 | Browser execution unavailable; API verifier passed |
+| **TRAILER-05** Distinguish lifecycle states and expose no publish action | `manage.component.spec.ts`: selected/uploading/staged/promoting/finalized/failed/canceled labels and controls; template has no YouTube publishing controls; API verifier asserts no-YouTube route boundary | Real browser: inspect all visible states and confirm no YouTube controls | Browser execution unavailable; no-YouTube automated evidence passed |
 
-## Wave 0 Requirements
+## Security and Lifecycle Assertions
 
-- [ ] Add focused Angular service/component tests for the rows above.
-- [ ] Add sibling API contract tests for reservation issuance/ownership, pre-save staging, select-before-Save create consumption, and create/update trailer-video promotion.
-- [ ] Confirm the available headless browser and adjust the command only if the project runner requires it.
+The sibling verifier command is the canonical backend evidence and covers:
 
-## Manual-Only Verifications
+- authenticated reservation issuance with opaque UUID, positive episode ID, normalized owner binding, and bounded expiry;
+- missing, malformed, unreserved, expired, reused, mismatched, and other-owner draft rejection before staging or create;
+- MP4 MIME/extension/size/missing-file validation and deterministic staging;
+- select-before-Save staged response, same `episodeId`/`draftId` create handoff, reservation consumption, canonical `episodes/{episodeId}/trailer.mp4` promotion, and create-failure recovery;
+- persisted replacement rollback, last-known-good preservation, expiry cleanup, and no YouTube/provider call.
 
-| Behavior | Requirement | Why Manual | Test Instructions |
-|----------|-------------|------------|-------------------|
-| Visible byte progress and cancel/retry interaction with a real MP4 | TRAILER-01..05 | Browser transport and filesystem timing are environment-dependent | Start the app and API, open New Episode File Management, confirm the draft reservation exists, choose a valid MP4 before Save, observe staged response, Save the same episode, verify finalized promotion, then cancel/retry/replace; verify the prior finalized video remains represented after a failed replacement. Confirm no YouTube controls appear. |
+The Angular contract is deliberately thin: it owns selection, progress, cancellation, retry, replacement-generation guards, state labels, and Save orchestration. The API owns authentication, ownership, validation, server-derived paths, staging, cleanup, promotion, rollback, and persistence. `authBypass` remains a local development login toggle and does not weaken these API checks.
+
+## Manual-Only Verification
+
+| Behavior | Requirement | Instructions |
+|----------|-------------|--------------|
+| Visible progress, browser cancellation, retry, replacement, and finalization with a real MP4 | TRAILER-01..05 | Start the sibling API and Angular app in local bypass mode, open New Episode → File Management, select a valid MP4 before Save, confirm reservation/staged status and visible byte progress, cancel and retry, select a replacement, then Save the same episode and verify finalized `episodes/{episodeId}/trailer.mp4` state. Confirm a failed/canceled replacement retains the prior finalized asset and no YouTube controls appear. |
 
 ## Validation Sign-Off
 
-- [ ] All tasks have automated verification or Wave 0 dependencies
-- [ ] Sampling continuity has no three consecutive tasks without automated verification
-- [ ] Wave 0 covers all missing test references
-- [ ] No watch-mode flags
-- [ ] `nyquist_compliant: true` set after validation
-- [ ] Approval: pending
+- [x] Task and plan IDs are mapped to focused and full verification commands.
+- [x] Reservation issuance, ownership, unreserved-ID rejection, staging, Save/create promotion, failure recovery, rollback, cleanup, and no-YouTube evidence are named.
+- [x] TRAILER-01 through TRAILER-05 each have automated/source evidence plus the required manual recovery check.
+- [x] All commands are deterministic and non-watch.
+- [ ] Focused and full Angular Karma assertions executed successfully — **blocked by unavailable ChromeHeadless binary**.
+- [ ] `nyquist_compliant: true` — pending successful browser-backed rerun.
+- [ ] Approval/sign-off — pending browser-backed rerun and manual real-MP4 recovery check.
