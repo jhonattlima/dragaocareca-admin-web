@@ -1,174 +1,145 @@
 # Feature Landscape
 
-**Domain:** Episode artifact selection and backend-generated ZIP downloads in an Angular podcast admin client
-**Project:** Dragao Careca Admin Web
-**Milestone:** v1.1 episode artifact downloads
-**Researched:** 2026-07-28
-**Overall confidence:** MEDIUM (project integration facts are HIGH; the new backend contract is not present in this repository)
+**Domain:** Trailer-video production and YouTube publishing inside a podcast episode admin workflow  
+**Project:** Dragao Careca Admin Web + sibling API  
+**Milestone:** v1.2 Trailer Video YouTube Publishing  
+**Researched:** 2026-08-03  
+**Overall confidence:** MEDIUM (existing project contracts are HIGH; current YouTube API behavior is verified against official Google documentation, but the new API job contract is not yet implemented)
 
-## Scope and Confirmed Project Baseline
+## Scope and Existing Baseline
 
-This milestone is an extension of the existing `/manage` Episodes tab. The current table has Edit/Delete actions, pagination, title/guest filtering, and an `Episode` model that already carries these artifact references:
+This research covers only the new v1.2 capabilities. The Angular app is a thin, sectioned admin client; the sibling API owns persistence, media promotion, YouTube credentials, background jobs, and business validation.
 
-| User-facing artifact | Existing `Episode` field | Availability rule for v1.1 |
-|---|---|---|
-| Episode file | `fileName` | Available when the field is non-empty |
-| Trailer | `trailerFileName` | Available when the field is non-empty |
-| Cover art | `coverFileName` | Available when the field is non-empty |
-| Low cover art (`.webp`) | `coverLowFileName` | Available when the field is non-empty |
-| Transcript | `transcriptFileName` | Available when the field is non-empty |
+Already present in the sibling API:
 
-Confirmed from the repository: the frontend is thin and API-driven; `ApiService` is the shared HTTP boundary; `AuthInterceptor` supplies bearer auth; local development uses `authBypass`; and Bootstrap 5.3.8 is already installed. There is currently no artifact-download method, selection state, endpoint, or ZIP library in the frontend.
+- `POST /v1/episodes/:episodeId/trailer-video` accepts MP4, writes to a deterministic staging file, and atomically replaces the final `episodes/{id}/trailer.mp4` file.
+- `trailerVideoFileName` and `trailerVideoSyncStatus` are persisted. Replacing an uploaded trailer is deliberately marked `manual-sync-required` when an existing YouTube link exists.
+- The artifact catalog already contains the canonical `trailer-video` selector and emits `trailer.mp4` in the episode ZIP when the file exists.
+- Existing artifact downloads already provide authenticated, asynchronous preparation, progress polling, retry/reset, and native browser download behavior.
 
-The following is a recommendation until the backend API documentation is available: the backend should accept an episode ID plus a typed list of artifact keys, generate the archive server-side, and return `application/zip` as a binary response. The frontend should not fetch individual files or create the ZIP.
-
-## Typical User Flow
-
-1. Operator sees a download-artifacts icon/button in each episode row.
-2. Activating it opens a labeled modal for that episode, showing all five artifact types.
-3. Available artifacts are checked by default, matching the requested “all available options checked” behavior. Missing artifacts are visibly unavailable and cannot be submitted.
-4. Operator may uncheck any available item, then chooses Download ZIP.
-5. The UI disables the submit action while the request is active and communicates that the backend is preparing the archive.
-6. The backend response is received as a Blob. The browser downloads one ZIP with a deterministic episode-oriented filename.
-7. The modal closes only after a successful download trigger, or remains open with a readable error if generation/download fails.
+Therefore, v1.2 should extend the existing contracts rather than create a second media model or a client-side YouTube integration.
 
 ## Table Stakes
 
-Features users expect. Missing = the product feels incomplete or unsafe for an operator workflow.
+Features users expect. Missing one makes the workflow unsafe or operationally incomplete.
 
-| Feature | Why Expected | Complexity | Notes |
+| Feature | Why Expected | Complexity | Recommendation |
 |---|---|---:|---|
-| Row-level download action | Operators need to identify the episode before selecting files | Low | Add an icon with a text/ARIA label such as “Download artifacts for episode 334”; do not rely on the icon alone. |
-| Episode context in modal | Prevents downloading the wrong episode | Low | Show episode number/ID and title in the modal heading. |
-| Five explicit artifact choices | The feature’s value is controlled retrieval of episode file, trailer, cover, low-cover `.webp`, and transcript | Low | Use stable backend keys, not display labels, in the request. |
-| Default-select all available artifacts | Matches the requested operator behavior and minimizes clicks | Low | Missing files must not be silently represented as selected. Recommended: checked + disabled, or omitted with “Unavailable”; choose one contract and test it. |
-| Select at least one validation | An empty archive request is confusing and may produce a backend error | Low | Disable Download ZIP when zero available items are selected and explain why. |
-| Clear available/unavailable state | Operators need to know whether a missing file is a data problem or a failed download | Low | Display filename when present; display “Not available” when absent. |
-| Cancel/close without mutation | Selection is transient and must not alter episode metadata | Low | Cancel resets only modal selection state. It must not call save/update or media delete endpoints. |
-| Authenticated API request | Downloads are part of the protected admin workflow | Medium | Route through `ApiService` so the existing interceptor adds the bearer token and `authBypass` remains respected. |
-| Binary response handling | ZIP bytes must not be parsed as JSON/text | Medium | Angular `HttpClient` supports `responseType: 'blob'`, returning `Observable<Blob>`; use this in the service. [Angular HTTP request docs](https://angular.dev/guide/http/making-requests), [HttpClient API](https://angular.dev/api/common/http/HttpClient) |
-| Browser download trigger and cleanup | The operator expects a saved file, not a Blob object in the UI | Medium | Create a temporary object URL, trigger an anchor with a `.zip` filename, then revoke the URL. MDN documents `download`, `createObjectURL`, and `revokeObjectURL`. [Anchor download](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/a), [revokeObjectURL](https://developer.mozilla.org/en-US/docs/Web/API/URL/revokeObjectURL) |
-| Loading, success, and failure states | ZIP generation may take longer than a normal JSON request | Medium | Prevent duplicate submissions; surface backend error messages where safe; restore controls after completion. |
-| Stable filename and ZIP MIME type | Makes the output usable in Windows Explorer and predictable for operators | Low | Prefer backend `Content-Disposition` when exposed; otherwise fallback to a sanitized name such as `episode-334-artifacts.zip`. Backend should return `Content-Type: application/zip`. [Content-Disposition](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Disposition) |
-| Keyboard and accessible modal behavior | This is an operator dialog, not a visual-only overlay | Medium | Labeled heading, `aria-labelledby`, visible focus, Escape/Cancel behavior, and keyboard-operable checkboxes/buttons. Bootstrap documents these modal/accessibility expectations. [Bootstrap modal](https://getbootstrap.com/docs/5.3/components/modal/), [Bootstrap accessibility](https://getbootstrap.com/docs/5.3/getting-started/accessibility/) |
+| Final MP4 picker in New Episode → File Management | Operators need one obvious place to select the trailer video alongside existing audio, trailer, and cover files. | Med | Accept `.mp4`; show filename, size, and a clear replacement action. Keep the existing sectioned layout. |
+| Client upload progress | A final MP4 can be large; a spinner cannot distinguish a healthy transfer from a stalled one. | Med | Use byte-based progress where the browser reports it; show percentage and transferred/total bytes. Do not claim YouTube processing progress is upload progress. |
+| Cancel browser-to-API upload | Operators must be able to stop a mistaken or oversized selection without waiting for completion. | Med | Abort the active request, clear the active progress state, and leave the previously promoted final file untouched. The API should clean the partial staging file. |
+| Retry after recoverable upload failure | Network interruptions and transient server errors are normal for large media. | Med | Retry from a clean, explicit state. If resumable browser upload is not introduced, label retry as a new transfer; never imply byte resume. |
+| Safe replacement semantics | A replacement must not destroy the last known-good trailer before the new MP4 is validated and fully received. | High | Preserve the sibling API’s staged-file → atomic promotion flow. Return the resulting episode row only after promotion; retain old media until promotion succeeds. |
+| Duplicate-job/request protection | Double-clicks, refreshes, and repeated retries can otherwise create competing uploads or YouTube videos. | High | Disable conflicting controls while active; API idempotency key or deterministic active-job lookup should make repeated requests converge on one job. |
+| Explicit local upload states | Operators need to distinguish staged, uploading, canceled, failed, and ready-to-publish. | Med | Model states separately from YouTube state; show actionable error text and a retry/replace path. |
+| YouTube non-public draft upload | Uploading public by default is an unacceptable publishing accident. | High | Create the YouTube video with `privacyStatus=private` as the product default. Unlisted may be supported internally only if deliberately chosen; it is not private because anyone with the URL can access it. `videos.insert` supports private, unlisted, and public values, while unverified API projects may force inserted videos to private. ([official `videos.insert` docs](https://developers.google.com/youtube/v3/docs/videos/insert), [video resource docs](https://developers.google.com/youtube/v3/docs/videos)) |
+| Returned YouTube link and status | The operator needs confirmation that the draft exists and a way to inspect it before publishing. | Med | Persist the YouTube video ID and canonical watch URL only after YouTube returns the created resource. Show privacy status and processing status separately. |
+| YouTube upload progress | A queued job with no visible state is not operationally usable. | High | API-owned job with status polling. Report upload bytes when available, then a distinct “processing on YouTube” phase; YouTube exposes `processingDetails.processingStatus` and estimated parts progress for owner-authorized reads. ([official implementation guide](https://developers.google.com/youtube/v3/guides/implementation/videos)) |
+| Recoverable YouTube failure | A transient upstream failure must not force the operator to guess whether a second upload is safe. | High | Persist job state, upstream video ID/session metadata where resumable recovery is possible, error class, and retry eligibility. Retry the same job/session when safe; otherwise require an explicit “start new upload” action. |
+| Explicit public Publish action | Non-public upload and public release are separate operator decisions. | High | Publish button is disabled until the draft upload is complete and YouTube processing has succeeded (or the API explicitly declares it publishable). Require a confirmation naming the episode/title and stating that the video becomes public. Implement publish through `videos.update` with `status.privacyStatus=public`; preserve metadata parts in the update body. ([official `videos.update` docs](https://developers.google.com/youtube/v3/docs/videos/update)) |
+| Publish result reconciliation | A successful API call must update the episode UI, not leave a stale “draft” state. | Med | Poll or refresh the episode after publish; show public status and the same canonical link. Treat a timeout as “unknown—refresh status,” not as permission to publish again. |
+| Public hashtag count lookup | The title workflow needs a measurable signal for a proposed public hashtag. | Med | Backend calls `search.list` with a normalized `q` and `type=video`, then returns `pageInfo.totalResults`. That value is an approximation, capped at 1,000,000, and must be labeled “estimated public results,” not an exact count. ([official `search.list` docs](https://developers.google.com/youtube/v3/docs/search/list)) |
+| Search input normalization and scope | Raw text can cause inconsistent counts and expensive repeated calls. | Med | Accept one hashtag/query at a time; normalize whitespace and require a valid `#tag`-style token or explicitly define broader query behavior. Send region/language scope deliberately and display it if material. Debounce and cache recent results server-side. |
+| Editable 100-character-safe title | Operators need to tune the trailer title, while YouTube rejects titles over its limit. | Low | Make the title editable before upload and before publish, show a live counter, reject `<` and `>` and enforce a maximum of 100 Unicode characters in both UI and API. The API’s `snippet.title` maximum is 100 characters. ([official video resource docs](https://developers.google.com/youtube/v3/docs/videos), [minimum functionality requirements](https://developers.google.com/youtube/terms/required-minimum-functionality)) |
+| Title update without accidental privacy change | Editing metadata should not unexpectedly publish or privatize a video. | Med | Send only the intended mutable parts, and when updating `snippet`, include required fields such as title/category as the API contract requires. Keep title editing separate from the Publish action. |
+| Trailer-video artifact option | The final MP4 is a first-class episode deliverable, not only a YouTube source. | Low | Keep the existing canonical `trailer-video` selector, display `trailer.mp4`, disable it when unavailable, and include it in the same authenticated ZIP with the existing progress/retry/download flow. No separate browser download is needed. |
+| Auth and bypass consistency | New API calls must work with the existing bearer interceptor and local `authBypass` development mode. | Med | Add calls through `ApiService`; never expose YouTube credentials or direct Google upload URLs to the browser. Preserve the current auth guard/interceptor behavior. |
 
-## Differentiators
+## Useful Differentiators
 
-Useful improvements that fit the project, but are not required to prove the v1.1 flow.
+Valuable improvements that fit the milestone if the core job contract is stable.
 
-| Feature | Value Proposition | Complexity | Recommendation |
+| Feature | Value Proposition | Complexity | Priority |
 |---|---|---:|---|
-| File metadata in the modal | Size, filename, and “last updated” help operators verify they selected the intended asset | Medium | Add only if the episodes API already exposes trustworthy size/timestamps; do not make extra per-file requests in v1.1. |
-| Select all / clear all controls | Faster for repeated partial-download workflows | Low | Good small enhancement after the basic five-checkbox flow is verified. “Select all” should mean all available, never unavailable items. |
-| Download summary before submit | Shows “3 of 5 files selected” and avoids accidental partial archives | Low | Recommended for a compact footer status. |
-| Download progress | Helps with large episode audio files and slow ZIP generation | High | Defer unless the backend streams progress or supports a job/status API. A single Blob response cannot provide reliable generation progress without additional backend support. |
-| Backend-provided archive manifest | Makes the ZIP auditable and clarifies skipped/missing files | Medium | Useful if the backend can include a manifest or return selected/skipped metadata; not necessary for the first UI slice. |
-| Retry without reopening | Reduces friction after a transient failure | Low | Preserve the selection on error and change the primary action to Retry. |
-| Remember last selection | Helps operators who repeatedly download the same subset | Low | Defer: it risks stale assumptions when an artifact becomes unavailable and is not needed for a five-item list. |
+| Resumable YouTube upload | Large uploads recover without re-sending all bytes. Google’s resumable protocol stores a session URI, uses `Content-Range`, returns `308` with the last accepted range, and supports retry after 5xx/network interruption. | High | Recommended for the API worker. It is especially appropriate because the API already owns long-running jobs. ([official resumable upload protocol](https://developers.google.com/youtube/v3/guides/using_resumable_upload_protocol)) |
+| Unified stage timeline | One compact timeline—local upload → staged → YouTube transfer → YouTube processing → private draft → published—reduces ambiguity. | Med | Recommended if each phase has a real backend state and timestamp. |
+| Replace-warning with impact summary | Tells the operator that replacing the MP4 does not automatically replace the already-uploaded YouTube video. | Low | Recommended. Explicitly offer “replace local trailer” and “upload replacement to YouTube” as separate consequences. |
+| Copy link action | Makes handoff to review or show notes faster. | Low | Recommended after the link exists; provide accessible confirmation. |
+| Last-known search count and timestamp | Prevents an empty screen when quota or network is temporarily unavailable and makes staleness visible. | Low | Recommended; label cached data clearly. |
+| Processing failure reason | YouTube exposes upload/processing failure and rejection reasons. Showing a normalized reason shortens support loops. | Med | Recommended where available; retain raw provider details in API logs, not necessarily in the UI. |
+| Job recovery after page reload | Operators can leave and return without starting another upload. | High | Recommended for YouTube jobs; optional for the local browser upload because a browser `File` object cannot reliably survive reload. |
 
 ## Anti-Features
 
-Features or approaches to explicitly avoid.
+Features to explicitly avoid in v1.2.
 
 | Anti-Feature | Why Avoid | What to Do Instead |
 |---|---|---|
-| Client-side ZIP generation | Duplicates backend business/storage logic, increases browser memory use for episode audio, and adds an unnecessary dependency | Submit artifact keys to the backend and download its ZIP Blob. |
-| Downloading five files independently | Creates multiple failure points, prompts, and partial-completion ambiguity | Make one backend request and one ZIP download. |
-| Treating filename strings as trusted paths | File names are backend data and may contain unsafe/path-like text | Render names as text only; let the backend resolve artifact paths by an allowlisted artifact enum. |
-| Sending arbitrary file paths from the browser | Expands the API into a path traversal/storage exposure risk | Send only `episodeId` plus fixed keys such as `audio`, `trailer`, `cover`, `coverLow`, and `transcript`. |
-| Closing the modal immediately on submit | Hides whether the request is still running and makes duplicate clicks likely | Keep it open and busy until the Blob response or error arrives. |
-| Showing unavailable options as normal checked boxes | Implies an artifact will be included when it cannot be | Disable/mark unavailable and exclude it from the payload. |
-| Adding a ZIP or file-download library | No browser-side archive creation is required; adds bundle and Angular 15/TypeScript 4.8 compatibility surface | Use Angular `HttpClient`, `Blob`, object URLs, and a temporary anchor. |
-| Reusing edit/save state for downloads | Download selection is an ephemeral action and must not dirty or submit the episode form | Keep a dedicated `artifactDownloadState` and selected-episode reference. |
-| Hardcoding the Windows mock path in production code | Couples the UI to a developer workstation and leaks environment-specific assumptions | Keep the Season 3 DC 334 fixture in test/mock data or a test harness; use only episode ID and mocked artifact fields. |
+| Direct browser-to-YouTube upload | Leaks credential/session complexity into Angular, conflicts with the thin-client boundary, and complicates cancellation and persistence. | Browser uploads to the sibling API; API worker owns YouTube OAuth and resumable transfer. |
+| Public-by-default upload | A single mistaken click can publish an unfinished or unreviewed trailer. | Always create non-public first and require an explicit Publish confirmation. |
+| Treating “upload complete” as “ready to publish” | YouTube may still be processing after `videos.insert`; a returned video ID does not guarantee playable content. | Poll processing status and expose a separate processing state. |
+| Exact hashtag popularity claim | `pageInfo.totalResults` is explicitly approximate and capped; it is not a durable market metric. | Display “estimated public results,” timestamp and query scope. |
+| Client-side YouTube API keys/OAuth | Credentials and provider rules belong to the API; this also makes server-side quota management impossible. | Keep Google authorization and quota accounting in the API. |
+| Automatic YouTube replacement on every local MP4 replacement | Replacing the local source can silently create a new video or leave the old public video inconsistent. | Mark sync as requiring action and make a separate upload/reconcile step explicit. |
+| Full browser-resumable upload implementation in v1.2 | It expands the Angular/API protocol significantly and is not required if the API endpoint already accepts the final MP4. | Provide cancel/retry with clear semantics now; reserve client resume for evidence-driven need. Use resumable transfer inside the API-to-YouTube worker. |
+| Batch YouTube publishing, scheduling, playlists, thumbnails, captions, or analytics | These are separate workflows and increase quota, metadata, and moderation complexity. | Ship one episode, one trailer, one explicit publish action. |
 
-## UX Behavior and State Model
+## Feature Dependencies
 
-Recommended component state:
+```
+New Episode MP4 selection
+  → authenticated local upload job
+  → staged/final trailer persistence
+  → YouTube draft metadata (title + privacy=private)
+  → YouTube upload job
+  → YouTube processing status
+  → returned link + editable title
+  → explicit public publish
 
-```text
-closed
-  → open (selected episode + derived availability + all available checked)
-  → submitting (selection frozen, cancel/close policy explicit)
-  → success (download triggered, close/reset)
-  → error (message shown, selection preserved, retry available)
+Hashtag query normalization → cached public-result count → title suggestion/editing
+Final trailer persistence → artifact preflight → trailer-video ZIP selector/download
+Job identity + persisted state → progress polling + cancel boundary + retry/reload recovery
 ```
 
-The modal should be controlled by Angular state, consistent with the existing custom delete/duplicate/reset overlays. Bootstrap’s CSS can supply the visual style; a Bootstrap JavaScript modal plugin is not required if the Angular template manages visibility, focus, Escape, backdrop, and cleanup correctly. If the Bootstrap plugin is used instead, keep one modal instance and avoid nested modals; Bootstrap documents one-modal-at-a-time behavior and recommends top-level placement.
-
-Recommended labels:
-
-- Episode file — show the existing `fileName`.
-- Trailer — show `trailerFileName`.
-- Cover art — show `coverFileName`.
-- Low cover art (`.webp`) — show `coverLowFileName`.
-- Transcript — show `transcriptFileName`.
-
-Do not infer availability from episode status alone: use the actual non-empty artifact fields returned by `GET /v1/episodes`. A transcript may be present while its status is stale, so the backend remains authoritative for whether the requested artifact can be packaged.
-
-## Feature Dependencies and Integration Points
-
-```text
-Episode list artifact fields
-  → availability mapping and default selection
-  → modal checkbox state
-  → validated artifact-key payload
-  → backend ZIP endpoint
-  → HttpClient Blob response
-  → object URL + browser download
-```
-
-| Dependency | Confirmed or open | Requirement implication |
-|---|---|---|
-| Episode list exposes five filename fields | Confirmed | No extra availability request is needed for the initial modal. |
-| New backend endpoint and HTTP method | Open | Pin down exact route, e.g. `POST /episodes/:episodeId/artifacts/download`; do not invent it in implementation planning. |
-| Request body shape | Open | Prefer `{ artifactTypes: string[] }` (or the backend’s established name) with an allowlisted enum; document it in `ApiService`. |
-| Response type | Recommendation | `200`, `Content-Type: application/zip`, `Content-Disposition: attachment; filename=...`, body as ZIP bytes. |
-| Cross-origin header exposure | Open | If the frontend must read the server filename from `Content-Disposition`, the API must expose that response header through CORS; otherwise use a safe client fallback filename. |
-| Auth/interceptor behavior | Confirmed | The call must use Angular `HttpClient` via `ApiService`; do not use unauthenticated direct `fetch()`. |
-| Modal styling/layout | Confirmed | Bootstrap 5.3.8 and existing sectioned/legacy-inspired styles are available. |
-| Mock validation fixture | User-required, exact path open | Validate with mock Season 3 DC 334 data from the user’s Windows path, but keep the path outside production code and clarify the fixture location before test implementation. |
+Important independence: local MP4 replacement and YouTube publishing must not be one implicit transaction. A local replacement can succeed while the existing YouTube video remains public and unchanged; the UI must show that distinction.
 
 ## MVP Recommendation
 
 Prioritize:
 
-1. Add a labeled download icon/button to each episode row.
-2. Add an Angular-controlled modal showing all five artifact options, with every available option checked by default and unavailable options clearly disabled/marked.
-3. Add a typed `ApiService` method for the agreed backend endpoint and artifact-key payload.
-4. Request the response as `Blob`, trigger a single sanitized `.zip` download, and revoke the object URL.
-5. Cover empty selection, duplicate-submit prevention, HTTP failure, malformed/empty Blob, and successful download with tests.
-6. Validate the full flow using the Season 3 DC 334 mock episode, including a fixture where all five artifacts exist and a fixture with missing artifacts.
+1. Final MP4 selection and API-backed staged replacement with visible upload progress, cancel, retry, and safe last-known-good preservation.
+2. Persisted YouTube draft job that uploads privately, reports transfer and processing phases, returns the watch link, and prevents duplicate jobs.
+3. Explicit public Publish action with confirmation and reconciliation.
+4. Editable title with a server-enforced 100-character limit.
+5. One normalized hashtag query returning a clearly labeled estimated public-result count with timestamp/error state.
+6. Existing artifact modal wired to the already-present `trailer-video` selector and `trailer.mp4` entry.
 
-Defer: progress reporting, archive manifest, per-artifact metadata, remembered selections, and batch/multi-episode downloads. These require either more backend contract or add complexity without improving the requested single-episode flow.
+Defer resumable transfer from browser to API, scheduled publishing, batch operations, thumbnails, captions, playlists, and analytics. Keep resumable API-to-YouTube transfer in MVP if the worker handles large files; Google documents it as the reliability path for large or unstable transfers.
 
-## Verification Considerations
+## UX State Contract Recommended for Roadmap
 
-The requirements and roadmap should include these checks:
+The roadmap should plan explicit state coverage rather than only happy-path buttons:
 
-- The DC 334 row renders the download action without changing existing edit/delete behavior or pagination.
-- Opening the modal derives the correct five availability states from mock fields and checks exactly the available options.
-- Unchecking items changes the request payload; clicking Download with no items does not call the API.
-- The API call includes the episode ID and only allowed artifact keys, and the auth interceptor remains in the request path.
-- A mocked ZIP Blob creates one download with a `.zip` name and releases its object URL.
-- A backend error leaves the modal open, preserves selection, shows a useful message, and allows retry.
-- Unavailable files cannot accidentally enter the payload.
-- Keyboard focus/close semantics and labels are usable in the modal.
-- `npm run build` remains green; existing budget warnings are documented rather than treated as this feature’s failure.
+| Area | Minimum states |
+|---|---|
+| Local MP4 | empty, selected, uploading, canceled, failed-retryable, staged, replacing, replacement-failed |
+| YouTube job | not-started, queued, uploading, upload-failed-retryable, processing, processing-failed, private-ready, publishing, public, publish-failed-unknown, canceled |
+| Title/count | generated, edited, valid, over-limit, invalid-character, count-loading, count-ready, count-stale, count-unavailable |
+| Artifact | trailer unavailable, trailer available/selected, ZIP queued, ZIP processing, ZIP ready, ZIP failure/retry |
 
-## Sources and Confidence
+Cancel should have a declared boundary: local HTTP upload cancellation is immediate from the browser’s perspective; canceling a YouTube job may only stop future work and cannot undo a video already accepted by YouTube. If a provider video exists, surface its ID/status and offer reconciliation rather than blindly retrying.
 
-- **HIGH:** Project-local `docs/README.md`, `docs/ARCHITECTURE.md`, `docs/CONFIGURATION.md`, `src/app/core/api.service.ts`, and `src/app/pages/manage/*` establish the existing fields, service boundary, auth, and layout constraints.
-- **HIGH:** [Angular HTTP request documentation](https://angular.dev/guide/http/making-requests) and [HttpClient API](https://angular.dev/api/common/http/HttpClient) establish Blob response handling.
-- **HIGH:** [MDN anchor download documentation](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/a), [MDN revokeObjectURL](https://developer.mozilla.org/en-US/docs/Web/API/URL/revokeObjectURL_static), and [MDN Content-Disposition](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Disposition) establish browser download and filename behavior.
-- **HIGH:** [Bootstrap 5.3 modal documentation](https://getbootstrap.com/docs/5.3/components/modal/) and [Bootstrap accessibility guidance](https://getbootstrap.com/docs/5.3/getting-started/accessibility/) establish modal interaction/accessibility considerations.
-- **MEDIUM:** The recommendation to avoid a ZIP library is an inference from the confirmed backend-generated-ZIP scope and the project’s current dependencies; it should be revisited only if the backend contract changes.
+## Quota and Operational Constraints
 
-## Open Questions for Requirements
+YouTube’s current quota documentation reports default daily allocations of 100 `search.list` calls, 100 `videos.insert` calls, and 10,000 units for other endpoints. Search is therefore not suitable for keystroke-by-keystroke requests; debounce, cache, and require an explicit lookup action. ([official quota and compliance docs](https://developers.google.com/youtube/v3/guides/quota_and_compliance_audits))
 
-- What exact HTTP method, route, request body key, and artifact enum names does the new backend expose?
-- Does the endpoint return the ZIP directly, or return a job ID requiring polling?
-- Does the API return `Content-Disposition`, and is that header exposed by CORS?
-- When a requested artifact disappears between list load and submit, should the backend fail the whole archive or skip it and report the omission?
-- What is the intended archive filename convention and maximum archive size?
-- Where is the canonical Season 3 DC 334 mock fixture, and what is its exact Windows path?
+The API should own rate limiting, OAuth scope/configuration, provider error mapping, job cleanup, and observability. The web client should only render the returned state and initiate user actions.
+
+## Confidence and Open Questions
+
+- **HIGH:** Existing local trailer-video staging/replacement and artifact-selector behavior, based on direct sibling-API inspection.
+- **MEDIUM:** YouTube privacy, processing, title, resumable-upload, search-count, and quota behavior, verified against current official Google docs and cross-checked across endpoint/resource guides.
+- **LOW / unresolved:** Exact v1.2 API route names, persistence schema, OAuth account/channel selection, maximum local MP4 size as a product decision, cancellation behavior after a YouTube video ID is created, and whether the project’s YouTube API project has passed the audit needed to lift private-only restrictions.
+
+These unresolved items need phase-specific API contract research before implementation. They should not be guessed in the frontend.
+
+## Sources
+
+- [YouTube Data API: videos.insert](https://developers.google.com/youtube/v3/docs/videos/insert) — upload, accepted media, privacy values, authorization, private-only restriction for unverified projects.
+- [YouTube Data API: video resource](https://developers.google.com/youtube/v3/docs/videos) — title limit, privacy/upload/processing states, failure reasons.
+- [YouTube Data API: videos.update](https://developers.google.com/youtube/v3/docs/videos/update) — mutable title/privacy fields and update semantics.
+- [YouTube Data API: processing-status implementation](https://developers.google.com/youtube/v3/guides/implementation/videos) — polling after upload.
+- [YouTube Data API: resumable upload protocol](https://developers.google.com/youtube/v3/guides/using_resumable_upload_protocol) — session, range, retry, and chunk behavior.
+- [YouTube Data API: search.list](https://developers.google.com/youtube/v3/docs/search/list) — query filters, `pageInfo.totalResults`, approximation/cap, and search quota.
+- [YouTube API quota and compliance audits](https://developers.google.com/youtube/v3/guides/quota_and_compliance_audits) — default quota allocation and audit implications.
+- [YouTube API required minimum functionality](https://developers.google.com/youtube/terms/required-minimum-functionality) — title length enforcement.

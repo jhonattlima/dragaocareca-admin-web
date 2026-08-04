@@ -1,258 +1,273 @@
 # Domain Pitfalls
 
-**Project:** Dragao Careca Admin Web
-**Milestone:** Episode artifact downloads
-**Domain:** Angular admin UI for selectable episode artifact downloads and backend-generated ZIPs
-**Researched:** 2026-07-28
-**Overall confidence:** MEDIUM-HIGH
+**Domain:** Trailer MP4 upload and YouTube publishing for the Dragao Careca Admin Web/API
+**Researched:** 2026-08-03
+**Scope:** v1.2 additions only: final MP4 upload/replacement, non-public YouTube upload, explicit public publish, hashtag search estimate, editable title, and artifact-download inclusion.
+**Overall confidence:** MEDIUM-HIGH for Google/YouTube API behavior; MEDIUM for application-specific recovery design.
 
-This file is scoped to the requested v1.1 download milestone. Confirmed facts are derived from the current repository and project docs; recommendations are implementation guidance for the new endpoint and UI contract.
+## System Context
 
-## Confirmed Integration Context
-
-- The frontend is an Angular 15 / TypeScript 4.8.2 client with a shared `ApiService`; backend business rules and ZIP generation remain out of scope for the browser.
-- The episode model already exposes the relevant availability fields: `fileName`, `trailerFileName`, `coverFileName`, `coverLowFileName`, and `transcriptFileName`.
-- The episode list is rendered by `ManageComponent`, which already owns pagination, editing, upload/delete state, transcription polling, and several custom overlays. Adding download behavior there has a meaningful regression surface.
-- Normal API requests receive `Authorization: Bearer <token>` from `AuthInterceptor`. With `environment.authBypass=true`, the frontend guard/login bypasses auth, but the backend must also be running in a compatible local bypass mode.
-- Existing tests are sparse. `ManageComponent` has focused summary-polling tests, but no coverage for episode CRUD/media flows or binary downloads. The root component spec is stale according to `docs/TESTING.md`.
-- The supplied validation fixture is the Season 3 DC 334 episode on the user’s Windows path. A browser cannot read that Windows path directly; validation must either seed/mock the episode through the app/API or use the file only in a backend/local fixture workflow.
+The existing Angular 15 client is intentionally thin. The sibling API already owns the canonical final file (`episodes/{episodeId}/trailer.mp4`), uses authenticated asynchronous artifact jobs, persists job state in SQLite, and has a `trailerVideoSyncStatus` field. New YouTube credentials, remote upload state, retries, and publish transitions should remain API-owned. The browser should submit/stage the file, render API state, and never receive a YouTube refresh token or a filesystem path.
 
 ## Critical Pitfalls
 
-### 1. Treating “checked” as “file exists”
+### 1. Treating browser cancellation as proof that the server received nothing
 
-**What goes wrong:** The modal opens with all five checkboxes checked, including artifacts whose filename field is empty, stale, or not actually present on disk. The request then asks the backend for unavailable files, producing an avoidable whole-download failure or a ZIP with surprising omissions.
+**What goes wrong:** An operator clicks Cancel, the browser aborts the XHR, and the UI assumes the upload did not arrive. The server may already have received the complete multipart body or may finish processing after the client disconnects. A subsequent Retry or Replace can then race with the first request and overwrite state unpredictably.
 
-**Why it happens:** The UI has five known artifact types, but availability is represented by optional filename fields and may change after the episode list was loaded. A checkbox’s selected state is not the same as backend availability.
+**Why it happens:** Browser upload progress/abort is a transport signal, not a distributed transaction. XHR exposes progress and abort events, but `loadend` does not itself establish success or failure; cross-origin upload listeners also require correct CORS/preflight handling. [MDN XHR upload](https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest/upload)
 
-**Consequences:** Operators cannot tell why an item was omitted; “all available checked” is violated; a transcript still processing can be presented as downloadable; the backend may return a 4xx for a selection that was valid when the modal opened.
+**Consequences:** Orphaned staging files, false failure messages, duplicate uploads, replacement of the wrong version, and an API record pointing at a file that the operator did not intend to promote.
 
-**Prevention:** Build modal rows from an explicit artifact descriptor containing a stable API key, label, filename, and `available` flag. Default `selected` to `available`, disable unavailable rows, and display a reason such as “Not uploaded” or “Transcript not ready.” Before submit, send only selected available keys. Keep the backend authoritative and handle a file disappearing between list and download as a normal error.
+**Prevention:**
 
-**Detection:** Test an episode with all files, one missing file, no files, and a transcript status other than `done`. Verify checkbox defaults, disabled state, outgoing selection, and user-visible messaging.
+- Give every browser upload an opaque upload ID and server-side state (`receiving`, `staged`, `canceled`, `failed`, `promoted`), with the episode ID bound server-side.
+- Make cancellation an explicit authenticated API operation that marks the upload canceled and deletes/retains temporary bytes according to a defined cleanup policy; aborting the browser request is only a best-effort early stop.
+- Promote only after a complete MP4 passes size/type validation and an atomic replacement step. Keep the existing final file until the new file is fully validated and promoted.
+- On reconnect/reopen, query the API rather than infer state from the last local progress event.
 
-### 2. Confusing artifact names, API keys, and filesystem paths
+**Detection:** A canceled request later appears as completed; more than one active upload exists for an episode; temporary files outnumber terminal upload records; the UI progress resets while the API reports a newer upload ID.
 
-**What goes wrong:** The frontend sends display labels or filenames where the endpoint expects stable artifact identifiers, or it infers paths such as `episodes/334/...` from a filename. It may also send `coverLow` while the backend expects `cover-webp`.
+**Phase ownership:** API upload lifecycle and cleanup: **v1.2 API**. XHR progress/abort UX and reconciliation on reload: **v1.2 Web**. Operational orphan cleanup metrics: **v1.2 API**.
 
-**Why it happens:** Existing upload endpoints use path suffixes (`audio`, `trailer`, `cover`, `cover-webp`), while the new download request may have a different contract. The frontend should not reconstruct backend storage paths.
+### 2. Replacing the final trailer while YouTube still references the old bytes
 
-**Consequences:** Files are omitted, the wrong asset is selected, backend validation fails, or a future storage layout change breaks the UI.
+**What goes wrong:** A local replacement changes `trailer.mp4` but leaves the old YouTube video ID/link and reports it as synced. The operator later publishes a YouTube asset that no longer corresponds to the final local trailer.
 
-**Prevention:** Define one typed request contract in `ApiService` using the exact backend vocabulary. Map UI-only labels to API keys in one place. Do not derive a path from the user’s Windows fixture path, `fileName`, or episode number. Confirm the request shape and response headers with the API contract before implementation.
+**Why it happens:** File replacement and remote publication are separate side effects. The existing API already distinguishes `unpublished`, `manual-sync-required`, and `synced`; bypassing that state loses the intended safety boundary.
 
-**Detection:** Unit-test the exact URL, HTTP method, JSON body, and selected artifact keys for DC 334 and a mixed selection. Treat a test that only checks “some request happened” as insufficient.
+**Consequences:** Publicly wrong trailer, stale artifact/download assumptions, and no reliable way to tell whether a YouTube link belongs to the current final file.
 
-### 3. Parsing a ZIP response as JSON or assuming the response is always a Blob
+**Prevention:**
 
-**What goes wrong:** The new method reuses the default `HttpClient` JSON behavior, or types the response as `Blob` while the backend actually returns an error JSON/HTML document. The code then creates a download from an error payload or reports an opaque browser failure.
+- On every successful replacement, atomically store a new local media fingerprint/version and transition YouTube state to `manual-sync-required` unless a new upload job is explicitly started.
+- Bind a YouTube upload job to episode ID plus the local trailer version/hash. A job must refuse to publish if the bound local version is no longer current.
+- Keep the old YouTube video private/unlisted or otherwise unchanged unless a deliberate cleanup policy exists; do not silently delete a public asset.
+- Make “Replace” visibly warn that the current YouTube link may become stale and require a fresh private upload before Publish.
 
-**Why it happens:** Existing `ApiService` methods are predominantly JSON and text calls. Angular’s generic type is a compile-time assertion, not runtime validation. Binary downloads require `responseType: 'blob'`; an error still arrives through the HTTP error channel and can itself have a Blob body when the request’s response type is binary.
+**Phase ownership:** Version binding, state machine, and stale-job rejection: **v1.2 API**. Replacement warning and disabled/stale Publish control: **v1.2 Web**.
 
-**Consequences:** A corrupt `.zip` is downloaded for a 401/404/500 response, error messages are lost, or TypeScript overload workarounds hide a mismatch in the actual response.
+### 3. Assuming upload completion means YouTube processing completion
 
-**Prevention:** Implement the download request centrally in `ApiService` with an explicit literal `responseType: 'blob'`. Use `observe: 'response'` if the filename or MIME type comes from headers. In the component, distinguish success from `HttpErrorResponse`, and if an error body is a Blob, read it as text only as a bounded error-message fallback. Do not trust the generic type as validation; check that the successful Blob is non-empty and has a plausible ZIP MIME type when the contract makes that guarantee.
+**What goes wrong:** `videos.insert` returns a video ID, the API stores the watch URL, and the UI immediately enables public publishing. YouTube may still be processing, or may later report `failed`/`rejected`.
 
-**Detection:** Flush a real Blob in an Angular HTTP test; separately simulate 400/401/404/500 responses with JSON and Blob error bodies. Assert that no anchor is clicked and no ZIP is reported as successful on error.
+**Why it happens:** YouTube separates upload status from processing status. Its `processingDetails.processingProgress` is owner-only, estimated, and can periodically decrease as YouTube revises `partsTotal`. [YouTube video resource](https://developers.google.com/youtube/v3/docs/videos)
 
-### 4. Losing the backend-generated filename
+**Consequences:** Publish requests fail or expose a not-yet-playable video; a progress bar reaches 100% while the artifact is not ready; retrying creates duplicate videos.
 
-**What goes wrong:** The browser saves every file as `download.zip`, uses an unsafe title verbatim, or ignores a `Content-Disposition` filename supplied by the backend.
+**Prevention:**
 
-**Why it happens:** The response body and filename are separate concerns. Returning only the body from `HttpClient` discards headers, and parsing `Content-Disposition` casually can mishandle quoting, encoding, or malicious path components.
+- Model at least `uploading`, `uploaded-processing`, `ready-private`, `publish-requested`, `public`, `failed`, `canceled`, and `stale` separately from the local file state.
+- Poll `videos.list(part=status,processingDetails,...)` server-side for the owned video ID. Treat YouTube progress as an estimate and never require monotonic percentage; cap or label it as “processing estimate.”
+- Enable Publish only after the API verifies the video is private and processing succeeded (or explicitly document the chosen readiness threshold).
+- Persist the returned video ID before polling; use it as the idempotency anchor for retries.
 
-**Consequences:** Operators overwrite similarly named downloads, cannot identify the episode, or receive a filename with path traversal characters or unusable characters.
+**Phase ownership:** YouTube polling and state transitions: **v1.2 API**. Progress copy and Publish enablement: **v1.2 Web**.
 
-**Prevention:** Prefer a backend-provided safe filename and expose it through `observe: 'response'`; otherwise generate a conservative fallback such as `episode-334-artifacts.zip`. Strip directory components and unsafe control/path characters before assigning the anchor’s `download` value. Do not trust a filename as an instruction to write outside the browser’s download directory.
+### 4. Designing retries as “insert again”
 
-**Detection:** Test absent, quoted, encoded, and malformed `Content-Disposition` headers, plus titles containing slashes, quotes, accents, and very long text.
+**What goes wrong:** A timeout occurs after YouTube accepted the upload. Retry calls `videos.insert` again and creates a second private video, possibly followed by publishing the wrong one.
 
-### 5. Creating an object URL and never releasing it
+**Why it happens:** A network response can be lost after the remote side commits. YouTube resumable uploads explicitly require status reconciliation; clients must not assume all or none of a failed request’s bytes arrived. [Resumable upload protocol](https://developers.google.com/youtube/v3/guides/using_resumable_upload_protocol)
 
-**What goes wrong:** Each download creates a new Blob URL that remains referenced for the lifetime of the page.
+**Consequences:** Duplicate private videos, quota waste, operator confusion, and a link field that changes between attempts.
 
-**Why it happens:** The happy path often ends immediately after `anchor.click()`, while cleanup is forgotten or placed in a branch that does not run after an error.
+**Prevention:**
 
-**Consequences:** Repeated large episode downloads retain Blob memory and can degrade or crash a long-lived operator session.
+- Persist the resumable session `Location`, local trailer version/hash, YouTube video ID when known, attempt count, last confirmed byte range, and terminal error.
+- After connection loss or 500/502/503/504, query the session with `Content-Range: bytes */TOTAL`, read `Range`, honor `Retry-After`, and resume from the next byte. Do not resend an overlapping or skipped range.
+- If the session has expired, mark the attempt recoverable and start a fresh attempt only after checking whether a video ID was already created; never blindly insert again.
+- Use bounded exponential backoff with jitter and a clear manual Retry state. Make the active-job uniqueness key episode + trailer version + operation type.
 
-**Prevention:** Create one object URL per successful response, trigger the temporary anchor, and revoke the URL after the browser has had a chance to begin the download. Put cleanup in a `finally`-equivalent path for created URLs; also clean any outstanding URL on component destruction if the implementation keeps one as state.
+**Phase ownership:** Resumable protocol, idempotency, backoff, and duplicate detection: **v1.2 API**. Retry button and explanatory error states: **v1.2 Web**.
 
-**Detection:** Spy on `URL.createObjectURL` and `URL.revokeObjectURL`; assert one revoke per created URL, including close/navigation and failed-trigger paths.
+### 5. Treating the resumable session as indefinitely resumable or cancelable
 
-### 6. Bypassing the interceptor with a direct `fetch()` or download URL
+**What goes wrong:** A stored upload URI is reused days later, or Cancel is presented as if it guarantees remote deletion. Google documents finite session lifetime and resume behavior, but not a universal “cancel remote upload and undo any created video” operation. Chunked transfers also require 256 KB multiples except the final chunk and add request overhead. [Resumable upload protocol](https://developers.google.com/youtube/v3/guides/using_resumable_upload_protocol)
 
-**What goes wrong:** The implementation constructs a plain `<a href="...">` or calls `window.fetch()` against the API URL. The request lacks the bearer token, or it relies on credentials/cookies that this application does not use.
+**Prevention:**
 
-**Why it happens:** Native navigation looks simpler for downloads, but `AuthInterceptor` only applies to Angular `HttpClient` requests. The project stores a JWT in local storage and attaches it centrally to `HttpClient` traffic.
+- Store session age/expiry assumptions and treat an expired/invalid session as a new attempt requiring reconciliation.
+- Define Cancel at the application boundary: stop local work, mark the job canceled, clean temporary data, and if YouTube already created a private video, retain its ID for safe retry/reconciliation or explicitly delete it only under a deliberate, authenticated cleanup policy.
+- Use a server-side worker for YouTube transfer so a tab close does not terminate the job. Browser progress should poll the API job, not proxy a long-lived Google request.
+- Choose a conservative chunk size, enforce the 256 KB rule, and test large files through the actual reverse proxy/timeouts.
 
-**Consequences:** Downloads work in `authBypass` development mode but fail with 401 in production, leading to a misleading “download feature works locally” result. A cross-origin redirect can also lose the intended auth context.
+**Phase ownership:** **v1.2 API**; Web owns only the user-visible meaning of Cancel and stale/reconnect rendering.
 
-**Prevention:** Route the download through `ApiService` and `HttpClient` so the existing interceptor applies. Do not put the JWT in a query string or expose it in a generated link. Verify both `authBypass=true` local behavior and normal bearer-token behavior with `authBypass=false`.
+### 6. Publishing public by default or conflating private with unlisted
 
-**Detection:** In an HTTP unit test, assert the `Authorization` header on the download request when a token exists. In browser validation, test an expired/missing token and confirm a visible auth failure rather than a downloaded error file.
+**What goes wrong:** An insert request defaults to public, or the API stores a link and the site treats it as publicly discoverable before operator approval. Conversely, “not public” is implemented as unlisted without the intended access boundary.
 
-### 7. Shipping or testing with the wrong auth bypass configuration
+**Why it happens:** YouTube supports `private`, `public`, and `unlisted`; `videos.update` controls `status.privacyStatus`. Google’s current documentation also states that uploads from unverified API projects created after 28 July 2020 are restricted to private until the project passes audit. [Video resource](https://developers.google.com/youtube/v3/docs/videos) and [videos.update](https://developers.google.com/youtube/v3/docs/videos/update)
 
-**What goes wrong:** The local mock path masks missing auth headers, or `authBypass: true` is accidentally included in a production build.
+**Consequences:** Accidental publication, misleading link behavior, audit surprises, or a Publish button that cannot succeed in production.
 
-**Why it happens:** The current development environment enables bypass and the login page redirects immediately. This makes the happy path convenient but removes an important integration check.
+**Prevention:**
 
-**Consequences:** Production operators see unauthorized downloads, or protected artifact contents become reachable without the intended guard if the production environment replacement is mispackaged.
+- Set `status.privacyStatus=private` explicitly on insert; do not rely on defaults or API-project verification status.
+- Treat the returned watch URL as an operator-only reference until the API confirms the stored remote privacy state.
+- Implement Publish as a separate authenticated, idempotent `videos.update` operation that changes only the intended status fields and verifies the result.
+- Make public transition one-way in the normal workflow, with an explicit “already public”/“publish in progress” state; do not accidentally overwrite other metadata when updating `status`.
+- Document the API project audit requirement as a release/deployment gate.
 
-**Prevention:** Keep bypass handling limited to the existing environment contract. Add a production-build/configuration check that asserts `authBypass` is false. Include a normal-auth test for the new method and a local mock-data test that does not pretend to validate production auth.
+**Phase ownership:** OAuth/project readiness and privacy state machine: **v1.2 API/ops**. Explicit confirmation and disabled-state copy: **v1.2 Web**.
 
-**Detection:** Inspect the built environment configuration and test a non-bypass run against the backend. Treat a passing bypass-only validation as incomplete.
+### 7. Exhausting quota through polling and hashtag lookup
 
-### 8. Leaving the modal or row in a contradictory loading state
+**What goes wrong:** The API polls YouTube too frequently, performs repeated hashtag searches on every keystroke, or retries `videos.insert` after uncertain outcomes. The current reference lists `videos.insert` at 100 quota units and `search.list` at 100 calls per day / one quota unit per call; the overview documents default daily allocations and notes quota costs can change. [videos.insert](https://developers.google.com/youtube/v3/docs/videos/insert), [search.list](https://developers.google.com/youtube/v3/docs/search/list), [YouTube API overview](https://developers.google.com/youtube/v3/getting-started)
 
-**What goes wrong:** Double-clicking submits duplicate ZIP jobs; closing the modal does not cancel or invalidate the request; the modal closes before the download is created; or an error leaves the Download button disabled forever.
+**Consequences:** Quota exhaustion blocks publication for the day, causes confusing 403 failures, and makes a single operator action affect unrelated metrics/API work.
 
-**Why it happens:** The request is asynchronous and the manage screen has independent upload, delete, polling, and global message state. A single boolean can be reset by the wrong callback or shared across episodes.
+**Prevention:**
 
-**Consequences:** Duplicate backend work, stale ZIPs for a different episode, buttons that stop responding, or an operator who cannot distinguish “preparing ZIP” from “browser download started.”
+- Centralize quota-aware YouTube calls in the API; never call Google directly from the browser.
+- Poll processing with backoff and a maximum duration; stop after terminal status and persist the last known state. Do not poll every UI render or every second indefinitely.
+- Debounce hashtag searches, normalize/cache the exact query plus region/type, and require an explicit Search action if necessary. Cache approximate results with a timestamp and label them accordingly.
+- Do not spend quota on a blind retry: reconcile resumable session/video ID first. Add per-operation rate limits and structured quota error handling.
+- Treat quotas as configuration/operations data rather than hard-coded UI assumptions.
 
-**Prevention:** Track download state with an episode identity and explicit phases such as `idle`, `submitting`, `success`, and `error`. Disable submit while active, allow safe cancellation/close behavior, and ignore late results whose episode no longer matches the active modal. Always reset state in success and error handlers. Keep download loading separate from upload progress and summary/transcription polling.
+**Phase ownership:** **v1.2 API** for scheduling, caching, quotas, and metrics; **v1.2 Web** for debounce, Search action, and stale-result labels.
 
-**Detection:** Test double submit, close-while-pending, switch-page-while-pending, success, error, and retry. Verify that only one backend request is made and that retry is possible after failure.
+### 8. Presenting `totalResults` as an exact public hashtag count
 
-### 9. Building an inaccessible or fragile custom modal
+**What goes wrong:** The UI says “exactly N public videos” or uses the value to promise a stable count. `search.list` explicitly says `pageInfo.totalResults` is an approximation, may not represent an exact value, and is capped at 1,000,000. YouTube Help describes hashtag results as videos whose title or description includes the hashtag; this is not a count of all uploads or a stable analytics metric. [search.list](https://developers.google.com/youtube/v3/docs/search/list), [YouTube hashtag help](https://support.google.com/youtube/answer/6390658)
 
-**What goes wrong:** The icon-only action has no accessible name; the modal lacks `role="dialog"`, `aria-modal`, a labelled heading, keyboard close, focus handling, or a backdrop that prevents interaction with the page. Alternatively, Bootstrap’s CSS modal markup is combined with its JavaScript plugin without adding/configuring the required JS dependency, or a second modal mechanism conflicts with the existing custom overlays.
+**Prevention:**
 
-**Why it happens:** The project already uses state-driven custom overlays for delete/duplicate/reset confirmations, while Bootstrap 5.3 modal behavior is a JavaScript plugin separate from the CSS classes.
+- Query `type=video`, pass a normalized hashtag term, and store region/language/query timestamp so the result is reproducible enough to explain.
+- Label the field “estimated public results” (or equivalent) and show “unavailable” on quota/API errors; never silently display zero.
+- Do not derive a title by assuming the count is exact or current. Do not use it for pagination or durable business logic.
+- Sanitize input to one valid hashtag according to the product’s rules; avoid accepting arbitrary URL/query fragments from the browser.
 
-**Consequences:** Keyboard and screen-reader users cannot complete the download; clicks leak to the episode table; focus is lost; or modal scroll/z-index behavior is inconsistent.
+**Phase ownership:** Query contract and validation: **v1.2 API**. Honest label/editable presentation: **v1.2 Web**.
 
-**Prevention:** Reuse the project’s established overlay pattern unless there is a deliberate reason to adopt Bootstrap’s JS modal. Give the icon a tooltip/title and `aria-label`, make the dialog labelled and keyboard-dismissible, restore focus to the trigger, and prevent submit when no artifacts are selected. Keep the modal at a top-level position compatible with fixed overlays.
+### 9. Truncating the title incorrectly at 100 characters
 
-**Detection:** Validate keyboard-only open/close/submit, Escape behavior, focus restoration, screen-reader labels, backdrop clicks, mobile viewport scrolling, and repeated open/close cycles.
+**What goes wrong:** The browser counts UTF-16 code units, bytes, or visible graphemes differently from the server, truncates a multibyte title incorrectly, or lets `<`/`>` through. YouTube documents a maximum of 100 characters and disallows `<` and `>` in `snippet.title`; `videos.update` requires the complete `snippet` fields relevant to the update and can overwrite mutable metadata included in the part. [Video resource](https://developers.google.com/youtube/v3/docs/videos), [videos.update](https://developers.google.com/youtube/v3/docs/videos/update)
 
-### 10. Validating only the “all five files present” happy path
+**Prevention:**
 
-**What goes wrong:** Validation uses the DC 334 fixture with every expected file and concludes the feature is complete. It misses empty selections, missing transcript, stale list data, backend partial-file policy, malformed ZIP, and large audio download behavior.
+- Enforce the limit in both Web and API, but make the API authoritative. Use the same Unicode-aware policy in both places, preserve whole user-perceived characters where possible, and reject/escape forbidden characters rather than silently changing meaning.
+- Display remaining capacity and validate the final title immediately before enqueue and before `videos.update`.
+- Store the exact title sent to YouTube in the job/audit record. Include the hashtag only if it fits; do not auto-append it after validation.
+- For metadata updates, send the complete intended `snippet` fields required by the endpoint and preserve existing description/category/tags as appropriate; avoid a partial update that erases fields.
 
-**Why it happens:** The requested fixture is useful for an end-to-end smoke test, but it does not cover the availability matrix or failure boundaries.
+**Phase ownership:** Canonical validation and YouTube payload: **v1.2 API**. Live counter, editable field, and accessible validation: **v1.2 Web**.
 
-**Consequences:** Operators encounter failures only on real historical episodes, where media is commonly incomplete or transcript generation is still pending.
+### 10. Leaking OAuth credentials or over-scoping the Google integration
 
-**Prevention:** Make DC 334 the named happy-path fixture, then add a mock matrix: all available; audio only; no transcript; missing cover-webp; no files; selected unavailable item; backend rejects one selection; empty/corrupt Blob; unauthorized; network failure; and retry after failure. Verify the resulting ZIP entries and that no unselected artifact appears.
+**What goes wrong:** The browser receives a refresh token, the API logs access tokens/session URLs, or credentials are stored unencrypted. Google’s OAuth guidance says server applications handle authorization-code exchange and that refresh tokens may be revoked/expire; its best-practice guidance recommends encrypting refresh tokens at rest and keeping the datastore inaccessible to the public. [Web-server OAuth](https://developers.google.com/identity/protocols/oauth2/web-server), [OAuth best practices](https://developers.google.com/identity/protocols/oauth2/resources/best-practices)
 
-**Detection:** Use `HttpTestingController` for deterministic request/response tests and a real browser/backend validation for the DC 334 ZIP. A passing `npm run build` is required by project rules but does not prove binary behavior.
+**Consequences:** Channel takeover, publish capability exposed to any admin/browser compromise, unrecoverable jobs after token revocation, and credential leakage through logs.
 
-### 11. Treating a successful HTTP response as proof the ZIP is usable
+**Prevention:**
 
-**What goes wrong:** The UI reports success for a zero-byte, HTML error page returned with status 200, or ZIP whose entries do not match the requested selection.
+- Keep client secret, refresh token, access token, and resumable session URI API-side only; redact them from logs, error payloads, database exports, and browser responses.
+- Request the minimum scopes needed (`youtube.upload` for insert and the appropriate authenticated YouTube scope for metadata/privacy operations), and ensure channel ownership/authorization is checked.
+- Encrypt refresh credentials at rest, rotate/revoke them operationally, and handle `invalid_grant`/revocation as a clear “reauthorization required” terminal job state.
+- Ensure artifact downloads remain authenticated and server-selected; a YouTube watch URL is not an authorization to download the local MP4.
 
-**Why it happens:** The frontend cannot fully validate ZIP structure without adding a ZIP parser, and the backend owns archive generation. Status-only checks are still too weak for a useful operator result.
+**Phase ownership:** **v1.2 API/ops**, with security review before production credentials are enabled. Web only renders redacted error/status data.
 
-**Consequences:** Operators save an archive that fails to open or silently lacks requested files.
+### 11. Allowing stale jobs to mutate current episode state
 
-**Prevention:** Keep ZIP creation and archive policy backend-owned. At the frontend boundary, require a non-empty Blob, use the backend’s documented MIME/filename contract, and surface a generic “download received but may be invalid” only if the contract allows such a state. Put entry-level correctness checks in backend tests or the milestone’s integration validation, not in a new browser ZIP library unless explicitly required.
+**What goes wrong:** A worker from an earlier trailer version completes after a replacement and writes its YouTube link, sync status, title, or public state onto the new episode version.
 
-**Detection:** Open the downloaded DC 334 archive and compare entries against the selected set. Include backend tests for partial/missing artifacts and archive integrity.
+**Why it happens:** SQLite job persistence survives restarts, while the episode row is mutable. Job ID alone is not enough to establish that the result still applies.
 
-### 12. Letting user-visible error extraction assume JSON
+**Prevention:**
 
-**What goes wrong:** The existing pattern `error?.error?.message` is applied unchanged to a Blob error. The UI shows a generic message even when the backend supplied a useful reason, or attempts to render binary data as text.
+- Include episode ID, local trailer version/hash, requested title, and operation type in every job. Apply completion with a compare-and-swap condition against the current version.
+- On startup, recover only jobs with an explicit resumable state; mark interrupted Google sessions for reconciliation rather than automatically replaying inserts.
+- Have a stale-job sweeper with bounded retention and cleanup of temporary/session metadata. Keep terminal records long enough for support/audit, but not sensitive tokens.
+- On every poll response, the Web must ignore an old job if the API says it is no longer current and refresh episode state.
 
-**Why it happens:** Current JSON endpoints usually provide an object-shaped error; a `responseType: 'blob'` request changes the error body representation.
+**Phase ownership:** Persistence/recovery/sweeper/CAS: **v1.2 API**. Reopen/navigation reconciliation: **v1.2 Web**.
 
-**Consequences:** Missing-file and auth failures become indistinguishable, increasing support burden and making retry decisions unclear.
+### 12. Assuming artifact inclusion is only a selector/UI change
 
-**Prevention:** Centralize a small, bounded error-message helper for this flow: handle object JSON, text, Blob text, status 0, and fallback status messages. Never display raw HTML or unbounded backend content. Preserve the existing manage-screen alert conventions and avoid overwriting unrelated upload/transcription messages.
+**What goes wrong:** The artifact modal offers “Trailer video,” but the ZIP worker resolves a client-supplied filename, reads the staging file, or snapshots the source before replacement is finalized. Alternatively, the download job includes an old video after a replacement.
 
-**Detection:** Assert messages for 401, 403, 404, 409/validation, 500, status 0, and Blob-encoded JSON errors.
+**Prevention:**
+
+- Keep `trailer-video` as a canonical selector that resolves only to the server-derived final `episodes/{episodeId}/trailer.mp4`; never accept a path or filename from the client.
+- Snapshot source evidence/hash at job preparation, as the existing artifact model does, and expose missing/partial results honestly.
+- Require final upload promotion to complete before the selector reports the video available. A failed/canceled upload must never become a downloadable artifact.
+- Revalidate authenticated episode ownership, selector validity, file containment, and source hash at preparation/download boundaries.
+
+**Phase ownership:** Selector/resolution/snapshot/security: **v1.2 API**. Checkbox/modal status and partial-result copy: **v1.2 Web**.
 
 ## Moderate Pitfalls
 
-### Selection state leaks between episodes
+### Reverse-proxy and request-size limits
 
-Reset the descriptor array whenever a modal opens for a new episode. Do not store selection by row index; use artifact keys so pagination and reordering cannot select the wrong file.
+Large MP4 uploads can be rejected or timed out by Nginx/Ingress, Express/multipart configuration, or platform limits before application code sees them. Align API max bytes, proxy body limits, request timeout, disk quota, and client error mapping. Test a file near the configured limit and a mid-transfer disconnect. **Owner: v1.2 API/ops.**
 
-### Modal submit sends an empty selection
+### MIME/type validation based only on the filename
 
-Disable the action and explain the requirement when all checkboxes are cleared. Do not call the backend merely to discover that an empty artifact list is invalid.
+`accept="video/mp4"` is a picker hint, not security validation. Validate authenticated episode ownership, declared MIME, byte size, extension policy, and—where practical—container/codec using server-side inspection before promotion. Store with a server-derived name. **Owner: v1.2 API.**
 
-### Missing transcript status is interpreted as missing transcript file
+### Progress that falsely reaches 100%
 
-`transcriptFileName` and `transcriptStatus` are different facts. Show a transcript as available only under the contract’s readiness rule, normally a present file plus a completed status. Confirm whether an existing filename is sufficient for historical episodes.
+Browser upload progress measures bytes sent to the API; API job progress measures server work; YouTube processing progress is a separate estimate. Use labeled stages and never map one percentage onto all three. **Owner: Web labels, API state contract.**
 
-### Download feedback is global and gets overwritten
+### CORS and authenticated polling failures
 
-Use a download-specific message/state region or keyed state. The existing component has global `errorMessage`/`successMessage` fields and concurrent upload/polling work; a late unrelated response must not erase the download result.
+Upload progress listeners can trigger preflight, and authenticated artifact downloads require exposed headers such as `Content-Disposition`/missing-artifact metadata. Verify production origins, `Authorization`, OPTIONS, exposed headers, and no-store behavior together. **Owner: v1.2 API/ops.**
 
-### Browser behavior is assumed to be identical everywhere
+### Unbounded local-file retention
 
-Test the supported desktop browser used by operators, plus at least one alternate browser if required by deployment. Programmatic anchor downloads and object URL timing can differ from a normal navigation, especially for large Blobs and popup/download restrictions.
+Retries and replacements can leave old final files, staged files, prepared copies, or failed job artifacts consuming disk. Define retention and cleanup only after terminal state and preserve the active final file until replacement is committed. **Owner: v1.2 API.**
 
-### Artifact labels expose backend filenames as trusted HTML
+### Publish authorization is broader than episode editing
 
-Render filenames as interpolated text, not `[innerHTML]`. Filenames are backend-derived data and should be treated as untrusted even if uploads are normally controlled.
-
-## Minor Pitfalls
-
-### Icon affordance is ambiguous
-
-Use a download icon with an accessible name and a visible tooltip/title. The action should be discoverable without relying on color alone.
-
-### Large ZIPs freeze the impression of the page
-
-Disable only the relevant download controls, retain a clear “Preparing download…” state, and avoid tying the operation to the entire manage-screen loading state.
-
-### Browser download starts after the modal has been destroyed
-
-If closing the modal destroys the trigger or clears state before the response callback runs, the download callback may lose its filename/episode context. Capture immutable request context and make cleanup independent of modal DOM lifetime.
+Any authenticated admin who can edit an episode may not necessarily be intended to publish publicly. Decide whether existing auth is sufficient; if not, add a server-side capability check. Never rely on hiding the Publish button. **Owner: v1.2 API/ops.**
 
 ## Phase-Specific Warnings
 
-| Phase topic | Likely pitfall | Mitigation |
-|-------------|----------------|------------|
-| Backend contract / `ApiService` | Wrong method, key names, or binary response type | Confirm exact endpoint/body/headers; test `responseType: 'blob'` and `observe: 'response'` explicitly |
-| Artifact availability model | Checkbox defaults include missing or not-ready files | Derive disabled/selected state from explicit availability; test all five artifact combinations |
-| Manage-screen UI | Download state collides with upload/delete/polling state | Keep a keyed download state machine and preserve existing custom overlay conventions |
-| Auth integration | Bypass-only testing hides missing bearer auth | Assert interceptor header and run one non-bypass validation with a real/expired token |
-| Browser download | Corrupt filename or leaked object URLs | Sanitize fallback names, revoke URLs, and test anchor-trigger cleanup |
-| Error handling | Blob-encoded JSON errors are treated as successful ZIPs | Cover HTTP and network errors; decode bounded Blob error text where useful |
-| DC 334 validation | Happy-path fixture proves only one matrix cell | Verify archive entries, then run missing-file, empty-selection, auth, retry, and large-file cases |
-| Release verification | Build passes while download contract is untested | Run focused unit tests, browser/API smoke test, and required `npm run build` |
+| Phase topic | Likely pitfall | Mitigation | Owner |
+|---|---|---|---|
+| Final MP4 upload | Browser cancel mistaken for server cancel; replacement races | Opaque upload IDs, explicit API cancel, atomic promotion, reconciliation polling | API + Web |
+| Upload retry | Duplicate YouTube video after lost response | Persist session/video ID, query status, resume by `Range`, bounded backoff | API |
+| YouTube processing | 100% upload mistaken for playable video | Poll owner-only processing status; separate processing and ready states | API |
+| Private staging | Accidental public or unlisted upload | Explicit `private` insert and verified privacy before showing Publish | API + Web |
+| Explicit publish | Metadata overwritten or publish race | Separate idempotent update, complete intended payload, CAS on trailer version | API |
+| Hashtag search | Exact count claim or mixed resource types | `type=video`, approximate label, debounce/cache, timestamp/region | API + Web |
+| Title editor | Unicode/forbidden-character rejection at publish time | Shared validation, visible counter, API final validation, preserve full metadata | API + Web |
+| Artifact download | Client path traversal or stale/staging source | Canonical selector, server resolution, source hash/snapshot, authenticated stream | API |
+| Credentials | Refresh token/session URI exposure | API-only encrypted storage, redacted logs, reauth state | API + Ops |
+| Restart/reopen | Stale jobs mutate current episode | Trailer version/hash binding, CAS, startup recovery and sweeper | API |
 
-## Verification Checklist for Requirements Planning
+## Recommended Recovery State Model
 
-- [ ] API method and request body are specified with exact artifact keys.
-- [ ] Successful response is a Blob; filename/MIME header behavior is specified.
-- [ ] Missing and not-ready artifacts are visibly disabled and excluded from the request.
-- [ ] Empty selection is blocked locally.
-- [ ] Authenticated and `authBypass` paths are tested separately.
-- [ ] 401/403/404/409/500/status-0 and Blob error bodies produce actionable UI messages.
-- [ ] Double-submit, close-while-pending, retry, and stale-episode races are covered.
-- [ ] Object URL creation/revocation and filename sanitization are tested.
-- [ ] DC 334 mock data is used for deterministic UI tests; the real/browser validation opens the resulting ZIP and checks entries.
-- [ ] `npm run build` remains green; known Angular budget warnings are not confused with download correctness.
+Keep local file and remote publication state separate. A minimal safe model is:
+
+```text
+local:     absent -> receiving -> staged -> promoting -> final -> failed/canceled
+youtube:   none -> queued -> uploading -> uploaded-processing -> ready-private
+           -> publish-requested -> public
+           -> failed/canceled/stale/reauthorization-required
+```
+
+Every YouTube transition should carry `episodeId`, `trailerVersion` (or content hash), `jobId`, and—after insert—the remote `videoId`. Public publication is valid only when the bound local version is still final and YouTube reports the expected private video. Artifact selection resolves the current final local version, not a YouTube state.
 
 ## Sources
 
-### Project sources (confirmed facts)
+- [YouTube Data API: Resumable uploads](https://developers.google.com/youtube/v3/guides/using_resumable_upload_protocol) — session URI, `308`/`Range`, retries, finite sessions, chunk rules. **MEDIUM-HIGH** (official, current page).
+- [YouTube Data API: videos.insert](https://developers.google.com/youtube/v3/docs/videos/insert) — upload method and quota impact. **MEDIUM-HIGH** (official, current page).
+- [YouTube Data API: video resource](https://developers.google.com/youtube/v3/docs/videos) — title limit, privacy values, private/audit behavior, processing status. **MEDIUM-HIGH** (official, current page).
+- [YouTube Data API: videos.update](https://developers.google.com/youtube/v3/docs/videos/update) — privacy/metadata update semantics and required parts. **MEDIUM-HIGH** (official, current page).
+- [YouTube Data API: search.list](https://developers.google.com/youtube/v3/docs/search/list) — query/type, quota, approximate `totalResults`. **MEDIUM-HIGH** (official, current page).
+- [YouTube Help: Find videos using hashtags](https://support.google.com/youtube/answer/6390658) — hashtag result semantics and over-tagging warning. **MEDIUM** (official help page).
+- [YouTube Data API overview](https://developers.google.com/youtube/v3/getting-started) — quota model/default allocation context. **MEDIUM-HIGH** (official, current page).
+- [Google OAuth web-server applications](https://developers.google.com/identity/protocols/oauth2/web-server) and [OAuth best practices](https://developers.google.com/identity/protocols/oauth2/resources/best-practices) — server-side tokens, revocation, encrypted refresh-token storage. **MEDIUM-HIGH** (official, current pages).
+- [MDN XMLHttpRequest upload](https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest/upload) — browser progress/abort behavior and CORS preflight implication. **MEDIUM** (browser reference, cross-check for client limitation).
+- Local project context: [`PROJECT.md`](/home/jhonatt/repos/jhonatt_projects/dragaocareca-admin-web/.planning/PROJECT.md), [`docs/ARCHITECTURE.md`](/home/jhonatt/repos/jhonatt_projects/dragaocareca-admin-web/docs/ARCHITECTURE.md), [`docs/CONFIGURATION.md`](/home/jhonatt/repos/jhonatt_projects/dragaocareca-admin-web/docs/CONFIGURATION.md), and sibling API `src/services/episode-trailer-video.service.ts`, `src/database/repositories/artifact-job.repository.ts`, `src/routes/episodes.routes.ts`. **MEDIUM-HIGH** for current repository contracts.
 
-- `docs/README.md`
-- `docs/ARCHITECTURE.md`
-- `docs/CONFIGURATION.md`
-- `docs/TESTING.md`
-- `src/app/core/api.service.ts`
-- `src/app/core/auth.interceptor.ts`
-- `src/app/pages/manage/manage.component.ts`
-- `src/app/pages/manage/manage.component.html`
-- `.planning/codebase/CONCERNS.md`
+## Gaps to Validate During Planning/Implementation
 
-### External sources (recommendations; MEDIUM confidence)
-
-- [Angular: Making HTTP requests](https://angular.dev/guide/http/making-requests) — `responseType: 'blob'`, literal typing, response headers, and `HttpErrorResponse` behavior.
-- [Angular: HttpClient API](https://angular.dev/api/common/http/HttpClient) — Blob and full-response overloads.
-- [Angular: Interceptors](https://angular.dev/guide/http/interceptors) — request/response middleware boundary.
-- [MDN: Using files from web applications](https://developer.mozilla.org/en-US/docs/Web/API/File_API/Using_files_from_web_applications) — object URL creation and explicit release.
-- [MDN: `URL.revokeObjectURL()`](https://developer.mozilla.org/en-US/docs/Web/API/URL/revokeObjectURL_static) — releasing object URLs.
-- [Bootstrap 5.3: Modal](https://getbootstrap.com/docs/5.3/components/modal/) — modal JavaScript, focus, backdrop, and fixed-position considerations.
-
-## Research Limitations
-
-- The new backend download endpoint and its exact request/response contract were not present in this frontend repository, so endpoint path, artifact key spelling, partial-file policy, and `Content-Disposition` guarantees remain open integration questions.
-- External documentation was used for browser/Angular behavior; the final implementation should pin decisions to the backend API contract and the browsers supported by deployment.
+- Confirm the exact Google OAuth scopes and channel authorization model for this deployment; the official docs establish the server-side pattern, but the project’s existing refresh-token provisioning is not present in the inspected API files.
+- Confirm whether the deployed Google API project has completed the YouTube audit needed to lift private-upload restrictions.
+- Choose and document the actual API upload transport/limits (single multipart request versus chunked application upload) and reverse-proxy timeout/size settings.
+- Decide whether a failed private YouTube upload is automatically deleted, retained for reconciliation, or surfaced for manual cleanup; this is a product/operations decision, not something the resumable protocol guarantees.
+- Define the exact Unicode counting policy for the 100-character title contract and test it with emoji, combining marks, and Portuguese diacritics.
