@@ -1,9 +1,9 @@
 import { CommonModule } from '@angular/common';
-import { HttpHeaders, HttpResponse } from '@angular/common/http';
+import { HttpEventType, HttpHeaders, HttpResponse } from '@angular/common/http';
 import { fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { of, Subject, throwError } from 'rxjs';
-import { ApiService, Episode, EpisodeArtifactJobSnapshot, EpisodeGeneratedSummaryStatus, EpisodeTranscriptionStatus } from '../../core/api.service';
+import { ApiService, Episode, EpisodeArtifactJobSnapshot, EpisodeGeneratedSummaryStatus, EpisodeTrailerVideoUploadResponse, EpisodeTranscriptionStatus } from '../../core/api.service';
 import { EpisodeFormComponent } from './episode-form.component';
 import { ManageComponent } from './manage.component';
 
@@ -19,6 +19,9 @@ describe('ManageComponent summary flow', () => {
       'getEpisodeArtifactJobStatus',
       'downloadEpisodeArtifact',
       'listEpisodes',
+      'reserveEpisodeDraft',
+      'uploadEpisodeTrailerVideo',
+      'createEpisode',
     ]);
     apiService.listEpisodes.and.returnValue(of([]));
     apiService.downloadEpisodeArtifact.and.returnValue(of(new HttpResponse<Blob>({
@@ -221,6 +224,9 @@ describe('ManageComponent artifact download modal', () => {
       'getEpisodeArtifactJobStatus',
       'downloadEpisodeArtifact',
       'listEpisodes',
+      'reserveEpisodeDraft',
+      'uploadEpisodeTrailerVideo',
+      'createEpisode',
     ]);
     apiService.listEpisodes.and.returnValue(of([]));
     apiService.getEpisodeArtifactJobStatus.and.returnValue(of(completedSnapshot()));
@@ -426,5 +432,92 @@ describe('ManageComponent artifact download modal', () => {
       component.resetArtifactFlow();
       expect(component.artifactJob).toBeNull();
     });
+  });
+});
+
+describe('ManageComponent trailer video lifecycle', () => {
+  let apiService: jasmine.SpyObj<ApiService>;
+  let component: ManageComponent;
+
+  beforeEach(() => {
+    apiService = jasmine.createSpyObj<ApiService>('ApiService', [
+      'listEpisodes', 'reserveEpisodeDraft', 'uploadEpisodeTrailerVideo', 'createEpisode',
+      'getEpisodeTranscriptionStatus', 'getEpisodeGeneratedSummaryStatus', 'startEpisodeArtifactJob',
+      'getEpisodeArtifactJobStatus', 'downloadEpisodeArtifact',
+    ]);
+    apiService.listEpisodes.and.returnValue(of([]));
+    component = new ManageComponent(apiService);
+  });
+
+  const staged = (fileName: string, draftId = 'draft-42'): HttpResponse<EpisodeTrailerVideoUploadResponse> => new HttpResponse({
+    body: {
+      episodeId: 42,
+      draftId,
+      state: 'staged',
+      trailerVideoFileName: fileName,
+      trailerVideoSyncStatus: 'unpublished',
+      message: 'Trailer video staged.',
+    },
+  });
+
+  it('reserves before immediately starting upload and retains the File for retry', () => {
+    const reservation = of({ draftId: 'draft-42', episodeId: 42, state: 'reserved' as const, expiresAt: '2026-08-05T00:00:00Z' });
+    const upload = new Subject<any>();
+    const file = new File(['video'], 'first.mp4', { type: 'video/mp4' });
+    apiService.reserveEpisodeDraft.and.returnValue(reservation);
+    apiService.uploadEpisodeTrailerVideo.and.returnValue(upload.asObservable());
+    const editor = component.addEditorState;
+    editor.formModel.episodeId = 42;
+
+    component.uploadMedia(editor, 'trailerVideo', file);
+    expect(apiService.reserveEpisodeDraft).toHaveBeenCalledOnceWith(42);
+    expect(apiService.uploadEpisodeTrailerVideo).toHaveBeenCalledOnceWith(42, 'draft-42', file);
+    upload.next({ type: HttpEventType.UploadProgress, loaded: 5, total: 10 });
+    expect(component.getTrailerVideoProgress(editor)).toBe(50);
+    expect(component.getTrailerVideoStatus(editor)).toBe('uploading');
+    upload.next({ type: HttpEventType.UploadProgress, loaded: 10, total: 10 });
+    expect(component.getTrailerVideoStatus(editor)).toBe('uploading');
+    upload.next(staged('episodes/42/trailer.mp4'));
+    expect(component.getTrailerVideoStatus(editor)).toBe('staged');
+
+    component.cancelTrailerVideo(editor);
+    expect(component.getTrailerVideoStatus(editor)).toBe('canceled');
+    component.retryTrailerVideo(editor);
+    expect(apiService.uploadEpisodeTrailerVideo).toHaveBeenCalledTimes(2);
+    expect(apiService.uploadEpisodeTrailerVideo.calls.mostRecent().args[2]).toBe(file);
+  });
+
+  it('ignores stale replacement events and only keeps the matching terminal response', () => {
+    const first = new Subject<any>();
+    const second = new Subject<any>();
+    apiService.reserveEpisodeDraft.and.returnValue(of({ draftId: 'draft-42', episodeId: 42, state: 'reserved' as const, expiresAt: '2026-08-05T00:00:00Z' }));
+    apiService.uploadEpisodeTrailerVideo.and.returnValues(first.asObservable(), second.asObservable());
+    const editor = component.episodesEditorState;
+    editor.formModel.episodeId = 42;
+    editor.formModel.trailerVideoFileName = 'episodes/42/old.mp4';
+
+    component.uploadMedia(editor, 'trailerVideo', new File(['a'], 'a.mp4', { type: 'video/mp4' }));
+    component.uploadMedia(editor, 'trailerVideo', new File(['b'], 'b.mp4', { type: 'video/mp4' }));
+    first.next({ type: HttpEventType.UploadProgress, loaded: 100, total: 100 });
+    first.next(staged('episodes/42/a.mp4'));
+    expect(component.getUploadFilename(editor, 'trailerVideo')).toBe('b.mp4');
+    expect(editor.formModel.trailerVideoFileName).toBe('episodes/42/old.mp4');
+    second.next(staged('episodes/42/b.mp4'));
+    expect(component.getTrailerVideoStatus(editor)).toBe('staged');
+    expect(editor.formModel.trailerVideoFileName).toBe('episodes/42/old.mp4');
+  });
+
+  it('tears down active work on reset and does not allow a late response into the new editor', () => {
+    const upload = new Subject<any>();
+    apiService.reserveEpisodeDraft.and.returnValue(of({ draftId: 'draft-42', episodeId: 42, state: 'reserved' as const, expiresAt: '2026-08-05T00:00:00Z' }));
+    apiService.uploadEpisodeTrailerVideo.and.returnValue(upload.asObservable());
+    const editor = component.addEditorState;
+    editor.formModel.episodeId = 42;
+    component.uploadMedia(editor, 'trailerVideo', new File(['a'], 'a.mp4', { type: 'video/mp4' }));
+    component.resetEditor(editor);
+    upload.next(staged('episodes/42/stale.mp4'));
+    expect(editor.formModel.trailerVideoFileName).toBeUndefined();
+    expect(component.getTrailerVideoStatus(editor)).toBe('selected');
+    component.ngOnDestroy();
   });
 });
