@@ -8,11 +8,11 @@
 
 ### Local Trailer Upload
 
-- [ ] **TRAILER-01**: The user can select an MP4 final trailer video in the New Episode File Management section.
-- [ ] **TRAILER-02**: The user can upload the selected trailer to the existing backend endpoint and see byte-level upload progress.
-- [ ] **TRAILER-03**: The user can cancel an in-progress local trailer upload, and the previous finalized trailer remains available when replacement does not complete.
-- [ ] **TRAILER-04**: The user can retry a failed or canceled local upload without selecting the file again, or replace it with a different selected video.
-- [ ] **TRAILER-05**: The UI clearly distinguishes selected, uploading, canceled, failed, staged, and replacement states and does not offer a publish action before local upload succeeds.
+- [x] **TRAILER-01**: The user can select an MP4 final trailer video in the New Episode File Management section.
+- [x] **TRAILER-02**: The user can upload the selected trailer to the existing backend endpoint and see byte-level upload progress.
+- [x] **TRAILER-03**: The user can cancel an in-progress local trailer upload, and the previous finalized trailer remains available when replacement does not complete.
+- [x] **TRAILER-04**: The user can retry a failed or canceled local upload without selecting the file again, or replace it with a different selected video.
+- [x] **TRAILER-05**: The UI clearly distinguishes selected, uploading, canceled, failed, staged, and replacement states and does not offer a publish action before local upload succeeds.
 
 ### YouTube Workflow
 
@@ -70,11 +70,11 @@ Traceability will be filled when the v1.2 roadmap is approved.
 
 | Requirement | Phase | Status |
 |---|---|---|
-| TRAILER-01 | Phase 7 | Pending |
-| TRAILER-02 | Phase 7 | Pending |
-| TRAILER-03 | Phase 7 | Pending |
-| TRAILER-04 | Phase 7 | Pending |
-| TRAILER-05 | Phase 7 | Pending |
+| TRAILER-01 | Phase 7 | Complete |
+| TRAILER-02 | Phase 7 | Complete |
+| TRAILER-03 | Phase 7 | Complete |
+| TRAILER-04 | Phase 7 | Complete |
+| TRAILER-05 | Phase 7 | Complete |
 | YOUTUBE-01 | Phase 8 | Pending |
 | YOUTUBE-02 | Phase 8 | Pending |
 | YOUTUBE-03 | Phase 8 | Pending |
