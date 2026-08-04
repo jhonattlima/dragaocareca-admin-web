@@ -70,6 +70,29 @@ Traceability will be filled when the v1.2 roadmap is approved.
 
 | Requirement | Phase | Status |
 |---|---|---|
+| TRAILER-01 | Phase 7 | Pending |
+| TRAILER-02 | Phase 7 | Pending |
+| TRAILER-03 | Phase 7 | Pending |
+| TRAILER-04 | Phase 7 | Pending |
+| TRAILER-05 | Phase 7 | Pending |
+| YOUTUBE-01 | Phase 8 | Pending |
+| YOUTUBE-02 | Phase 8 | Pending |
+| YOUTUBE-03 | Phase 8 | Pending |
+| YOUTUBE-04 | Phase 8 | Pending |
+| YOUTUBE-05 | Phase 8 | Pending |
+| YOUTUBE-06 | Phase 9 | Pending |
+| YOUTUBE-07 | Phase 9 | Pending |
+| TITLE-01 | Phase 9 | Pending |
+| TITLE-02 | Phase 9 | Pending |
+| TITLE-03 | Phase 9 | Pending |
+| TITLE-04 | Phase 9 | Pending |
+| ARTIFACT-01 | Phase 11 | Pending |
+| ARTIFACT-02 | Phase 11 | Pending |
+| OPS-01 | Phase 8 | Pending |
+| OPS-02 | Phase 8 | Pending |
+| OPS-03 | Phase 8 | Pending |
+| OPS-04 | Phase 8 | Pending |
+| OPS-05 | Phase 10 | Pending |
 
 ---
 *Requirements defined: 2026-08-03*
