@@ -54,11 +54,11 @@ v1.2 extends the existing episode workflow from finalized local trailer video th
   3. User can retry the same selected video or choose a different replacement without confusing staged, uploading, canceled, failed, and finalized states.
   4. Publish controls are unavailable until the replacement has successfully become the finalized local trailer.
 
-**Plans**: 2/3 plans executed
+**Plans**: 3/3 plans executed
 
 - [x] 07-01-PLAN.md
 - [x] 07-02-PLAN.md
-- [ ] 07-03-PLAN.md
+- [x] 07-03-PLAN.md
 
 **UI hint**: yes
 
@@ -131,7 +131,7 @@ v1.2 extends the existing episode workflow from finalized local trailer video th
 | 4 | v1.1 Episode Artifact Downloads | 3/3 | Complete | 2026-07-31 |
 | 5 | v1.1 Episode Artifact Downloads | 4/4 | Complete | 2026-07-31 |
 | 6 | v1.1 Episode Artifact Downloads | 4/4 | Complete | 2026-07-31 |
-| 7. Final Trailer Video Upload | v1.2 | 2/3 | In Progress|  |
+| 7. Final Trailer Video Upload | v1.2 | 3/3 | In Progress|  |
 | 8. YouTube Job Lifecycle | v1.2 | 0/TBD | Not started | - |
 | 9. Title, Hashtags & Publishing | v1.2 | 0/TBD | Not started | - |
 | 10. Operator Workflow Integration | v1.2 | 0/TBD | Not started | - |
