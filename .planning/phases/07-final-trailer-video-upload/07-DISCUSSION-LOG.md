@@ -13,8 +13,8 @@
 | Upload with episode creation | Send the video during initial episode creation | |
 | Upload after episode exists | Use the existing episode ID and media-upload flow | ✓ |
 
-**User's choice:** Trailer upload happens at the same time as the other files uploads.
-**Notes:** The episode is expected to exist before media uploads, so the existing endpoint and staging/promotion flow apply.
+**User's choice:** Selecting the trailer file immediately starts the upload using the episode ID already present in the form, before the final Save episode action.
+**Notes:** Phase 7 must reconcile this pre-save upload timing with the existing API route's episode lookup and preserve the staging/promotion flow.
 
 ## Replacement safety
 

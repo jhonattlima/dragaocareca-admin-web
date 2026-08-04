@@ -14,18 +14,19 @@ Add final MP4 trailer-video upload to the New Episode File Management workflow u
 ## Implementation Decisions
 
 ### Upload timing and media lifecycle
-- **D-01:** Trailer video upload happens alongside the other media uploads after the episode record exists and has an episode ID.
-- **D-02:** Use the existing `POST /v1/episodes/:episodeId/trailer-video` contract and treat the video like the other media files: upload to the staging folder first, then promote atomically to the finalized media location.
-- **D-03:** Preserve the previous finalized trailer until the replacement upload completes successfully; a failed or canceled replacement must not remove the last-known-good video.
+- **D-01:** Selecting the trailer file starts its upload immediately using the episode ID already present in the form; it must not wait for the final “Save episode” action.
+- **D-02:** The Phase 7 API work must make that pre-save upload contract valid. If the existing route requires a persisted episode row, the API must support the form's known episode ID/draft lifecycle without weakening ownership or validation.
+- **D-03:** Treat the video like the other media files: upload to the staging folder first, then promote atomically to the finalized media location.
+- **D-04:** Preserve the previous finalized trailer until the replacement upload completes successfully; a failed or canceled replacement must not remove the last-known-good video.
 
 ### Cancellation, retry, and replacement
-- **D-04:** Canceling an in-progress local upload stops the browser request and leaves the selected file available for retry.
-- **D-05:** Retry may reuse the selected file without requiring the operator to choose it again; the operator may also choose a different replacement video.
-- **D-06:** The UI must distinguish selected, uploading, canceled, failed, staged/promoting, and finalized states and must not expose YouTube actions in this phase.
+- **D-05:** Canceling an in-progress local upload stops the browser request and leaves the selected file available for retry.
+- **D-06:** Retry may reuse the selected file without requiring the operator to choose it again; the operator may also choose a different replacement video.
+- **D-07:** The UI must distinguish selected, uploading, canceled, failed, staged/promoting, and finalized states and must not expose YouTube actions in this phase.
 
 ### File Management presentation
-- **D-07:** Add a dedicated Trailer video card alongside the existing Episode audio, Trailer audio, and cover upload cards.
-- **D-08:** Match the established upload-card treatment for drag/drop, file selection, progress, busy state, success, error, and replacement behavior.
+- **D-08:** Add a dedicated Trailer video card alongside the existing Episode audio, Trailer audio, and cover upload cards.
+- **D-09:** Match the established upload-card treatment for drag/drop, file selection, progress, busy state, success, error, and replacement behavior.
 
 ### the agent's Discretion
 - Exact copy, iconography, spacing, and helper text within the established sectioned File Management card pattern.
