@@ -10,13 +10,28 @@ The frontend stays thin: it orchestrates API calls and presents state, while the
 
 Keep the admin workflow reliable, legible, and backend-driven so operators can manage episodes and inspect system state without fighting the UI.
 
+## Current Milestone: v1.2 Trailer Video YouTube Publishing
+
+**Goal:** Let operators upload a final trailer video from New Episode, monitor and cancel transfers, stage it privately on YouTube, review the returned link, publish it publicly, and download it later from Episodes.
+
+**Target features:**
+- add a trailer-video upload box to New Episode File Management with upload progress, cancel, retry, and replacement behavior
+- add API-owned YouTube upload/publish jobs with progress polling and safe cancellation boundaries
+- fill the existing YouTube link field after the non-public YouTube upload and provide an explicit Publish button
+- add public YouTube hashtag search-count lookup beside the YouTube link and generate an editable, 100-character-safe trailer title
+- include the final trailer video in the Episodes artifact-download modal
+
 ## Current State
 
 **Shipped:** v1.1 Episode Artifact Downloads (2026-07-31)
 
+**Next:** v1.2 Trailer Video YouTube Publishing
+
 Operators can select episode artifacts from the Episodes list, monitor backend ZIP preparation, and receive an authenticated native browser download. The release includes the SQLite-backed API job lifecycle, canonical selector validation, accessible modal, progress polling, server-authoritative filenames, retry/reset behavior, CORS header exposure, DC334 full-selection evidence, and green frontend build/test gates.
 
 The happy path was accepted as the release scope. The broader live recovery matrix was intentionally not performed; UI-08 and VAL-02 remain documented validation debt.
+
+The next milestone extends the existing final trailer-video API upload contract and artifact selector. YouTube upload, public publishing, hashtag search counts, and their progress/cancellation contracts are new API capabilities.
 
 ## Validated Requirements
 
@@ -38,6 +53,14 @@ The happy path was accepted as the release scope. The broader live recovery matr
 
 - UI-08: complete live partial/failure/authentication/retry/reset/reopen/repeated-completion recovery matrix.
 - VAL-02: complete manual validation of visible progress and ZIP contents for a correctly matched live fixture.
+
+## Active v1.2 Requirements
+
+- Upload and replace final MP4 trailer videos from New Episode with visible progress, cancellation, retry, and replacement controls.
+- Upload the staged trailer to YouTube as non-public, return its link, and allow explicit public publishing.
+- Display YouTube transfer progress and recoverable failure states without duplicating jobs.
+- Search public YouTube hashtag results and use the count in the editable trailer-title workflow.
+- Include the final trailer video in episode artifact downloads.
 
 ## Out of Scope
 
