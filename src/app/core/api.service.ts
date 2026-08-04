@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { HttpEvent, HttpParams, HttpResponse } from '@angular/common/http';
+import { HttpEvent, HttpHeaders, HttpParams, HttpResponse } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 
@@ -22,6 +22,8 @@ export interface Episode {
   coverFileName?: string;
   coverLowFileName?: string;
   trailerFileName?: string;
+  trailerVideoFileName?: string | null;
+  trailerVideoSyncStatus?: 'unpublished' | 'manual-sync-required' | 'synced';
   youtube?: string;
   spotifyId?: string;
   musicCredits?: string[];
@@ -57,6 +59,7 @@ export interface EpisodeWriteInput {
   coverFileName?: string;
   coverLowFileName?: string;
   trailerFileName?: string;
+  trailerVideoFileName?: string | null;
   youtube?: string;
   spotifyId?: string;
   musicCredits?: string[];
@@ -214,6 +217,22 @@ export interface DeleteEpisodeResponse {
   message: string;
 }
 
+export interface EpisodeTrailerVideoDraftReservation {
+  draftId: string;
+  episodeId: number;
+  state: 'reserved';
+  expiresAt: string;
+}
+
+export interface EpisodeTrailerVideoUploadResponse {
+  episodeId: number;
+  draftId: string | null;
+  state: 'staged' | 'finalized';
+  trailerVideoFileName: string | null;
+  trailerVideoSyncStatus?: 'unpublished' | 'manual-sync-required' | 'synced';
+  message: string;
+}
+
 export interface HealthStatus {
   status: string;
   uptime: number;
@@ -254,8 +273,9 @@ export class ApiService {
     return this.http.get<StructuredEntryCatalogResponse>(`${environment.apiBaseUrl}/episodes/references`);
   }
 
-  createEpisode(payload: EpisodeWriteInput): Observable<Episode> {
-    return this.http.post<Episode>(`${environment.apiBaseUrl}/episodes`, payload);
+  createEpisode(payload: EpisodeWriteInput, draftId?: string): Observable<Episode> {
+    const body = draftId ? { ...payload, draftId } : payload;
+    return this.http.post<Episode>(`${environment.apiBaseUrl}/episodes`, body);
   }
 
   updateEpisode(episodeId: number, payload: EpisodeWriteInput): Observable<Episode> {
@@ -272,6 +292,28 @@ export class ApiService {
 
   uploadEpisodeTrailer(episodeId: number, file: File): Observable<HttpEvent<Episode>> {
     return this.uploadEpisodeFile(episodeId, file, 'trailer');
+  }
+
+  reserveEpisodeDraft(episodeId: number): Observable<EpisodeTrailerVideoDraftReservation> {
+    return this.http.post<EpisodeTrailerVideoDraftReservation>(`${environment.apiBaseUrl}/episodes/drafts`, { episodeId });
+  }
+
+  uploadEpisodeTrailerVideo(
+    episodeId: number,
+    draftId: string,
+    file: File,
+  ): Observable<HttpEvent<EpisodeTrailerVideoUploadResponse>> {
+    const formData = new FormData();
+    formData.append('file', file, file.name);
+    return this.http.post<EpisodeTrailerVideoUploadResponse>(
+      `${environment.apiBaseUrl}/episodes/${episodeId}/trailer-video`,
+      formData,
+      {
+        headers: new HttpHeaders({ 'X-Episode-Draft-Id': draftId }),
+        observe: 'events',
+        reportProgress: true,
+      },
+    );
   }
 
   uploadEpisodeCover(episodeId: number, file: File): Observable<HttpEvent<Episode>> {
