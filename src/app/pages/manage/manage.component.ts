@@ -2015,7 +2015,7 @@ export class ManageComponent implements OnInit, OnDestroy {
     this.trailerVideoReservations.set(editor, reservation);
   }
 
-  private startTrailerVideoUpload(editor: EpisodeEditorState, episodeId: number, draftId: string, file: File, generation: number): void {
+  private startTrailerVideoUpload(editor: EpisodeEditorState, episodeId: number, draftId: string | null, file: File, generation: number): void {
     const state = this.getTrailerVideoState(editor);
     state.subscription?.unsubscribe();
     state.subscription = null;
@@ -2097,7 +2097,11 @@ export class ManageComponent implements OnInit, OnDestroy {
       state.episodeId = episodeId;
       state.priorFinalFileName = editor.formModel.trailerVideoFileName ?? state.priorFinalFileName;
       const generation = state.generation;
-      this.reserveTrailerVideoDraft(editor, generation, file);
+      if (editor.editingEpisodeId) {
+        this.startTrailerVideoUpload(editor, episodeId, null, file, generation);
+      } else {
+        this.reserveTrailerVideoDraft(editor, generation, file);
+      }
       return;
     }
 

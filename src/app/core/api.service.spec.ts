@@ -142,6 +142,25 @@ describe('ApiService trailer video lifecycle', () => {
     expect((events[1] as HttpResponse<EpisodeTrailerVideoUploadResponse>).body).toEqual(response);
   });
 
+  it('posts persisted replacement MP4 without requesting a draft reservation', () => {
+    const file = new File(['video'], 'replacement.mp4', { type: 'video/mp4' });
+    apiService.uploadEpisodeTrailerVideo(42, null, file).subscribe();
+
+    const request = httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/42/trailer-video`);
+    expect(request.request.method).toBe('POST');
+    expect(request.request.headers.has('X-Episode-Draft-Id')).toBeFalse();
+    expect(request.request.body instanceof FormData).toBeTrue();
+    expect((request.request.body as FormData).get('file')).toEqual(file);
+    request.flush({
+      episodeId: 42,
+      draftId: null,
+      state: 'finalized',
+      trailerVideoFileName: 'episodes/42/trailer.mp4',
+      trailerVideoSyncStatus: 'manual-sync-required',
+      message: 'Trailer video finalized.',
+    });
+  });
+
   it('sends the same draft id and episode id when creating an episode', () => {
     apiService.createEpisode({ episodeId: 42, title: 'Draft', summary: 'Summary', pubDate: '2026-08-04', explicit: 'no' }, 'draft-42').subscribe();
     const request = httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes`);

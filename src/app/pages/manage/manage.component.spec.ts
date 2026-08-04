@@ -490,14 +490,19 @@ describe('ManageComponent trailer video lifecycle', () => {
   it('ignores stale replacement events and only keeps the matching terminal response', () => {
     const first = new Subject<any>();
     const second = new Subject<any>();
-    apiService.reserveEpisodeDraft.and.returnValue(of({ draftId: 'draft-42', episodeId: 42, state: 'reserved' as const, expiresAt: '2026-08-05T00:00:00Z' }));
     apiService.uploadEpisodeTrailerVideo.and.returnValues(first.asObservable(), second.asObservable());
     const editor = component.episodesEditorState;
     editor.formModel.episodeId = 42;
+    editor.editingEpisodeId = 42;
     editor.formModel.trailerVideoFileName = 'episodes/42/old.mp4';
 
     component.uploadMedia(editor, 'trailerVideo', new File(['a'], 'a.mp4', { type: 'video/mp4' }));
     component.uploadMedia(editor, 'trailerVideo', new File(['b'], 'b.mp4', { type: 'video/mp4' }));
+    expect(apiService.reserveEpisodeDraft).not.toHaveBeenCalled();
+    expect(apiService.uploadEpisodeTrailerVideo.calls.allArgs()).toEqual([
+      [42, null, jasmine.any(File)],
+      [42, null, jasmine.any(File)],
+    ]);
     first.next({ type: HttpEventType.UploadProgress, loaded: 100, total: 100 });
     first.next(staged('episodes/42/a.mp4'));
     expect(component.getUploadFilename(editor, 'trailerVideo')).toBe('b.mp4');
@@ -505,6 +510,33 @@ describe('ManageComponent trailer video lifecycle', () => {
     second.next(staged('episodes/42/b.mp4'));
     expect(component.getTrailerVideoStatus(editor)).toBe('staged');
     expect(editor.formModel.trailerVideoFileName).toBe('episodes/42/old.mp4');
+  });
+
+  it('uses the authenticated persisted replacement path without reserving a draft', () => {
+    const upload = new Subject<any>();
+    const editor = component.episodesEditorState;
+    editor.formModel.episodeId = 42;
+    editor.editingEpisodeId = 42;
+    editor.formModel.trailerVideoFileName = 'episodes/42/old.mp4';
+    apiService.uploadEpisodeTrailerVideo.and.returnValue(upload.asObservable());
+
+    component.uploadMedia(editor, 'trailerVideo', new File(['new'], 'new.mp4', { type: 'video/mp4' }));
+
+    expect(apiService.reserveEpisodeDraft).not.toHaveBeenCalled();
+    expect(apiService.uploadEpisodeTrailerVideo).toHaveBeenCalledOnceWith(42, null, jasmine.any(File));
+    upload.next(new HttpResponse({
+      body: {
+        episodeId: 42,
+        draftId: null,
+        state: 'finalized',
+        trailerVideoFileName: 'episodes/42/trailer.mp4',
+        trailerVideoSyncStatus: 'manual-sync-required',
+        message: 'Trailer video finalized.',
+      },
+    }));
+
+    expect(component.getTrailerVideoStatus(editor)).toBe('finalized');
+    expect(editor.formModel.trailerVideoFileName).toBe('episodes/42/trailer.mp4');
   });
 
   it('tears down active work on reset and does not allow a late response into the new editor', () => {

@@ -300,7 +300,7 @@ export class ApiService {
 
   uploadEpisodeTrailerVideo(
     episodeId: number,
-    draftId: string,
+    draftId: string | null,
     file: File,
   ): Observable<HttpEvent<EpisodeTrailerVideoUploadResponse>> {
     const formData = new FormData();
@@ -309,7 +309,7 @@ export class ApiService {
       `${environment.apiBaseUrl}/episodes/${episodeId}/trailer-video`,
       formData,
       {
-        headers: new HttpHeaders({ 'X-Episode-Draft-Id': draftId }),
+        headers: draftId ? new HttpHeaders({ 'X-Episode-Draft-Id': draftId }) : new HttpHeaders(),
         observe: 'events',
         reportProgress: true,
       },
