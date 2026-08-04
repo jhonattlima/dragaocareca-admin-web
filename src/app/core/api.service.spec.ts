@@ -1,8 +1,8 @@
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { environment } from '../../environments/environment';
-import { HttpResponse } from '@angular/common/http';
-import { ApiService, EpisodeArtifactJobSnapshot, EpisodeArtifactSelector } from './api.service';
+import { HttpEventType, HttpResponse } from '@angular/common/http';
+import { ApiService, EpisodeArtifactJobSnapshot, EpisodeArtifactSelector, EpisodeTrailerVideoUploadResponse } from './api.service';
 
 describe('ApiService artifact jobs', () => {
   let apiService: ApiService;
@@ -88,6 +88,66 @@ describe('ApiService artifact jobs', () => {
     const request = httpTestingController.expectOne('https://api.example.test/v1/episodes/42/download');
     expect(request.request.responseType).toBe('blob');
     request.flush(new Blob(['zip bytes'], { type: 'application/zip' }));
+  });
+});
+
+describe('ApiService trailer video lifecycle', () => {
+  let apiService: ApiService;
+  let httpTestingController: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [HttpClientTestingModule],
+      providers: [ApiService],
+    });
+    apiService = TestBed.inject(ApiService);
+    httpTestingController = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => httpTestingController.verify());
+
+  it('reserves a draft with the form episode id and returns the typed reservation', () => {
+    let reservation: unknown;
+    apiService.reserveEpisodeDraft(42).subscribe(value => reservation = value);
+
+    const request = httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/drafts`);
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({ episodeId: 42 });
+    request.flush({ draftId: 'draft-42', episodeId: 42, state: 'reserved', expiresAt: '2026-08-05T00:00:00.000Z' });
+    expect(reservation).toEqual(jasmine.objectContaining({ draftId: 'draft-42', episodeId: 42 }));
+  });
+
+  it('posts the MP4 multipart field with draft header and exposes progress before staged response', () => {
+    const file = new File(['video'], 'trailer.mp4', { type: 'video/mp4' });
+    const events: unknown[] = [];
+    apiService.uploadEpisodeTrailerVideo(42, 'draft-42', file).subscribe(event => events.push(event));
+
+    const request = httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/42/trailer-video`);
+    expect(request.request.method).toBe('POST');
+    expect(request.request.reportProgress).toBeTrue();
+    expect(request.request.headers.get('X-Episode-Draft-Id')).toBe('draft-42');
+    expect(request.request.body instanceof FormData).toBeTrue();
+    expect((request.request.body as FormData).get('file')).toEqual(file);
+    request.event({ type: HttpEventType.UploadProgress, loaded: 50, total: 100 });
+    const response: EpisodeTrailerVideoUploadResponse = {
+      episodeId: 42,
+      draftId: 'draft-42',
+      state: 'staged',
+      trailerVideoFileName: 'episodes/42/trailer.mp4',
+      trailerVideoSyncStatus: 'unpublished',
+      message: 'Trailer video staged.',
+    };
+    request.flush(response);
+    expect((events[0] as { type: HttpEventType }).type).toBe(HttpEventType.UploadProgress);
+    expect((events[1] as HttpResponse<EpisodeTrailerVideoUploadResponse>).body).toEqual(response);
+  });
+
+  it('sends the same draft id and episode id when creating an episode', () => {
+    apiService.createEpisode({ episodeId: 42, title: 'Draft', summary: 'Summary', pubDate: '2026-08-04', explicit: 'no' }, 'draft-42').subscribe();
+    const request = httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes`);
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual(jasmine.objectContaining({ episodeId: 42, draftId: 'draft-42' }));
+    request.flush({ episodeId: 42, title: 'Draft', summary: 'Summary', pubDate: '2026-08-04', explicit: 'no' });
   });
 });
 
