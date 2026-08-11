@@ -14,7 +14,7 @@ Implement the durable, server-owned YouTube trailer job lifecycle for the curren
 ## Implementation Decisions
 
 ### Job trigger and operator status
-- **D-01:** Start the job through an explicit “Upload to YouTube” action associated with the finalized trailer in the existing episode workflow.
+- **D-01:** Start the job through an explicit “Upload to YouTube” action associated with the finalized trailer in the existing episode workflow, accepting the current operator-supplied or derived title and summary as basic job input.
 - **D-02:** Expose clear lifecycle states: `queued`, `uploading`, `processing`, `private-ready`, `failed`, and `canceled`.
 - **D-03:** Show transfer percentage only for the upload stage. Processing must use honest indeterminate/progress messaging when YouTube does not provide a reliable percentage; never imply public publication.
 
@@ -30,7 +30,7 @@ Implement the durable, server-owned YouTube trailer job lifecycle for the curren
 
 ### Failure messaging and security
 - **D-10:** Present stable operator-facing categories for authentication, quota, timeout, network/provider failure, invalid trailer, and reconciliation-required states.
-- **D-11:** Keep provider credentials, OAuth tokens, raw Google payloads, filesystem paths, internal stack traces, and sensitive provider identifiers out of browser-visible job DTOs and logs.
+- **D-11:** Keep provider credentials, OAuth tokens, raw Google payloads, filesystem paths, internal stack traces, and raw provider identifiers out of browser-visible job DTOs and logs; a validated sanitized `privateWatchUrl` is allowed once provider video evidence exists.
 - **D-12:** Every failure state must communicate whether retry is available and, when relevant, the next retry time or reconciliation action.
 
 ### the agent's Discretion
@@ -110,7 +110,7 @@ Implement the durable, server-owned YouTube trailer job lifecycle for the curren
 <deferred>
 ## Deferred Ideas
 
-- Public publishing, editable title assembly, 100-Unicode-character validation, hashtag lookup/count, and YouTube link persistence after publishing — Phase 9.
+- Public publishing, richer editable title assembly, 100-Unicode-character validation, hashtag lookup/count, and YouTube link persistence after publishing — Phase 9. The basic title/summary accepted by the Phase 8 start request is in scope.
 - Full end-to-end placement of every YouTube control in the final operator workflow and compatibility release integration — Phase 10.
 - Adding finalized `trailer-video` to the Episodes artifact modal and ZIP flow — Phase 11.
 - Scheduled publication, playlists, thumbnails, captions, analytics, batch operations, and automatic replacement/deletion of already-public videos — future scope.
