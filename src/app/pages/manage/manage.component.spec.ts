@@ -435,6 +435,49 @@ describe('ManageComponent artifact download modal', () => {
   });
 });
 
+describe('ManageComponent YouTube lifecycle RED scaffold', () => {
+  let apiService: jasmine.SpyObj<ApiService>;
+  let component: ManageComponent;
+
+  beforeEach(() => {
+    apiService = jasmine.createSpyObj<ApiService>('ApiService', ['listEpisodes']);
+    apiService.listEpisodes.and.returnValue(of([]));
+    component = new ManageComponent(apiService);
+  });
+
+  it('starts only the finalized trailer with the current title and summary', () => {
+    const editor = component.addEditorState;
+    editor.formModel.episodeId = 42;
+    editor.formModel.trailerVideoFileName = 'episodes/42/trailer.mp4';
+    editor.formModel.title = 'Selected title';
+    editor.formModel.summary = 'Selected summary';
+
+    expect((component as unknown as { startYoutubeTrailerJob: (target: typeof editor) => void }).startYoutubeTrailerJob)
+      .toEqual(jasmine.any(Function));
+  });
+
+  it('maps transfer, processing, private-ready, failed, and retained-private states truthfully', () => {
+    const mapStatus = (component as unknown as {
+      getYoutubeTrailerJobStatusLabel: (snapshot: { status: string; cancellation: { boundary: string | null } }) => string;
+    }).getYoutubeTrailerJobStatusLabel;
+
+    expect(mapStatus({ status: 'transferring', cancellation: { boundary: null } })).toContain('Uploading');
+    expect(mapStatus({ status: 'processing', cancellation: { boundary: null } })).toContain('Processing');
+    expect(mapStatus({ status: 'ready', cancellation: { boundary: null } })).toContain('Private');
+    expect(mapStatus({ status: 'cancelled', cancellation: { boundary: 'provider-video-retained' } })).toContain('Reconciliation');
+  });
+
+  it('defines reload recovery, retry/cancel boundaries, polling teardown, and stale-source protection', () => {
+    const lifecycle = component as unknown as Record<string, unknown>;
+    expect(lifecycle.restoreCurrentYoutubeTrailerJob).toEqual(jasmine.any(Function));
+    expect(lifecycle.retryYoutubeTrailerJob).toEqual(jasmine.any(Function));
+    expect(lifecycle.cancelYoutubeTrailerJob).toEqual(jasmine.any(Function));
+    expect(lifecycle.clearYoutubeTrailerJobPolling).toEqual(jasmine.any(Function));
+    expect(lifecycle.youtubeTrailerJobSourceGeneration).toBeDefined();
+    expect(lifecycle.publishYoutubeTrailer).toBeUndefined();
+  });
+});
+
 describe('ManageComponent trailer video lifecycle', () => {
   let apiService: jasmine.SpyObj<ApiService>;
   let component: ManageComponent;

@@ -3,6 +3,21 @@ import { TestBed } from '@angular/core/testing';
 import { environment } from '../../environments/environment';
 import { HttpEventType, HttpResponse } from '@angular/common/http';
 import { ApiService, EpisodeArtifactJobSnapshot, EpisodeArtifactSelector, EpisodeTrailerVideoUploadResponse } from './api.service';
+import { Observable } from 'rxjs';
+
+type YoutubeTrailerJobSnapshotRed = {
+  jobId: string;
+  episodeId: number;
+  status: 'queued' | 'claimed' | 'transferring' | 'processing' | 'ready' | 'failed' | 'cancel_requested' | 'cancelled' | 'obsolete';
+  privateWatchUrl: string | null;
+  progress: { confirmedBytes: number; totalBytes: number; processingPartsProcessed: number | null; processingPartsTotal: number | null; processingTimeLeftMs: number | null };
+  cancellation: { requestedAt: string | null; cancelledAt: string | null; boundary: string | null };
+  error: { category: string | null; occurredAt: string | null };
+  retry: { count: number; nextAttemptAt: string | null };
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+};
 
 describe('ApiService artifact jobs', () => {
   let apiService: ApiService;
@@ -168,6 +183,96 @@ describe('ApiService trailer video lifecycle', () => {
     expect(request.request.body).toEqual(jasmine.objectContaining({ episodeId: 42, draftId: 'draft-42' }));
     request.flush({ episodeId: 42, title: 'Draft', summary: 'Summary', pubDate: '2026-08-04', explicit: 'no' });
   });
+});
+
+describe('ApiService YouTube trailer lifecycle RED scaffold', () => {
+  let apiService: ApiService;
+  let httpTestingController: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [HttpClientTestingModule],
+      providers: [ApiService],
+    });
+    apiService = TestBed.inject(ApiService);
+    httpTestingController = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => httpTestingController.verify());
+
+  it('starts with the selected title and summary and retains a sanitized private URL', () => {
+    const snapshot = youtubeSnapshot({
+      status: 'ready',
+      privateWatchUrl: 'https://www.youtube.com/watch?v=private-42',
+    });
+    let response: YoutubeTrailerJobSnapshotRed | undefined;
+
+    (apiService as unknown as { startYoutubeTrailerJob: (episodeId: number, title: string, summary: string) => Observable<YoutubeTrailerJobSnapshotRed> })
+      .startYoutubeTrailerJob(42, 'Selected title', 'Selected summary')
+      .subscribe(value => response = value);
+
+    const request = httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/42/youtube-trailer-jobs`);
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({ title: 'Selected title', summary: 'Selected summary' });
+    request.flush(snapshot);
+    expect(response?.privateWatchUrl).toBe('https://www.youtube.com/watch?v=private-42');
+  });
+
+  it('supports current lookup, status, same-job retry, and cancellation with empty control bodies', () => {
+    const snapshot = youtubeSnapshot();
+    const service = apiService as unknown as {
+      getCurrentYoutubeTrailerJob: (episodeId: number) => Observable<YoutubeTrailerJobSnapshotRed | null>;
+      getYoutubeTrailerJobStatus: (episodeId: number, jobId: string) => Observable<YoutubeTrailerJobSnapshotRed>;
+      retryYoutubeTrailerJob: (episodeId: number, jobId: string) => Observable<YoutubeTrailerJobSnapshotRed>;
+      cancelYoutubeTrailerJob: (episodeId: number, jobId: string) => Observable<YoutubeTrailerJobSnapshotRed>;
+    };
+
+    service.getCurrentYoutubeTrailerJob(42).subscribe();
+    httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/42/youtube-trailer-jobs/current`).flush(snapshot);
+    service.getYoutubeTrailerJobStatus(42, 'job-42').subscribe();
+    httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/42/youtube-trailer-jobs/job-42`).flush(snapshot);
+    service.retryYoutubeTrailerJob(42, 'job-42').subscribe();
+    const retry = httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/42/youtube-trailer-jobs/job-42/retry`);
+    expect(retry.request.body).toEqual({});
+    retry.flush(snapshot);
+    service.cancelYoutubeTrailerJob(42, 'job-42').subscribe();
+    const cancel = httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/42/youtube-trailer-jobs/job-42/cancel`);
+    expect(cancel.request.body).toEqual({});
+    cancel.flush(snapshot);
+  });
+
+  it('exposes safe lifecycle fixtures without provider/session/source/raw-error fields or Angular publish controls', () => {
+    const snapshot = youtubeSnapshot({ status: 'cancelled', privateWatchUrl: 'https://www.youtube.com/watch?v=private-42' });
+    expect(snapshot.status).toBe('cancelled');
+    expect(snapshot.privateWatchUrl).toMatch(/^https:\/\/www\.youtube\.com\/watch\?v=/);
+    expect(snapshot as unknown as Record<string, unknown>).not.toEqual(jasmine.objectContaining({
+      providerVideoId: jasmine.anything(),
+      sessionUri: jasmine.anything(),
+      sourceFileName: jasmine.anything(),
+      sourceSha256: jasmine.anything(),
+      errorMessage: jasmine.anything(),
+      oauthToken: jasmine.anything(),
+    }));
+    expect((apiService as unknown as Record<string, unknown>).publishYoutubeTrailer).toBeUndefined();
+  });
+});
+
+const youtubeSnapshot = (overrides: Partial<{
+  status: YoutubeTrailerJobSnapshotRed['status'];
+  privateWatchUrl: string | null;
+}> = {}) => ({
+  jobId: 'job-42',
+  episodeId: 42,
+  status: 'queued' as const,
+  privateWatchUrl: null,
+  progress: { confirmedBytes: 0, totalBytes: 100, processingPartsProcessed: null, processingPartsTotal: null, processingTimeLeftMs: null },
+  cancellation: { requestedAt: null, cancelledAt: null, boundary: null },
+  error: { category: null, occurredAt: null },
+  retry: { count: 0, nextAttemptAt: null },
+  createdAt: '2026-08-11T00:00:00.000Z',
+  updatedAt: '2026-08-11T00:00:00.000Z',
+  completedAt: null,
+  ...overrides,
 });
 
 const createSnapshot = (overrides: Partial<EpisodeArtifactJobSnapshot> = {}): EpisodeArtifactJobSnapshot => ({
