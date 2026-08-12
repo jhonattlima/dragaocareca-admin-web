@@ -212,6 +212,59 @@ export interface EpisodeArtifactJobSnapshot {
   updatedAt: string;
 }
 
+export type YoutubeTrailerJobStatus =
+  | 'queued'
+  | 'claimed'
+  | 'transferring'
+  | 'processing'
+  | 'ready'
+  | 'failed'
+  | 'cancel_requested'
+  | 'cancelled'
+  | 'obsolete';
+
+export type YoutubeTrailerJobErrorCategory =
+  | 'authentication'
+  | 'session-expired'
+  | 'quota'
+  | 'timeout'
+  | 'network'
+  | 'provider'
+  | 'invalid-trailer'
+  | 'reconciliation-required';
+
+export type YoutubeTrailerCancellationBoundary = 'local-cancelled' | 'provider-video-retained';
+
+export interface YoutubeTrailerJobSnapshot {
+  jobId: string;
+  episodeId: number;
+  status: YoutubeTrailerJobStatus;
+  progress: {
+    confirmedBytes: number;
+    totalBytes: number;
+    processingPartsProcessed: number | null;
+    processingPartsTotal: number | null;
+    processingTimeLeftMs: number | null;
+  };
+  cancellation: {
+    requestedAt: string | null;
+    cancelledAt: string | null;
+    boundary: YoutubeTrailerCancellationBoundary | null;
+  };
+  error: {
+    category: YoutubeTrailerJobErrorCategory | null;
+    occurredAt: string | null;
+  };
+  retry: {
+    count: number;
+    nextAttemptAt: string | null;
+  };
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+  privateWatchUrl: string | null;
+}
+
 export interface DeleteEpisodeResponse {
   episodeId: number;
   message: string;
@@ -370,6 +423,39 @@ export class ApiService {
 
   getEpisodeArtifactJobStatus(episodeId: number, jobId: string): Observable<EpisodeArtifactJobSnapshot> {
     return this.http.get<EpisodeArtifactJobSnapshot>(`${environment.apiBaseUrl}/episodes/${episodeId}/artifacts/jobs/${jobId}`);
+  }
+
+  startYoutubeTrailerJob(episodeId: number, title: string, summary: string): Observable<YoutubeTrailerJobSnapshot> {
+    return this.http.post<YoutubeTrailerJobSnapshot>(
+      `${environment.apiBaseUrl}/episodes/${episodeId}/youtube-trailer-jobs`,
+      { title, summary },
+    );
+  }
+
+  getCurrentYoutubeTrailerJob(episodeId: number): Observable<YoutubeTrailerJobSnapshot | null> {
+    return this.http.get<YoutubeTrailerJobSnapshot | null>(
+      `${environment.apiBaseUrl}/episodes/${episodeId}/youtube-trailer-jobs/current`,
+    );
+  }
+
+  getYoutubeTrailerJobStatus(episodeId: number, jobId: string): Observable<YoutubeTrailerJobSnapshot> {
+    return this.http.get<YoutubeTrailerJobSnapshot>(
+      `${environment.apiBaseUrl}/episodes/${episodeId}/youtube-trailer-jobs/${jobId}`,
+    );
+  }
+
+  retryYoutubeTrailerJob(episodeId: number, jobId: string): Observable<YoutubeTrailerJobSnapshot> {
+    return this.http.post<YoutubeTrailerJobSnapshot>(
+      `${environment.apiBaseUrl}/episodes/${episodeId}/youtube-trailer-jobs/${jobId}/retry`,
+      {},
+    );
+  }
+
+  cancelYoutubeTrailerJob(episodeId: number, jobId: string): Observable<YoutubeTrailerJobSnapshot> {
+    return this.http.post<YoutubeTrailerJobSnapshot>(
+      `${environment.apiBaseUrl}/episodes/${episodeId}/youtube-trailer-jobs/${jobId}/cancel`,
+      {},
+    );
   }
 
   downloadEpisodeArtifact(downloadUrl: string): Observable<HttpResponse<Blob>> {

@@ -208,6 +208,21 @@ describe('ApiService YouTube trailer lifecycle', () => {
     expect(response?.privateWatchUrl).toBe('https://www.youtube.com/watch?v=private-42');
   });
 
+  it('accepts both queued 202 responses and reused 200 responses', () => {
+    const snapshot = youtubeSnapshot();
+    const responses: YoutubeTrailerJobSnapshot[] = [];
+
+    apiService.startYoutubeTrailerJob(42, 'Title', 'Summary').subscribe(value => responses.push(value));
+    const queued = httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/42/youtube-trailer-jobs`);
+    queued.flush(snapshot, { status: 202, statusText: 'Accepted' });
+
+    apiService.startYoutubeTrailerJob(42, 'Title', 'Summary').subscribe(value => responses.push(value));
+    const reused = httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/42/youtube-trailer-jobs`);
+    reused.flush({ ...snapshot, status: 'ready' }, { status: 200, statusText: 'OK' });
+
+    expect(responses.map(value => value.status)).toEqual(['queued', 'ready']);
+  });
+
   it('supports current lookup, status, same-job retry, and cancellation with empty control bodies', () => {
     const snapshot = youtubeSnapshot();
     apiService.getCurrentYoutubeTrailerJob(42).subscribe();
@@ -236,7 +251,22 @@ describe('ApiService YouTube trailer lifecycle', () => {
       errorMessage: jasmine.anything(),
       oauthToken: jasmine.anything(),
     }));
-    expect((apiService as unknown as Record<string, unknown>).publishYoutubeTrailer).toBeUndefined();
+    expect((apiService as unknown as Record<string, unknown>)['publishYoutubeTrailer']).toBeUndefined();
+  });
+
+  it('accepts every raw backend lifecycle status without widening the safe DTO', () => {
+    const statuses: YoutubeTrailerJobSnapshot['status'][] = [
+      'queued', 'claimed', 'transferring', 'processing', 'ready', 'failed',
+      'cancel_requested', 'cancelled', 'obsolete',
+    ];
+
+    statuses.forEach(status => {
+      let response: YoutubeTrailerJobSnapshot | undefined;
+      apiService.getYoutubeTrailerJobStatus(42, `job-${status}`).subscribe(value => response = value);
+      const request = httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/42/youtube-trailer-jobs/job-${status}`);
+      request.flush(youtubeSnapshot({ status }));
+      expect(response?.status).toBe(status);
+    });
   });
 });
 
