@@ -9,6 +9,7 @@ import {
   EpisodeWriteInput,
   EpisodeTrailerVideoDraftReservation,
   EpisodeTrailerVideoUploadResponse,
+  YoutubeTrailerJobSnapshot,
   StructuredEntryCatalogResponse,
 } from '../../core/api.service';
 
@@ -58,6 +59,18 @@ interface TrailerVideoState {
   episodeId: number | null;
   draftId: string | null;
   priorFinalFileName: string;
+}
+
+interface YoutubeTrailerJobState {
+  snapshot: YoutubeTrailerJobSnapshot | null;
+  episodeId: number | null;
+  jobId: string | null;
+  sourceGeneration: number;
+  sourceFileName: string;
+  pollingTimer: number | null;
+  pollingSubscription: Subscription | null;
+  startInFlight: symbol | null;
+  error: string;
 }
 
 interface UploadDefinition {
@@ -185,6 +198,8 @@ export class ManageComponent implements OnInit, OnDestroy {
   readonly episodesEditorState: EpisodeEditorState = this.buildEditorState();
   private readonly trailerVideoStates = new WeakMap<EpisodeEditorState, TrailerVideoState>();
   private readonly trailerVideoReservations = new WeakMap<EpisodeEditorState, Subscription>();
+  private readonly youtubeTrailerJobStates = new WeakMap<EpisodeEditorState, YoutubeTrailerJobState>();
+  readonly youtubeTrailerJobSourceGeneration = new WeakMap<EpisodeEditorState, number>();
   readonly artifactDefinitions: ArtifactDefinition[] = [
     { selector: 'episode', label: 'Episode audio', formatHint: '.mp3', fileField: 'fileName' },
     { selector: 'trailer', label: 'Trailer', formatHint: '.mp3', fileField: 'trailerFileName' },
@@ -344,6 +359,8 @@ export class ManageComponent implements OnInit, OnDestroy {
 
     this.clearEpisodeGenerationPolling();
     this.clearArtifactJobPolling();
+    this.clearYoutubeTrailerJobPolling(this.addEditorState);
+    this.clearYoutubeTrailerJobPolling(this.episodesEditorState);
     this.cancelTrailerVideoWork(this.addEditorState, 'canceled');
     this.cancelTrailerVideoWork(this.episodesEditorState, 'canceled');
     this.artifactObjectUrls.forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
@@ -599,6 +616,7 @@ export class ManageComponent implements OnInit, OnDestroy {
   startEdit(episode: Episode): void {
     this.activeTab = 'episodes';
     const editor = this.episodesEditorState;
+    this.clearYoutubeTrailerJobPolling(editor);
     editor.editingEpisodeId = episode.episodeId;
     editor.formModel = {
       episodeId: episode.episodeId,
@@ -643,10 +661,328 @@ export class ManageComponent implements OnInit, OnDestroy {
       status: episode.trailerVideoFileName ? 'finalized' : 'selected',
       episodeId: episode.episodeId,
     });
+    this.restoreCurrentYoutubeTrailerJob(editor);
+  }
+
+  getYoutubeTrailerJob(editor: EpisodeEditorState): YoutubeTrailerJobSnapshot | null {
+    return this.getYoutubeTrailerJobState(editor).snapshot;
+  }
+
+  canStartYoutubeTrailerJob(editor: EpisodeEditorState): boolean {
+    const state = this.getYoutubeTrailerJobState(editor);
+    const snapshot = state.snapshot;
+    return Number.isInteger(editor.formModel.episodeId)
+      && (editor.formModel.episodeId ?? 0) > 0
+      && Boolean(editor.formModel.trailerVideoFileName?.trim())
+      && Boolean(editor.formModel.title?.trim())
+      && Boolean(editor.formModel.summary?.trim())
+      && state.startInFlight === null
+      && !(snapshot && !['failed', 'cancelled', 'obsolete'].includes(snapshot.status));
+  }
+
+  isYoutubeTrailerJobActive(editor: EpisodeEditorState): boolean {
+    const status = this.getYoutubeTrailerJob(editor)?.status;
+    return status === 'queued' || status === 'claimed' || status === 'transferring'
+      || status === 'processing' || status === 'cancel_requested';
+  }
+
+  getYoutubeTrailerJobStatusLabel(snapshot: Pick<YoutubeTrailerJobSnapshot, 'status' | 'cancellation'> | null): string {
+    if (!snapshot) {
+      return '';
+    }
+    switch (snapshot.status) {
+      case 'queued':
+      case 'claimed':
+        return 'Queued for private YouTube transfer';
+      case 'transferring':
+        return 'Uploading to YouTube (private)';
+      case 'processing':
+        return 'Processing on YouTube (private)';
+      case 'ready':
+        return 'Private-ready — not published';
+      case 'failed':
+        return 'YouTube transfer failed';
+      case 'cancel_requested':
+        return 'Cancellation requested — provider work may still finish';
+      case 'cancelled':
+        return snapshot.cancellation.boundary === 'provider-video-retained'
+          ? 'Reconciliation required — private provider video retained'
+          : 'Canceled locally';
+      case 'obsolete':
+        return 'Trailer replaced — old job is stale';
+    }
+  }
+
+  getYoutubeTrailerJobProgress(editor: EpisodeEditorState): number | null {
+    const snapshot = this.getYoutubeTrailerJob(editor);
+    if (!snapshot || snapshot.status !== 'transferring') {
+      return null;
+    }
+    const { confirmedBytes, totalBytes } = snapshot.progress;
+    return Number.isFinite(confirmedBytes) && Number.isFinite(totalBytes) && totalBytes > 0
+      && confirmedBytes >= 0 && confirmedBytes <= totalBytes
+      ? Math.round((confirmedBytes / totalBytes) * 100)
+      : null;
+  }
+
+  isYoutubeTrailerJobProgressDeterminate(editor: EpisodeEditorState): boolean {
+    return this.getYoutubeTrailerJobProgress(editor) !== null;
+  }
+
+  canRetryYoutubeTrailerJob(editor: EpisodeEditorState): boolean {
+    const snapshot = this.getYoutubeTrailerJob(editor);
+    if (!snapshot || snapshot.status !== 'failed') {
+      return false;
+    }
+    return snapshot.retry.nextAttemptAt === null
+      || new Date(snapshot.retry.nextAttemptAt).getTime() <= Date.now();
+  }
+
+  getYoutubeTrailerJobRetryMessage(editor: EpisodeEditorState): string {
+    const snapshot = this.getYoutubeTrailerJob(editor);
+    if (!snapshot?.retry.nextAttemptAt) {
+      return snapshot?.error.category ? `Retry category: ${snapshot.error.category}.` : '';
+    }
+    const nextAttempt = new Date(snapshot.retry.nextAttemptAt);
+    return Number.isNaN(nextAttempt.getTime())
+      ? 'Retry will be available when the provider permits it.'
+      : `Retry available after ${nextAttempt.toLocaleTimeString()}.`;
+  }
+
+  getYoutubeTrailerJobErrorMessage(editor: EpisodeEditorState): string {
+    return this.getYoutubeTrailerJobState(editor).error;
+  }
+
+  canCancelYoutubeTrailerJob(editor: EpisodeEditorState): boolean {
+    const status = this.getYoutubeTrailerJob(editor)?.status;
+    return status === 'queued' || status === 'claimed' || status === 'transferring' || status === 'processing';
+  }
+
+  getYoutubeTrailerJobPrivateWatchUrl(editor: EpisodeEditorState): string | null {
+    const snapshot = this.getYoutubeTrailerJob(editor);
+    return snapshot && (snapshot.status === 'ready' || snapshot.cancellation.boundary === 'provider-video-retained')
+      ? snapshot.privateWatchUrl
+      : null;
+  }
+
+  startYoutubeTrailerJob(editor: EpisodeEditorState): void {
+    if (!this.canStartYoutubeTrailerJob(editor)) {
+      return;
+    }
+    const state = this.getYoutubeTrailerJobState(editor);
+    const episodeId = editor.formModel.episodeId;
+    const sourceFileName = editor.formModel.trailerVideoFileName?.trim() ?? '';
+    if (!episodeId || !sourceFileName) {
+      return;
+    }
+    const sourceGeneration = state.sourceGeneration;
+    const startToken = Symbol(`youtube-job-start-${episodeId}`);
+    state.startInFlight = startToken;
+    state.error = '';
+    this.apiService.startYoutubeTrailerJob(episodeId, editor.formModel.title.trim(), editor.formModel.summary.trim()).subscribe({
+      next: (snapshot) => {
+        if (state.startInFlight !== startToken || !this.isCurrentYoutubeSource(editor, state, episodeId, sourceGeneration, sourceFileName)) {
+          return;
+        }
+        state.startInFlight = null;
+        this.storeYoutubeTrailerJob(editor, snapshot, sourceFileName);
+        this.ensureYoutubeTrailerJobPolling(editor, snapshot.jobId);
+      },
+      error: (error) => {
+        if (state.startInFlight !== startToken || !this.isCurrentYoutubeSource(editor, state, episodeId, sourceGeneration, sourceFileName)) {
+          return;
+        }
+        state.startInFlight = null;
+        state.error = this.getYoutubeTrailerJobError(error, 'Could not start the private YouTube transfer.');
+      },
+    });
+  }
+
+  restoreCurrentYoutubeTrailerJob(editor: EpisodeEditorState): void {
+    const episodeId = editor.formModel.episodeId;
+    const sourceFileName = editor.formModel.trailerVideoFileName?.trim() ?? '';
+    if (!episodeId || !sourceFileName || !this.apiService.getCurrentYoutubeTrailerJob) {
+      return;
+    }
+    const state = this.getYoutubeTrailerJobState(editor);
+    this.stopYoutubeTrailerJobPolling(editor);
+    state.snapshot = null;
+    state.episodeId = episodeId;
+    state.jobId = null;
+    state.sourceFileName = sourceFileName;
+    const sourceGeneration = state.sourceGeneration;
+    this.apiService.getCurrentYoutubeTrailerJob(episodeId).subscribe({
+      next: (snapshot) => {
+        if (!snapshot || !this.isCurrentYoutubeSource(editor, state, episodeId, sourceGeneration, sourceFileName)) {
+          return;
+        }
+        this.storeYoutubeTrailerJob(editor, snapshot, sourceFileName);
+        if (this.isYoutubeTrailerJobActive(editor)) {
+          this.ensureYoutubeTrailerJobPolling(editor, snapshot.jobId);
+        }
+      },
+      error: (error) => {
+        if (this.isCurrentYoutubeSource(editor, state, episodeId, sourceGeneration, sourceFileName)) {
+          state.error = this.getYoutubeTrailerJobError(error, 'Could not restore the YouTube transfer status.');
+        }
+      },
+    });
+  }
+
+  retryYoutubeTrailerJob(editor: EpisodeEditorState): void {
+    const snapshot = this.getYoutubeTrailerJob(editor);
+    if (!snapshot || !this.canRetryYoutubeTrailerJob(editor) || !this.isCurrentYoutubeSource(editor, this.getYoutubeTrailerJobState(editor), editor.formModel.episodeId, this.getYoutubeTrailerJobState(editor).sourceGeneration, this.getYoutubeTrailerJobState(editor).sourceFileName)) {
+      return;
+    }
+    const state = this.getYoutubeTrailerJobState(editor);
+    const episodeId = editor.formModel.episodeId;
+    const sourceGeneration = state.sourceGeneration;
+    this.stopYoutubeTrailerJobPolling(editor);
+    this.apiService.retryYoutubeTrailerJob(episodeId, snapshot.jobId).subscribe({
+      next: (nextSnapshot) => {
+        if (!this.isCurrentYoutubeSource(editor, state, episodeId, sourceGeneration, state.sourceFileName) || state.jobId !== snapshot.jobId) {
+          return;
+        }
+        this.storeYoutubeTrailerJob(editor, nextSnapshot, state.sourceFileName);
+        this.ensureYoutubeTrailerJobPolling(editor, nextSnapshot.jobId);
+      },
+      error: (error) => {
+        if (this.isCurrentYoutubeSource(editor, state, episodeId, sourceGeneration, state.sourceFileName)) {
+          state.error = this.getYoutubeTrailerJobError(error, 'Could not retry the YouTube transfer.');
+        }
+      },
+    });
+  }
+
+  cancelYoutubeTrailerJob(editor: EpisodeEditorState): void {
+    const snapshot = this.getYoutubeTrailerJob(editor);
+    const state = this.getYoutubeTrailerJobState(editor);
+    const episodeId = editor.formModel.episodeId;
+    if (!snapshot || !this.canCancelYoutubeTrailerJob(editor) || !episodeId || state.jobId !== snapshot.jobId) {
+      return;
+    }
+    const sourceGeneration = state.sourceGeneration;
+    this.stopYoutubeTrailerJobPolling(editor);
+    this.apiService.cancelYoutubeTrailerJob(episodeId, snapshot.jobId).subscribe({
+      next: (nextSnapshot) => {
+        if (this.isCurrentYoutubeSource(editor, state, episodeId, sourceGeneration, state.sourceFileName) && state.jobId === snapshot.jobId) {
+          this.storeYoutubeTrailerJob(editor, nextSnapshot, state.sourceFileName);
+        }
+      },
+      error: (error) => {
+        if (this.isCurrentYoutubeSource(editor, state, episodeId, sourceGeneration, state.sourceFileName)) {
+          state.error = this.getYoutubeTrailerJobError(error, 'Cancellation could not be confirmed.');
+        }
+      },
+    });
+  }
+
+  clearYoutubeTrailerJobPolling(editor: EpisodeEditorState): void {
+    const state = this.getYoutubeTrailerJobState(editor);
+    this.stopYoutubeTrailerJobPolling(editor);
+    state.sourceGeneration += 1;
+    this.youtubeTrailerJobSourceGeneration.set(editor, state.sourceGeneration);
+    state.snapshot = null;
+    state.episodeId = null;
+    state.jobId = null;
+    state.sourceFileName = '';
+    state.startInFlight = null;
+    state.error = '';
+  }
+
+  private getYoutubeTrailerJobState(editor: EpisodeEditorState): YoutubeTrailerJobState {
+    let state = this.youtubeTrailerJobStates.get(editor);
+    if (!state) {
+      state = {
+        snapshot: null,
+        episodeId: null,
+        jobId: null,
+        sourceGeneration: 0,
+        sourceFileName: '',
+        pollingTimer: null,
+        pollingSubscription: null,
+        startInFlight: null,
+        error: '',
+      };
+      this.youtubeTrailerJobStates.set(editor, state);
+      this.youtubeTrailerJobSourceGeneration.set(editor, state.sourceGeneration);
+    }
+    return state;
+  }
+
+  private storeYoutubeTrailerJob(editor: EpisodeEditorState, snapshot: YoutubeTrailerJobSnapshot, sourceFileName: string): void {
+    const state = this.getYoutubeTrailerJobState(editor);
+    if (snapshot.episodeId !== editor.formModel.episodeId || (state.jobId && state.jobId !== snapshot.jobId)) {
+      return;
+    }
+    state.snapshot = snapshot;
+    state.episodeId = snapshot.episodeId;
+    state.jobId = snapshot.jobId;
+    state.sourceFileName = sourceFileName;
+    state.error = '';
+    if (['ready', 'failed', 'cancelled', 'obsolete'].includes(snapshot.status)) {
+      this.stopYoutubeTrailerJobPolling(editor);
+    }
+  }
+
+  private ensureYoutubeTrailerJobPolling(editor: EpisodeEditorState, jobId: string): void {
+    const state = this.getYoutubeTrailerJobState(editor);
+    if (state.pollingTimer !== null && state.jobId === jobId) {
+      return;
+    }
+    this.stopYoutubeTrailerJobPolling(editor);
+    const episodeId = editor.formModel.episodeId;
+    const sourceGeneration = state.sourceGeneration;
+    const sourceFileName = state.sourceFileName;
+    const refresh = (): void => {
+      if (!episodeId || state.jobId !== jobId || !this.isCurrentYoutubeSource(editor, state, episodeId, sourceGeneration, sourceFileName)) {
+        return;
+      }
+      state.pollingSubscription?.unsubscribe();
+      state.pollingSubscription = this.apiService.getYoutubeTrailerJobStatus(episodeId, jobId).subscribe({
+        next: (snapshot) => {
+          if (!this.isCurrentYoutubeSource(editor, state, episodeId, sourceGeneration, sourceFileName) || state.jobId !== jobId) {
+            return;
+          }
+          this.storeYoutubeTrailerJob(editor, snapshot, sourceFileName);
+        },
+        error: (error) => {
+          if (this.isCurrentYoutubeSource(editor, state, episodeId, sourceGeneration, sourceFileName) && state.jobId === jobId) {
+            state.error = this.getYoutubeTrailerJobError(error, 'Could not refresh the YouTube transfer status. Retrying…');
+          }
+        },
+      });
+    };
+    state.pollingTimer = window.setInterval(refresh, 2000);
+    refresh();
+  }
+
+  private stopYoutubeTrailerJobPolling(editor: EpisodeEditorState): void {
+    const state = this.getYoutubeTrailerJobState(editor);
+    if (state.pollingTimer !== null) {
+      clearInterval(state.pollingTimer);
+      state.pollingTimer = null;
+    }
+    state.pollingSubscription?.unsubscribe();
+    state.pollingSubscription = null;
+  }
+
+  private isCurrentYoutubeSource(editor: EpisodeEditorState, state: YoutubeTrailerJobState, episodeId: number | null, sourceGeneration: number, sourceFileName: string): boolean {
+    return episodeId !== null
+      && editor.formModel.episodeId === episodeId
+      && state.sourceGeneration === sourceGeneration
+      && state.sourceFileName === sourceFileName
+      && editor.formModel.trailerVideoFileName?.trim() === sourceFileName;
+  }
+
+  private getYoutubeTrailerJobError(error: any, fallback: string): string {
+    const category = error?.error?.category;
+    return typeof category === 'string' ? `YouTube transfer error: ${category}.` : fallback;
   }
 
   resetForm(): void {
     const editor = this.currentEditorState;
+      this.clearYoutubeTrailerJobPolling(editor);
       editor.editingEpisodeId = null;
       editor.formModel = this.buildEmptyFormModel();
       editor.selectedMembers = [];
@@ -1381,6 +1717,7 @@ export class ManageComponent implements OnInit, OnDestroy {
 
   resetEditor(editor: EpisodeEditorState): void {
     this.cancelTrailerVideoWork(editor, 'canceled');
+    this.clearYoutubeTrailerJobPolling(editor);
     editor.trailerVideoDraftId = null;
     if (editor === this.addEditorState) {
       this.clearEpisodeGenerationPolling();
@@ -2090,6 +2427,7 @@ export class ManageComponent implements OnInit, OnDestroy {
 
     if (kind === 'trailerVideo') {
       const state = this.getTrailerVideoState(editor);
+      this.clearYoutubeTrailerJobPolling(editor);
       this.cancelTrailerVideoWork(editor, 'canceled');
       state.file = file;
       state.status = 'selected';

@@ -3,7 +3,7 @@ import { HttpEventType, HttpHeaders, HttpResponse } from '@angular/common/http';
 import { fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { of, Subject, throwError } from 'rxjs';
-import { ApiService, Episode, EpisodeArtifactJobSnapshot, EpisodeGeneratedSummaryStatus, EpisodeTrailerVideoUploadResponse, EpisodeTranscriptionStatus } from '../../core/api.service';
+import { ApiService, Episode, EpisodeArtifactJobSnapshot, EpisodeGeneratedSummaryStatus, EpisodeTrailerVideoUploadResponse, EpisodeTranscriptionStatus, YoutubeTrailerJobSnapshot } from '../../core/api.service';
 import { EpisodeFormComponent } from './episode-form.component';
 import { ManageComponent } from './manage.component';
 
@@ -440,9 +440,27 @@ describe('ManageComponent YouTube lifecycle RED scaffold', () => {
   let component: ManageComponent;
 
   beforeEach(() => {
-    apiService = jasmine.createSpyObj<ApiService>('ApiService', ['listEpisodes']);
+    apiService = jasmine.createSpyObj<ApiService>('ApiService', [
+      'listEpisodes', 'startYoutubeTrailerJob', 'getCurrentYoutubeTrailerJob',
+      'getYoutubeTrailerJobStatus', 'retryYoutubeTrailerJob', 'cancelYoutubeTrailerJob',
+    ]);
     apiService.listEpisodes.and.returnValue(of([]));
     component = new ManageComponent(apiService);
+  });
+
+  const snapshot = (overrides: Partial<YoutubeTrailerJobSnapshot> = {}): YoutubeTrailerJobSnapshot => ({
+    jobId: 'job-42',
+    episodeId: 42,
+    status: 'queued',
+    progress: { confirmedBytes: 0, totalBytes: 100, processingPartsProcessed: null, processingPartsTotal: null, processingTimeLeftMs: null },
+    cancellation: { requestedAt: null, cancelledAt: null, boundary: null },
+    error: { category: null, occurredAt: null },
+    retry: { count: 0, nextAttemptAt: null },
+    createdAt: '2026-08-11T00:00:00Z',
+    updatedAt: '2026-08-11T00:00:00Z',
+    completedAt: null,
+    privateWatchUrl: null,
+    ...overrides,
   });
 
   it('starts only the finalized trailer with the current title and summary', () => {
@@ -469,12 +487,78 @@ describe('ManageComponent YouTube lifecycle RED scaffold', () => {
 
   it('defines reload recovery, retry/cancel boundaries, polling teardown, and stale-source protection', () => {
     const lifecycle = component as unknown as Record<string, unknown>;
-    expect(lifecycle.restoreCurrentYoutubeTrailerJob).toEqual(jasmine.any(Function));
-    expect(lifecycle.retryYoutubeTrailerJob).toEqual(jasmine.any(Function));
-    expect(lifecycle.cancelYoutubeTrailerJob).toEqual(jasmine.any(Function));
-    expect(lifecycle.clearYoutubeTrailerJobPolling).toEqual(jasmine.any(Function));
-    expect(lifecycle.youtubeTrailerJobSourceGeneration).toBeDefined();
-    expect(lifecycle.publishYoutubeTrailer).toBeUndefined();
+    expect(lifecycle['restoreCurrentYoutubeTrailerJob']).toEqual(jasmine.any(Function));
+    expect(lifecycle['retryYoutubeTrailerJob']).toEqual(jasmine.any(Function));
+    expect(lifecycle['cancelYoutubeTrailerJob']).toEqual(jasmine.any(Function));
+    expect(lifecycle['clearYoutubeTrailerJobPolling']).toEqual(jasmine.any(Function));
+    expect(lifecycle['youtubeTrailerJobSourceGeneration']).toBeDefined();
+    expect(lifecycle['publishYoutubeTrailer']).toBeUndefined();
+  });
+
+  it('sends current metadata once and polls the returned job', () => {
+    const editor = component.addEditorState;
+    editor.formModel.episodeId = 42;
+    editor.formModel.trailerVideoFileName = 'episodes/42/trailer.mp4';
+    editor.formModel.title = 'Title';
+    editor.formModel.summary = 'Summary';
+    apiService.startYoutubeTrailerJob.and.returnValue(of(snapshot()));
+    apiService.getYoutubeTrailerJobStatus.and.returnValue(of(snapshot({ status: 'transferring', progress: { confirmedBytes: 25, totalBytes: 100, processingPartsProcessed: null, processingPartsTotal: null, processingTimeLeftMs: null } })));
+
+    component.startYoutubeTrailerJob(editor);
+
+    expect(apiService.startYoutubeTrailerJob).toHaveBeenCalledOnceWith(42, 'Title', 'Summary');
+    expect(component.getYoutubeTrailerJobProgress(editor)).toBe(25);
+  });
+
+  it('ignores duplicate starts while the first request is in flight', () => {
+    const editor = component.addEditorState;
+    editor.formModel.episodeId = 42;
+    editor.formModel.trailerVideoFileName = 'episodes/42/trailer.mp4';
+    editor.formModel.title = 'Title';
+    editor.formModel.summary = 'Summary';
+    const pending = new Subject<YoutubeTrailerJobSnapshot>();
+    apiService.startYoutubeTrailerJob.and.returnValue(pending.asObservable());
+
+    component.startYoutubeTrailerJob(editor);
+    component.startYoutubeTrailerJob(editor);
+
+    expect(apiService.startYoutubeTrailerJob).toHaveBeenCalledTimes(1);
+    pending.next(snapshot());
+  });
+
+  it('recovers current jobs and preserves retained-private cancellation guidance', () => {
+    const editor = component.addEditorState;
+    editor.formModel.episodeId = 42;
+    editor.formModel.trailerVideoFileName = 'episodes/42/trailer.mp4';
+    const retained = snapshot({
+      status: 'cancelled',
+      cancellation: { requestedAt: '2026-08-11T00:00:00Z', cancelledAt: '2026-08-11T00:01:00Z', boundary: 'provider-video-retained' },
+      privateWatchUrl: 'https://youtu.be/private-42',
+    });
+    apiService.getCurrentYoutubeTrailerJob.and.returnValue(of(retained));
+
+    component.restoreCurrentYoutubeTrailerJob(editor);
+
+    expect(component.getYoutubeTrailerJobStatusLabel(retained)).toContain('Reconciliation');
+    expect(component.getYoutubeTrailerJobPrivateWatchUrl(editor)).toBe('https://youtu.be/private-42');
+  });
+
+  it('cancels the durable job without polling and keeps the returned boundary visible', () => {
+    const editor = component.addEditorState;
+    editor.formModel.episodeId = 42;
+    editor.formModel.trailerVideoFileName = 'episodes/42/trailer.mp4';
+    const queued = snapshot();
+    const cancelled = snapshot({ status: 'cancelled', cancellation: { requestedAt: '2026-08-11T00:00:00Z', cancelledAt: '2026-08-11T00:01:00Z', boundary: 'local-cancelled' } });
+    apiService.startYoutubeTrailerJob.and.returnValue(of(queued));
+    apiService.getYoutubeTrailerJobStatus.and.returnValue(of(queued));
+    apiService.cancelYoutubeTrailerJob.and.returnValue(of(cancelled));
+    editor.formModel.title = 'Title';
+    editor.formModel.summary = 'Summary';
+    component.startYoutubeTrailerJob(editor);
+    component.cancelYoutubeTrailerJob(editor);
+
+    expect(apiService.cancelYoutubeTrailerJob).toHaveBeenCalledOnceWith(42, 'job-42');
+    expect(component.getYoutubeTrailerJobStatusLabel(cancelled)).toContain('Canceled');
   });
 });
 
