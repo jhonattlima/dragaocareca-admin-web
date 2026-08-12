@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Trailer Video YouTube Publishing
+current_phase: 8
+current_phase_name: YouTube Job Lifecycle
 status: executing
-stopped_at: Completed 08-youtube-job-lifecycle-08-00-PLAN.md
-last_updated: "2026-08-12T01:18:08.293Z"
+stopped_at: Completed 08-01-PLAN.md
+last_updated: "2026-08-12T01:25:43.887Z"
 last_activity: 2026-08-12
 last_activity_desc: completed Phase 8 Wave 0 RED acceptance scaffold
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 8
-  completed_plans: 4
+  completed_plans: 5
   percent: 20
-current_phase: 8
-current_phase_name: YouTube Job Lifecycle
 ---
 
 # Project State
@@ -29,11 +29,11 @@ See: .planning/PROJECT.md
 ## Current Position
 
 Phase: 8 of 11 (YouTube Job Lifecycle)
-Plan: 0 of 05
+Plan: 1 of 05
 Status: Wave 0 RED scaffold complete — ready for Wave 1
 Last activity: 2026-08-12 — completed Phase 8 Wave 0 RED acceptance scaffold
 
-Progress: ░░░░░░░░░░ [█████░░░░░] 50%
+Progress: ░░░░░░░░░░ [██████░░░░] 63%
 
 ## Performance Metrics
 
@@ -51,6 +51,7 @@ Progress: ░░░░░░░░░░ [█████░░░░░] 50%
 | Phase 07-final-trailer-video-upload P02 | 20min | 3 tasks | 5 files |
 | Phase 07 P03 | 12min | 2 tasks | 4 files |
 | Phase 08-youtube-job-lifecycle P00 | 25 | 2 tasks | 3 files |
+| Phase 08 P01 | 12 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -70,6 +71,8 @@ Progress: ░░░░░░░░░░ [█████░░░░░] 50%
 - [Phase ?]: Keep YouTube transfer, processing, publishing, hashtags, title generation, and trailer artifact downloads outside Phase 7.
 - [Phase ?]: Wave 0 keeps the API publish route as an API-owned idempotency seam while Angular remains publish-control-free in Phase 8.
 - [Phase ?]: Wave 0 RED checks intentionally fail until the downstream API and Angular implementation plans complete the contract.
+- [Phase ?]: Phase 8 Plan 1 uses the existing durable metadata_snapshot_json field for initial title/summary job input and keeps provider/session/source evidence API-owned.
+- [Phase ?]: Phase 8 Plan 1 exposes only a validated privateWatchUrl and normalized operator error categories in the browser DTO.
 
 ### Pending Todos
 
@@ -88,6 +91,6 @@ Progress: ░░░░░░░░░░ [█████░░░░░] 50%
 
 ## Session Continuity
 
-Last session: 2026-08-12T01:17:15.486Z
-Stopped at: Completed 08-youtube-job-lifecycle-08-00-PLAN.md
+Last session: 2026-08-12T01:25:43.879Z
+Stopped at: Completed 08-01-PLAN.md
 Resume file: None

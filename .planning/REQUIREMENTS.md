@@ -16,11 +16,11 @@
 
 ### YouTube Workflow
 
-- [ ] **YOUTUBE-01**: The user can start a server-owned YouTube trailer job for the current finalized trailer using the selected title and summary.
-- [ ] **YOUTUBE-02**: The API uploads the trailer to YouTube as non-public and returns a watch link/video identifier without exposing provider credentials to the browser.
-- [ ] **YOUTUBE-03**: The user can see separate progress/state feedback for YouTube transfer, YouTube processing, and readiness to publish.
-- [ ] **YOUTUBE-04**: The user can retry recoverable YouTube failures without creating duplicate active jobs or duplicate provider videos when an existing upload can be reconciled.
-- [ ] **YOUTUBE-05**: The user can cancel a pending or active YouTube job with honest messaging about work already accepted by YouTube and any resulting private video requiring reconciliation.
+- [x] **YOUTUBE-01**: The user can start a server-owned YouTube trailer job for the current finalized trailer using the selected title and summary.
+- [x] **YOUTUBE-02**: The API uploads the trailer to YouTube as non-public and returns a watch link/video identifier without exposing provider credentials to the browser.
+- [x] **YOUTUBE-03**: The user can see separate progress/state feedback for YouTube transfer, YouTube processing, and readiness to publish.
+- [x] **YOUTUBE-04**: The user can retry recoverable YouTube failures without creating duplicate active jobs or duplicate provider videos when an existing upload can be reconciled.
+- [x] **YOUTUBE-05**: The user can cancel a pending or active YouTube job with honest messaging about work already accepted by YouTube and any resulting private video requiring reconciliation.
 - [ ] **YOUTUBE-06**: After a non-public YouTube video is ready, the user can explicitly publish it publicly with a separate confirmation action.
 - [ ] **YOUTUBE-07**: The existing YouTube link field is populated with the returned non-public link and remains available after public publishing.
 
@@ -38,10 +38,10 @@
 
 ### Operational Safety
 
-- [ ] **OPS-01**: YouTube credentials and provider requests remain API-owned, authenticated, and absent from browser-visible payloads, logs, and public job snapshots.
-- [ ] **OPS-02**: YouTube jobs persist their episode/source identity, state, progress, provider identifiers, and failure information so polling, reload, restart recovery, and stale-response protection cannot update a newer trailer.
-- [ ] **OPS-03**: Duplicate starts, retries, publish requests, and concurrent replacement actions are idempotent or safely rejected with actionable state.
-- [ ] **OPS-04**: The API handles YouTube OAuth, quota, provider, proxy-size, and timeout failures with stable user-facing error states and bounded retry behavior.
+- [x] **OPS-01**: YouTube credentials and provider requests remain API-owned, authenticated, and absent from browser-visible payloads, logs, and public job snapshots.
+- [x] **OPS-02**: YouTube jobs persist their episode/source identity, state, progress, provider identifiers, and failure information so polling, reload, restart recovery, and stale-response protection cannot update a newer trailer.
+- [x] **OPS-03**: Duplicate starts, retries, publish requests, and concurrent replacement actions are idempotent or safely rejected with actionable state.
+- [x] **OPS-04**: The API handles YouTube OAuth, quota, provider, proxy-size, and timeout failures with stable user-facing error states and bounded retry behavior.
 - [ ] **OPS-05**: Existing authentication modes, `authBypass`, episode editing, summary behavior, artifact downloads, frontend tests, and `npm run build` remain compatible.
 
 ## Future Requirements
@@ -75,11 +75,11 @@ Traceability will be filled when the v1.2 roadmap is approved.
 | TRAILER-03 | Phase 7 | Complete |
 | TRAILER-04 | Phase 7 | Complete |
 | TRAILER-05 | Phase 7 | Complete |
-| YOUTUBE-01 | Phase 8 | Pending |
-| YOUTUBE-02 | Phase 8 | Pending |
-| YOUTUBE-03 | Phase 8 | Pending |
-| YOUTUBE-04 | Phase 8 | Pending |
-| YOUTUBE-05 | Phase 8 | Pending |
+| YOUTUBE-01 | Phase 8 | Complete |
+| YOUTUBE-02 | Phase 8 | Complete |
+| YOUTUBE-03 | Phase 8 | Complete |
+| YOUTUBE-04 | Phase 8 | Complete |
+| YOUTUBE-05 | Phase 8 | Complete |
 | YOUTUBE-06 | Phase 9 | Pending |
 | YOUTUBE-07 | Phase 9 | Pending |
 | TITLE-01 | Phase 9 | Pending |
@@ -88,10 +88,10 @@ Traceability will be filled when the v1.2 roadmap is approved.
 | TITLE-04 | Phase 9 | Pending |
 | ARTIFACT-01 | Phase 11 | Pending |
 | ARTIFACT-02 | Phase 11 | Pending |
-| OPS-01 | Phase 8 | Pending |
-| OPS-02 | Phase 8 | Pending |
-| OPS-03 | Phase 8 | Pending |
-| OPS-04 | Phase 8 | Pending |
+| OPS-01 | Phase 8 | Complete |
+| OPS-02 | Phase 8 | Complete |
+| OPS-03 | Phase 8 | Complete |
+| OPS-04 | Phase 8 | Complete |
 | OPS-05 | Phase 10 | Pending |
 
 ---
