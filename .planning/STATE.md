@@ -5,15 +5,15 @@ milestone_name: Trailer Video YouTube Publishing
 current_phase: 8
 current_phase_name: YouTube Job Lifecycle
 status: executing
-stopped_at: Completed 08-02-PLAN.md
-last_updated: "2026-08-12T01:31:51.084Z"
+stopped_at: Completed 08-03-PLAN.md
+last_updated: "2026-08-12T01:37:23.974Z"
 last_activity: 2026-08-12
 last_activity_desc: completed Phase 8 Wave 0 RED acceptance scaffold
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 8
-  completed_plans: 6
+  completed_plans: 7
   percent: 20
 ---
 
@@ -29,11 +29,11 @@ See: .planning/PROJECT.md
 ## Current Position
 
 Phase: 8 of 11 (YouTube Job Lifecycle)
-Plan: 2 of 05
+Plan: 3 of 05
 Status: Wave 0 RED scaffold complete — ready for Wave 1
 Last activity: 2026-08-12 — completed Phase 8 Wave 0 RED acceptance scaffold
 
-Progress: ░░░░░░░░░░ [████████░░] 75%
+Progress: ░░░░░░░░░░ [█████████░] 88%
 
 ## Performance Metrics
 
@@ -53,6 +53,7 @@ Progress: ░░░░░░░░░░ [████████░░] 75%
 | Phase 08-youtube-job-lifecycle P00 | 25 | 2 tasks | 3 files |
 | Phase 08 P01 | 12 | 2 tasks | 5 files |
 | Phase 08-youtube-job-lifecycle P02 | 25 | 2 tasks | 2 files |
+| Phase 08 P03 | 8 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -76,6 +77,8 @@ Progress: ░░░░░░░░░░ [████████░░] 75%
 - [Phase ?]: Phase 8 Plan 1 exposes only a validated privateWatchUrl and normalized operator error categories in the browser DTO.
 - [Phase ?]: Phase 8 Plan 2 verifies accepted title/summary input, private URL sanitization, recovery, cancellation, retry, and API publication boundaries in the existing sibling fake-provider verifier.
 - [Phase ?]: Phase 8 coverage explicitly opts browser OAuth/direct provider calls, Angular publish controls, automatic publication/deletion, richer metadata, hashtags, artifact downloads, and final workflow integration to their owning boundaries.
+- [Phase ?]: Expose typed YouTube lifecycle wrappers with metadata-bearing start, current/status lookup, same-job retry, and cancellation; keep retry/cancel bodies empty.
+- [Phase ?]: Allowlist browser DTO fields to lifecycle progress, cancellation, normalized errors, retry timing, timestamps, and sanitized privateWatchUrl; exclude provider/session/source/raw-error/publication fields.
 
 ### Pending Todos
 
@@ -94,6 +97,6 @@ Progress: ░░░░░░░░░░ [████████░░] 75%
 
 ## Session Continuity
 
-Last session: 2026-08-12T01:31:51.077Z
-Stopped at: Completed 08-02-PLAN.md
+Last session: 2026-08-12T01:37:23.967Z
+Stopped at: Completed 08-03-PLAN.md
 Resume file: None
