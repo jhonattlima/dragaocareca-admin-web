@@ -2,22 +2,13 @@ import { HttpClientTestingModule, HttpTestingController } from '@angular/common/
 import { TestBed } from '@angular/core/testing';
 import { environment } from '../../environments/environment';
 import { HttpEventType, HttpResponse } from '@angular/common/http';
-import { ApiService, EpisodeArtifactJobSnapshot, EpisodeArtifactSelector, EpisodeTrailerVideoUploadResponse } from './api.service';
-import { Observable } from 'rxjs';
-
-type YoutubeTrailerJobSnapshotRed = {
-  jobId: string;
-  episodeId: number;
-  status: 'queued' | 'claimed' | 'transferring' | 'processing' | 'ready' | 'failed' | 'cancel_requested' | 'cancelled' | 'obsolete';
-  privateWatchUrl: string | null;
-  progress: { confirmedBytes: number; totalBytes: number; processingPartsProcessed: number | null; processingPartsTotal: number | null; processingTimeLeftMs: number | null };
-  cancellation: { requestedAt: string | null; cancelledAt: string | null; boundary: string | null };
-  error: { category: string | null; occurredAt: string | null };
-  retry: { count: number; nextAttemptAt: string | null };
-  createdAt: string;
-  updatedAt: string;
-  completedAt: string | null;
-};
+import {
+  ApiService,
+  EpisodeArtifactJobSnapshot,
+  EpisodeArtifactSelector,
+  EpisodeTrailerVideoUploadResponse,
+  YoutubeTrailerJobSnapshot,
+} from './api.service';
 
 describe('ApiService artifact jobs', () => {
   let apiService: ApiService;
@@ -185,7 +176,7 @@ describe('ApiService trailer video lifecycle', () => {
   });
 });
 
-describe('ApiService YouTube trailer lifecycle RED scaffold', () => {
+describe('ApiService YouTube trailer lifecycle', () => {
   let apiService: ApiService;
   let httpTestingController: HttpTestingController;
 
@@ -205,10 +196,9 @@ describe('ApiService YouTube trailer lifecycle RED scaffold', () => {
       status: 'ready',
       privateWatchUrl: 'https://www.youtube.com/watch?v=private-42',
     });
-    let response: YoutubeTrailerJobSnapshotRed | undefined;
+    let response: YoutubeTrailerJobSnapshot | undefined;
 
-    (apiService as unknown as { startYoutubeTrailerJob: (episodeId: number, title: string, summary: string) => Observable<YoutubeTrailerJobSnapshotRed> })
-      .startYoutubeTrailerJob(42, 'Selected title', 'Selected summary')
+    apiService.startYoutubeTrailerJob(42, 'Selected title', 'Selected summary')
       .subscribe(value => response = value);
 
     const request = httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/42/youtube-trailer-jobs`);
@@ -220,22 +210,15 @@ describe('ApiService YouTube trailer lifecycle RED scaffold', () => {
 
   it('supports current lookup, status, same-job retry, and cancellation with empty control bodies', () => {
     const snapshot = youtubeSnapshot();
-    const service = apiService as unknown as {
-      getCurrentYoutubeTrailerJob: (episodeId: number) => Observable<YoutubeTrailerJobSnapshotRed | null>;
-      getYoutubeTrailerJobStatus: (episodeId: number, jobId: string) => Observable<YoutubeTrailerJobSnapshotRed>;
-      retryYoutubeTrailerJob: (episodeId: number, jobId: string) => Observable<YoutubeTrailerJobSnapshotRed>;
-      cancelYoutubeTrailerJob: (episodeId: number, jobId: string) => Observable<YoutubeTrailerJobSnapshotRed>;
-    };
-
-    service.getCurrentYoutubeTrailerJob(42).subscribe();
+    apiService.getCurrentYoutubeTrailerJob(42).subscribe();
     httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/42/youtube-trailer-jobs/current`).flush(snapshot);
-    service.getYoutubeTrailerJobStatus(42, 'job-42').subscribe();
+    apiService.getYoutubeTrailerJobStatus(42, 'job-42').subscribe();
     httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/42/youtube-trailer-jobs/job-42`).flush(snapshot);
-    service.retryYoutubeTrailerJob(42, 'job-42').subscribe();
+    apiService.retryYoutubeTrailerJob(42, 'job-42').subscribe();
     const retry = httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/42/youtube-trailer-jobs/job-42/retry`);
     expect(retry.request.body).toEqual({});
     retry.flush(snapshot);
-    service.cancelYoutubeTrailerJob(42, 'job-42').subscribe();
+    apiService.cancelYoutubeTrailerJob(42, 'job-42').subscribe();
     const cancel = httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/42/youtube-trailer-jobs/job-42/cancel`);
     expect(cancel.request.body).toEqual({});
     cancel.flush(snapshot);
@@ -257,10 +240,7 @@ describe('ApiService YouTube trailer lifecycle RED scaffold', () => {
   });
 });
 
-const youtubeSnapshot = (overrides: Partial<{
-  status: YoutubeTrailerJobSnapshotRed['status'];
-  privateWatchUrl: string | null;
-}> = {}) => ({
+const youtubeSnapshot = (overrides: Partial<YoutubeTrailerJobSnapshot> = {}): YoutubeTrailerJobSnapshot => ({
   jobId: 'job-42',
   episodeId: 42,
   status: 'queued' as const,
