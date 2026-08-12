@@ -103,7 +103,7 @@ Plans 01-04 can implement against executable RED expectations. The backend and A
 ## Self-Check: PASSED
 
 - Summary file exists.
-- Task commits `c9ddaf3` and `9492216` exist.
+- Task commits `9492216` exists in this checkout and sibling API task commit `c9ddaf3` exists in `../dragaocareca-admin-api`.
 - All three plan files are present and the frontend production build passed.
 
 ---
