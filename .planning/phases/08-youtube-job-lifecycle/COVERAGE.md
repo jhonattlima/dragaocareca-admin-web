@@ -1,31 +1,42 @@
 # Phase 8 YouTube/API Capability Coverage
 
-This coverage record resolves the provider/API gate for Phase 8. It preserves the locked private-first boundary and identifies later-phase ownership explicitly.
+This is the API coverage-gate artifact for Phase 8. The boundary is private-first,
+server-owned, authenticated, and source-identity bound. D-01 through D-12 are the
+locked decisions from `08-CONTEXT.md`.
 
-| Capability | Decision | Evidence / test owner | Scope disposition |
+| Capability | Decision | Evidence / owner | Disposition |
 |---|---|---|---|
-| Authenticated explicit start | `POST .../youtube-trailer-jobs`, validated `{title, summary}` body, canonical finalized source | API route/OpenAPI and lifecycle verifier; Angular ApiService spec | Covered in Phase 8 per D-01, D-08, D-11 |
-| YOUTUBE-01 title/summary wording | Phase 8 accepts the current operator-supplied or derived title and summary in the start payload, persists them as job input, and passes them to the provider. Phase 9 owns richer title authoring/validation. | Route/service/OpenAPI and verifier contract test | Covered literally in Phase 8; richer authoring belongs to Phase 9 |
-| Reload/current-job recovery | Authenticated `GET .../youtube-trailer-jobs/current` returns the current non-obsolete source job | Repository/service/route verifier and Angular reload test | Covered in Phase 8 per D-07 |
-| Resumable private upload | Existing API provider/worker/session/range reconciliation is retained | Worker/provider fake-provider verifier | Covered in Phase 8 per D-03, D-04 |
-| Processing and private readiness | Provider privacy/upload/processing checks determine `ready`; UI maps it to `private-ready` | Service DTO/OpenAPI, Manage tests/manual check | Covered in Phase 8; never public/published |
-| YOUTUBE-02 private watch link | Add nullable `privateWatchUrl` once the provider video is available; no `providerVideoId` field is exposed | DTO/OpenAPI omission and URL assertions; Angular DTO/template tests | Covered literally in Phase 8; broader link/publishing UI remains Phase 9/10 |
-| Same-job retry | Retry route preserves row, session URI, and provider video evidence; no new provider upload is created | Repository/service/route verifier | Covered in Phase 8 per D-04, D-08 |
-| OPS-03 API publish idempotency | Existing API-owned publish route remains; repeated publish requests converge safely. Angular publish controls remain outside Phase 8. | Existing publish route and lifecycle verifier | Covered API contract in Phase 8; Angular publication integration belongs to Phase 9/10 |
-| Cancellation boundary | Before acceptance: `local-cancelled`; after accepted bytes/video: `provider-video-retained` / reconciliation-required with sanitized privateWatchUrl when known; status/link/guidance only, no automatic deletion/publication | Provider fake scenarios and Manage tests/manual check | Covered in Phase 8 per D-05/D-06 |
-| Source identity and stale protection | SHA-256/bytes/relative filename plus revision/lease CAS; browser source generation/job guards | Repository/worker verifier and Manage tests | Covered in Phase 8 per D-09 and OPS-02/03 |
-| API restart recovery | Startup recovery and worker single-run guard reclaim persisted interrupted jobs | Worker/repository verifier | Covered in Phase 8 per D-07 |
-| Error normalization | Authentication/OAuth, quota, timeout, network/provider, invalid trailer, session-expired, and reconciliation categories are bounded and retry-aware | Provider/service fake fixtures and DTO/log verifier | Covered in Phase 8 per D-10/D-12 and OPS-04 |
-| Credential/session/source/log safety | API-only credentials; DTO/log allowlist omits OAuth, raw payloads, paths, stacks, sessions, provider IDs, and raw messages/reasons | Verifier log/DTO/OpenAPI assertions | Covered in Phase 8 per D-11 and OPS-01 |
-| Browser OAuth/direct YouTube calls | Not permitted; Angular only calls authenticated sibling API | Architecture tests/review boundary | Explicit opt-out: Phase 8 security boundary |
-| Angular publish controls | No Angular Publish action or publication workflow is added to Phase 8 | Template tests and manual UI review | Explicit opt-out: Phase 9/10 owns broader publication integration; API publish route remains |
-| Automatic public publication/deletion | No automatic publication or deletion of retained/private videos | API/service/verifier boundary | Explicit opt-out: Phase 8 provides status/link/guidance only |
-| Rich title authoring and 100-Unicode validation | Basic title/summary are accepted at start; richer authoring/validation is not implemented | Start contract tests and handoff | Explicit opt-out: Phase 9 |
-| Hashtag lookup/count | Not implemented | Roadmap/requirements trace | Explicit opt-out: Phase 9 |
-| Trailer artifact download | Not changed | Existing artifact regression plus roadmap trace | Explicit opt-out: Phase 11 |
-| Final workflow-wide integration/compatibility | Phase 8 adds thin Manage lifecycle controls only; release-wide integration remains separate | Angular build/test gate and roadmap trace | Explicit opt-out: Phase 10 owns final workflow integration; OPS-05 remains Phase 10 |
-| Scheduled/batch/playlists/thumbnails/captions/analytics/public replacement | Not implemented | Future requirements/out-of-scope trace | Explicit future-scope opt-out |
+| Authenticated metadata-bearing start | Accept only optional `title` and `summary`; reject provider IDs, session URLs, credentials, filesystem paths, and unknown body fields. | `episodes.routes.ts` strict Zod schema; lifecycle verifier no-store/body assertions; OpenAPI start schema. | Covered: YOUTUBE-01, D-01, D-08, D-11 |
+| Accepted title/summary job input | Persist the accepted pair in `metadata_snapshot_json` and pass it to the private upload provider. | `youtube-trailer-job.service.ts`; fake-provider metadata capture in `verify-youtube-trailer-job-lifecycle.ts`. | Covered: YOUTUBE-01 |
+| Current lookup and reload recovery | Authenticated `current` lookup fingerprints the canonical finalized trailer and returns the active current-source job. | Service/repository route plus current/status verifier assertions. | Covered: YOUTUBE-03, OPS-02, D-07 |
+| Resumable private upload | Persist session/range evidence internally, resume after interruption, and begin provider uploads with `privacyStatus=private`. | Worker/provider implementation and fake-provider range/restart assertions. | Covered: YOUTUBE-02, YOUTUBE-03, D-03/D-04 |
+| Processing poll and private readiness | Poll processing separately from transfer; `ready` requires processed private provider state. | Worker fake-provider processing assertions and sanitized DTO/OpenAPI schema. | Covered: YOUTUBE-02, D-02/D-03 |
+| Sanitized `privateWatchUrl` | Expose only a validated YouTube watch URL after provider-video evidence; invalid IDs produce null. Never expose provider ID, session, source, lease, or raw failure fields. | DTO negative assertions, OpenAPI omission checks, and lifecycle verifier. | Covered: YOUTUBE-02, OPS-01, D-11 |
+| Same-job retry | Retry the same durable row and resumable evidence; do not create another provider upload for an unchanged source. | Repository/service retry implementation and lifecycle retry assertions. | Covered: YOUTUBE-03, OPS-04, D-04 |
+| Cancellation boundary/reconciliation | Before provider acceptance report `local-cancelled`; after accepted bytes/video report `provider-video-retained` and reconciliation guidance. Never claim remote deletion. | Worker fake-provider cancellation scenarios and route DTO assertions. | Covered: YOUTUBE-04, D-05/D-06 |
+| Source fingerprint/idempotency | Bind each job to canonical relative filename, SHA-256, and byte count; obsolete replaced sources and reject late CAS writes. | Repository `obsoletePriorSource`, worker source guard, and replacement verifier scenario. | Covered: YOUTUBE-03, OPS-02, D-08/D-09 |
+| Duplicate starts | Repeated starts for the same episode/source reuse the active job and return no-store responses. | `createOrReuse`, route duplicate-start verifier assertion, OpenAPI response. | Covered: OPS-02, D-08 |
+| API restart recovery | Recover claimed/transferring/processing rows with a single worker lease and reconcile persisted session/provider evidence. | Worker `recoverInterrupted`, startup guard, and restart/range verifier scenarios. | Covered: YOUTUBE-03, OPS-02, D-07 |
+| Stable errors and bounded retry | Normalize authentication/OAuth, quota, timeout, network/provider, invalid-trailer, session-expired, and reconciliation categories; retry only bounded recoverable classes with `nextAttemptAt`. | Provider normalization, service retry policy, DTO category allowlist, and fake-provider failure fixtures. | Covered: OPS-04, D-10/D-12 |
+| Logs/DTO/OpenAPI sanitization | Serialized evidence omits credentials, session URLs, raw provider payloads/messages/reasons, filesystem paths, provider IDs, leases, and stack traces. | Verifier negative serialized-field assertions plus safe OpenAPI schema. | Covered: OPS-01, T-08-06, D-11 |
+| Existing API publish idempotency | Retain the authenticated API publish route; repeated requests reconcile the same provider video and publication row. Phase 8 verifier proves route presence/boundary; publication-specific fake-provider evidence remains in the sibling publication verifier. | `/youtube-trailer-jobs/{jobId}/publish`, `publishYoutubeTrailer`, publication verifier. | Covered API seam: OPS-03; no Angular publish control in Phase 8 |
+| Browser OAuth/direct provider calls | Browser never receives OAuth credentials or calls YouTube; Angular calls only the authenticated sibling API. | Architecture contract and API-only provider boundary. | Explicit opt-out: Phase 8 security boundary; API owns OAuth |
+| Angular publish controls | No Angular Publish action or publication workflow is added. | Lifecycle verifier boundary assertion and Manage scope. | Explicit opt-out: Phase 9/10 own publication authoring/UI; API publish route remains |
+| Automatic deletion/publication | No automatic public transition or deletion of a retained/private provider video. | Cancellation/service/provider contract. | Explicit opt-out: Phase 8 only reports status/link/guidance; publication is explicit and deletion is future scope |
+| Rich title authoring and 100-Unicode validation | Phase 8 accepts basic title/summary only; richer title assembly and Unicode validation are not part of job start. | Start schema and Phase 9 handoff. | Explicit opt-out: Phase 9 |
+| Hashtag lookup/count | Not part of the private upload lifecycle. | Requirements/roadmap boundary. | Explicit opt-out: Phase 9 |
+| Trailer artifact download | Existing artifact routes are unchanged by YouTube jobs. | Phase 7 artifact contract and regression verifier. | Explicit opt-out: Phase 11 |
+| Final workflow-wide integration | Backend lifecycle evidence is complete, but full placement and compatibility release integration is not claimed here. | Phase 8 verifier/build; roadmap handoff. | Explicit opt-out: Phase 10; OPS-05 remains there |
+| Post-public replacement/deletion, scheduling, playlists, thumbnails, captions, analytics, batch operations | Not implemented in the private-first lifecycle. | Future-scope boundary. | Explicit future opt-out: later product/infrastructure phase |
 
-## Contract handoff to Phase 9
+## Handoff to Phase 9
 
-Phase 8 hands off a persisted private-ready job, accepted title/summary job input, normalized status/error/cancellation data, optional sanitized `privateWatchUrl`, and the existing API-owned idempotent publish route. Phase 9 must define and test richer title validation, link persistence in the existing YouTube field, and publication UI; Phase 10 owns broader Angular workflow integration. Phase 8 must not add Angular publish controls, automatic publication, or deletion of retained/private videos.
+Phase 8 provides a durable private-ready job, accepted title/summary input,
+normalized status/error/cancellation data, an optional sanitized `privateWatchUrl`,
+and the existing API-owned idempotent publish route. Phase 9 owns richer title
+validation, hashtag authoring/counting, link persistence after publication, and
+publication UI. Phase 10 owns final Angular workflow integration. Phase 11 owns
+adding finalized `trailer-video` to the artifact modal and ZIP flow.
+
+No capability above is silently omitted: every unsupported provider/API surface is
+marked as an explicit security or later-phase opt-out with an owner.
