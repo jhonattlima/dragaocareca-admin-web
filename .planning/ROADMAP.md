@@ -75,9 +75,9 @@ v1.2 extends the existing episode workflow from finalized local trailer video th
   4. A cancellation reports the accepted-work boundary honestly, including when a private provider video remains for reconciliation, and stale jobs cannot update a newer trailer.
   5. Provider credentials, OAuth details, and unstable provider errors are never exposed in browser-visible job data, while quota, OAuth, timeout, and provider failures become bounded recoverable states.
 
-**Plans**: 5 plans
+**Plans**: 1/5 plans executed
 
-- [ ] 08-00-PLAN.md — Establish Wave 0 RED coverage for contract and lifecycle seams
+- [x] 08-00-PLAN.md — Establish Wave 0 RED coverage for contract and lifecycle seams
 - [ ] 08-01-PLAN.md — Extend the durable API job contract and lifecycle
 - [ ] 08-02-PLAN.md — Verify backend lifecycle coverage and handoffs
 - [ ] 08-03-PLAN.md — Add Angular YouTube API wrappers and DTO tests
@@ -138,7 +138,7 @@ v1.2 extends the existing episode workflow from finalized local trailer video th
 | 5 | v1.1 Episode Artifact Downloads | 4/4 | Complete | 2026-07-31 |
 | 6 | v1.1 Episode Artifact Downloads | 4/4 | Complete | 2026-07-31 |
 | 7. Final Trailer Video Upload | v1.2 | 3/3 | In Progress|  |
-| 8. YouTube Job Lifecycle | v1.2 | 0/TBD | Not started | - |
+| 8. YouTube Job Lifecycle | v1.2 | 1/5 | In Progress|  |
 | 9. Title, Hashtags & Publishing | v1.2 | 0/TBD | Not started | - |
 | 10. Operator Workflow Integration | v1.2 | 0/TBD | Not started | - |
 | 11. Trailer Artifact & Compatibility Release | v1.2 | 0/TBD | Not started | - |

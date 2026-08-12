@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Trailer Video YouTube Publishing
-current_phase: 7
-current_phase_name: Final Trailer Video Upload
-status: verifying
-stopped_at: Completed 07-final-trailer-video-upload-07-03-PLAN.md
-last_updated: "2026-08-04T18:09:54.985Z"
-last_activity: 2026-08-04
-last_activity_desc: completed 07-01 backend trailer-video lifecycle plan
+status: executing
+stopped_at: Completed 08-youtube-job-lifecycle-08-00-PLAN.md
+last_updated: "2026-08-12T01:18:08.293Z"
+last_activity: 2026-08-12
+last_activity_desc: completed Phase 8 Wave 0 RED acceptance scaffold
 progress:
   total_phases: 5
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 8
+  completed_plans: 4
   percent: 20
+current_phase: 8
+current_phase_name: YouTube Job Lifecycle
 ---
 
 # Project State
@@ -24,16 +24,16 @@ progress:
 See: .planning/PROJECT.md
 
 **Core value:** Keep the admin workflow reliable, legible, and backend-driven so operators can manage episodes and inspect system state without fighting the UI.
-**Current focus:** Phase 7 — Final Trailer Video Upload
+**Current focus:** Phase 8 — YouTube Job Lifecycle
 
 ## Current Position
 
-Phase: 7 of 11 (Final Trailer Video Upload)
-Plan: 3 of 03
-Status: Phase complete — ready for verification
-Last activity: 2026-08-04 — completed 07-01 backend trailer-video lifecycle plan
+Phase: 8 of 11 (YouTube Job Lifecycle)
+Plan: 0 of 05
+Status: Wave 0 RED scaffold complete — ready for Wave 1
+Last activity: 2026-08-12 — completed Phase 8 Wave 0 RED acceptance scaffold
 
-Progress: ░░░░░░░░░░ [██████████] 100%
+Progress: ░░░░░░░░░░ [█████░░░░░] 50%
 
 ## Performance Metrics
 
@@ -50,6 +50,7 @@ Progress: ░░░░░░░░░░ [██████████] 100%
 | Phase 07-final-trailer-video-upload P01 | 32min | 3 tasks | 9 files |
 | Phase 07-final-trailer-video-upload P02 | 20min | 3 tasks | 5 files |
 | Phase 07 P03 | 12min | 2 tasks | 4 files |
+| Phase 08-youtube-job-lifecycle P00 | 25 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -67,6 +68,8 @@ Progress: ░░░░░░░░░░ [██████████] 100%
 - [Phase ?]: Document the server-issued opaque trailer-video draft reservation, X-Episode-Draft-Id staging, and Save-time promotion consistently across canonical frontend docs.
 - [Phase ?]: Keep ChromeHeadless-unavailable results explicit and leave browser assertion/sign-off pending rather than treating bundle compilation as test success.
 - [Phase ?]: Keep YouTube transfer, processing, publishing, hashtags, title generation, and trailer artifact downloads outside Phase 7.
+- [Phase ?]: Wave 0 keeps the API publish route as an API-owned idempotency seam while Angular remains publish-control-free in Phase 8.
+- [Phase ?]: Wave 0 RED checks intentionally fail until the downstream API and Angular implementation plans complete the contract.
 
 ### Pending Todos
 
@@ -85,6 +88,6 @@ Progress: ░░░░░░░░░░ [██████████] 100%
 
 ## Session Continuity
 
-Last session: 2026-08-04T18:09:54.978Z
-Stopped at: Completed 07-final-trailer-video-upload-07-03-PLAN.md
+Last session: 2026-08-12T01:17:15.486Z
+Stopped at: Completed 08-youtube-job-lifecycle-08-00-PLAN.md
 Resume file: None
