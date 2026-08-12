@@ -5,16 +5,16 @@ milestone_name: Trailer Video YouTube Publishing
 current_phase: 8
 current_phase_name: YouTube Job Lifecycle
 status: executing
-stopped_at: Completed 08-03-PLAN.md
-last_updated: "2026-08-12T01:37:23.974Z"
+stopped_at: Completed 08-04-PLAN.md
+last_updated: "2026-08-12T01:45:19.628Z"
 last_activity: 2026-08-12
 last_activity_desc: completed Phase 8 Wave 0 RED acceptance scaffold
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 8
-  completed_plans: 7
-  percent: 20
+  completed_plans: 8
+  percent: 40
 ---
 
 # Project State
@@ -29,11 +29,11 @@ See: .planning/PROJECT.md
 ## Current Position
 
 Phase: 8 of 11 (YouTube Job Lifecycle)
-Plan: 3 of 05
+Plan: 4 of 05
 Status: Wave 0 RED scaffold complete — ready for Wave 1
 Last activity: 2026-08-12 — completed Phase 8 Wave 0 RED acceptance scaffold
 
-Progress: ░░░░░░░░░░ [█████████░] 88%
+Progress: ░░░░░░░░░░ [██████████] 100%
 
 ## Performance Metrics
 
@@ -54,6 +54,7 @@ Progress: ░░░░░░░░░░ [█████████░] 88%
 | Phase 08 P01 | 12 | 2 tasks | 5 files |
 | Phase 08-youtube-job-lifecycle P02 | 25 | 2 tasks | 2 files |
 | Phase 08 P03 | 8 | 2 tasks | 2 files |
+| Phase 08 P04 | 8 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -79,6 +80,8 @@ Progress: ░░░░░░░░░░ [█████████░] 88%
 - [Phase ?]: Phase 8 coverage explicitly opts browser OAuth/direct provider calls, Angular publish controls, automatic publication/deletion, richer metadata, hashtags, artifact downloads, and final workflow integration to their owning boundaries.
 - [Phase ?]: Expose typed YouTube lifecycle wrappers with metadata-bearing start, current/status lookup, same-job retry, and cancellation; keep retry/cancel bodies empty.
 - [Phase ?]: Allowlist browser DTO fields to lifecycle progress, cancellation, normalized errors, retry timing, timestamps, and sanitized privateWatchUrl; exclude provider/session/source/raw-error/publication fields.
+- [Phase ?]: Keep YouTube job state separate from local MP4 upload state and guard callbacks by episode, job, source generation, and source filename.
+- [Phase ?]: Expose private-ready and provider-video-retained reconciliation only; Angular has no publish control or raw provider fields.
 
 ### Pending Todos
 
@@ -97,6 +100,6 @@ Progress: ░░░░░░░░░░ [█████████░] 88%
 
 ## Session Continuity
 
-Last session: 2026-08-12T01:37:23.967Z
-Stopped at: Completed 08-03-PLAN.md
+Last session: 2026-08-12T01:45:19.621Z
+Stopped at: Completed 08-04-PLAN.md
 Resume file: None
