@@ -32,7 +32,7 @@ v1.2 extends the existing episode workflow from finalized local trailer video th
 
 ### 📋 v1.2 Trailer Video YouTube Publishing (Planned)
 
-**Milestone Goal:** Let operators safely upload a final trailer video, stage it privately on YouTube, review and publish it explicitly, and download the finalized local video from Episodes.
+**Milestone Goal:** Let operators safely upload a trailer video, start its private YouTube transfer immediately, populate the private link, and publish it with saved episode metadata while cleaning up replaced or deleted provider videos.
 
 - [ ] **Phase 7: Final Trailer Video Upload** - Select, upload, cancel, retry, and safely replace a final MP4 through the existing trailer-video API route.
 - [ ] **Phase 8: YouTube Job Lifecycle** - Persist and execute resumable server-side YouTube uploads through private readiness with safe retry and cancellation boundaries.
@@ -64,15 +64,15 @@ v1.2 extends the existing episode workflow from finalized local trailer video th
 
 ### Phase 8: YouTube Job Lifecycle
 
-**Goal**: The API can upload the current finalized trailer to YouTube through a durable, resumable, server-owned job that reaches private readiness safely.
+**Goal**: The API can upload a staged trailer from a hidden draft through a durable, resumable, server-owned job that reaches private readiness safely before Save.
 **Depends on**: Phase 7
 **Requirements**: YOUTUBE-01, YOUTUBE-02, YOUTUBE-03, YOUTUBE-04, YOUTUBE-05, OPS-01, OPS-02, OPS-03, OPS-04
 **Success Criteria** (what must be TRUE):
 
-  1. User can start one authenticated YouTube job for the current finalized trailer, and its state remains available after polling, reload, or API restart.
+  1. User can start one authenticated YouTube job after trailer staging, and its state remains available while the episode is still a hidden draft, after reload, or after API restart.
   2. User can distinguish YouTube transfer, YouTube processing, and private-ready states with progress that does not falsely imply publication.
   3. A recoverable retry resumes or reconciles an accepted provider upload without creating duplicate active jobs or duplicate provider videos.
-  4. A cancellation reports the accepted-work boundary honestly, including when a private provider video remains for reconciliation, and stale jobs cannot update a newer trailer.
+  4. Replacing or deleting a trailer requests cleanup of its private provider video, while cancellation reports the accepted-work boundary honestly and stale jobs cannot update a newer trailer.
   5. Provider credentials, OAuth details, and unstable provider errors are never exposed in browser-visible job data, while quota, OAuth, timeout, and provider failures become bounded recoverable states.
 
 **Plans**: 5/5 plans executed
@@ -85,7 +85,7 @@ v1.2 extends the existing episode workflow from finalized local trailer video th
 
 ### Phase 9: Title, Hashtags & Publishing
 
-**Goal**: Operators can prepare safe YouTube metadata, review the private result, and deliberately publish the ready video.
+**Goal**: Operators can review the private result, keep the link in the episode form, and have Save commit metadata and publish the ready video.
 **Depends on**: Phase 8
 **Requirements**: YOUTUBE-06, YOUTUBE-07, TITLE-01, TITLE-02, TITLE-03, TITLE-04
 **Success Criteria** (what must be TRUE):
@@ -93,7 +93,7 @@ v1.2 extends the existing episode workflow from finalized local trailer video th
   1. User receives an editable `Trailer - {episode name}` title suggestion containing selected hashtag values, with a shared 100-Unicode-character limit and clear forbidden-character validation that preserves edits.
   2. User can request a normalized hashtag lookup and see an explicitly approximate public-result count with retrieval time, or a recoverable unavailable/error state.
   3. Once YouTube processing is ready, the existing YouTube link field shows the returned private watch link and remains usable after publication.
-  4. User must confirm a separate Publish action before the API changes the video from non-public to public, and repeated publish requests are safely idempotent.
+  4. Saving the episode commits the summary, title, and hashtags before the API changes the private video to public; repeated Save/commit requests are safely idempotent.
 
 **Plans**: TBD
 **UI hint**: yes

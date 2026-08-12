@@ -263,6 +263,8 @@ export interface YoutubeTrailerJobSnapshot {
   updatedAt: string;
   completedAt: string | null;
   privateWatchUrl: string | null;
+  publicationStatus?: 'not_started' | 'pending' | 'metadata_accepted' | 'playlist_confirmed' | 'public_confirmed' | 'failed';
+  publicationErrorCategory?: string | null;
 }
 
 export interface DeleteEpisodeResponse {
@@ -425,10 +427,23 @@ export class ApiService {
     return this.http.get<EpisodeArtifactJobSnapshot>(`${environment.apiBaseUrl}/episodes/${episodeId}/artifacts/jobs/${jobId}`);
   }
 
-  startYoutubeTrailerJob(episodeId: number, title: string, summary: string): Observable<YoutubeTrailerJobSnapshot> {
+  startYoutubeTrailerJob(episodeId: number, title: string, summary: string, draftId?: string | null, hashtags: string[] = []): Observable<YoutubeTrailerJobSnapshot> {
     return this.http.post<YoutubeTrailerJobSnapshot>(
       `${environment.apiBaseUrl}/episodes/${episodeId}/youtube-trailer-jobs`,
-      { title, summary },
+        { title, summary, hashtags, ...(draftId ? { draftId } : {}) },
+    );
+  }
+
+  commitYoutubeTrailerJob(episodeId: number, jobId?: string): Observable<YoutubeTrailerJobSnapshot> {
+    return this.http.post<YoutubeTrailerJobSnapshot>(
+      `${environment.apiBaseUrl}/episodes/${episodeId}/youtube-trailer-jobs/commit`,
+      jobId ? { jobId } : {},
+    );
+  }
+
+  deleteYoutubeTrailerVideo(episodeId: number): Observable<{ episodeId: number; message: string }> {
+    return this.http.delete<{ episodeId: number; message: string }>(
+      `${environment.apiBaseUrl}/episodes/${episodeId}/trailer-video`,
     );
   }
 

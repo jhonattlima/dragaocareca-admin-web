@@ -6,7 +6,7 @@
 <domain>
 ## Phase Boundary
 
-Implement the durable, server-owned YouTube trailer job lifecycle for the current finalized local trailer: explicit start, persisted job state, polling/reload/restart recovery, private-first upload and processing readiness, safe retry, honest cancellation, duplicate protection, and bounded operator-facing failures. Browser-side YouTube OAuth, direct provider calls, public publishing, title/hashtag authoring, and artifact-download changes remain outside this phase.
+Implement the durable, server-owned YouTube trailer lifecycle from staged draft upload through Save-time publication: private transfer immediately after trailer staging, sanitized private-link feedback, persisted job state, polling/reload/restart recovery, safe retry, honest cancellation, Save-time metadata/publication, provider-video deletion on replacement/deletion, duplicate protection, and bounded operator-facing failures. Browser-side YouTube OAuth, direct provider calls, and raw provider details remain outside this phase.
 
 </domain>
 
@@ -14,7 +14,7 @@ Implement the durable, server-owned YouTube trailer job lifecycle for the curren
 ## Implementation Decisions
 
 ### Job trigger and operator status
-- **D-01:** Start the job through an explicit “Upload to YouTube” action associated with the finalized trailer in the existing episode workflow, accepting the current operator-supplied or derived title and summary as basic job input.
+- **D-01:** Start the private job automatically after a valid trailer upload reaches staged state, using the draft reservation and current title/summary; persisted episodes may still restore or retry the same job.
 - **D-02:** Expose clear lifecycle states: `queued`, `uploading`, `processing`, `private-ready`, `failed`, and `canceled`.
 - **D-03:** Show transfer percentage only for the upload stage. Processing must use honest indeterminate/progress messaging when YouTube does not provide a reliable percentage; never imply public publication.
 

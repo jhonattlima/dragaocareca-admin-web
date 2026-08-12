@@ -98,9 +98,9 @@
     </div>
   </div>
 
-  <div class="section-block youtube-lifecycle-section" *ngIf="editor.formModel.trailerVideoFileName">
+  <div class="section-block youtube-lifecycle-section" *ngIf="editor.formModel.trailerVideoFileName || editor.trailerVideoDraftId">
     <h2 class="manage-section-title">YouTube private transfer</h2>
-    <p class="section-hint">Send the finalized local trailer to YouTube as a private video. Publication is a separate workflow.</p>
+    <p class="section-hint">The trailer can upload privately as soon as staging completes. Saving the episode finalizes its metadata and publishes the video.</p>
     <div class="youtube-lifecycle-card" aria-live="polite">
       <div class="d-flex align-items-center justify-content-between gap-2">
         <strong>{{ controller.getYoutubeTrailerJobStatusLabel(controller.getYoutubeTrailerJob(editor)) || 'Ready to send privately' }}</strong>
@@ -143,6 +143,9 @@
       </p>
       <p class="small mt-2 mb-0" *ngIf="controller.getYoutubeTrailerJobPrivateWatchUrl(editor) as privateWatchUrl">
         Private video: <a [href]="privateWatchUrl" target="_blank" rel="noopener noreferrer">Open private watch URL</a>
+      </p>
+      <p class="small mt-2 mb-0" *ngIf="controller.getYoutubeTrailerJob(editor)?.publicationStatus === 'public_confirmed'">
+        YouTube publication confirmed.
       </p>
       <div class="d-flex gap-2 mt-3">
         <button

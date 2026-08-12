@@ -55,9 +55,9 @@
 **Episode Management Flow:**
 1. `ManageComponent` loads episodes from `GET /v1/episodes`.
 2. Local editor state stages add/edit forms, structured people/link entries, uploads, and pagination.
-3. For a new trailer video, `ManageComponent` requests an authenticated `POST /v1/episodes/drafts` reservation immediately before upload, then `ApiService` sends multipart field `file` plus `X-Episode-Draft-Id` to `POST /v1/episodes/:episodeId/trailer-video` with progress events.
+3. For a new trailer video, `ManageComponent` requests an authenticated `POST /v1/episodes/drafts` reservation immediately before upload, then `ApiService` sends multipart field `file` plus `X-Episode-Draft-Id` to `POST /v1/episodes/:episodeId/trailer-video` with progress events. The reservation creates a hidden draft episode row so durable YouTube jobs can safely reference the positive episode ID.
 4. The API validates the authenticated owner, reservation, MP4 MIME/extension/size, and server-derived staging path. It returns `state: "staged"` for a new episode; Angular keeps the selected `File` and prior finalized filename through cancel/failure/retry and only claims finalization after a successful Save/create response.
-5. Save/create sends the same `draftId` to `POST /v1/episodes`. The API consumes the reservation and promotes staged bytes atomically to `episodes/{episodeId}/trailer.mp4`, preserving/restoring the last-known-good final file on failure. Persisted replacements use the same rollback-safe promotion boundary and return `state: "finalized"`.
+5. After staging completes, the client starts a private YouTube job against the draft source. When YouTube returns a provider link, the API exposes only the sanitized watch URL and the form fills the YouTube field. Save/create sends the same `draftId` to `POST /v1/episodes`; the API consumes the reservation, converts the hidden draft row, and promotes staged bytes atomically to `episodes/{episodeId}/trailer.mp4`. Save then requests publication; the API waits for private readiness, updates metadata, and publishes.
 6. Other media upload/delete flows call their matching episode endpoints and patch local file-name state from the response. After draft transcription reaches `done`, the manage page polls `GET /v1/episodes/:episodeId/episodes-generated-summary` and fills the summary field when generated text is available.
 7. Delete episode uses `DELETE /v1/episodes/:episodeId` and refreshes the list.
 
@@ -102,7 +102,7 @@
 
 The transcript-to-summary flow remains backend-owned: the frontend only polls the two status endpoints and presents progress, errors, and generated text.
 
-Trailer-video responsibilities are split at the HTTP boundary: Angular orchestrates selection, progress, cancellation, retry, replacement-generation guards, and state labels; the API owns validation, authenticated ownership, staging, bounded draft cleanup, canonical naming, promotion, rollback, and persistence. Phase 7 does not include YouTube upload/processing/publishing, hashtags, title generation, or trailer artifact downloads; those remain later-phase surfaces.
+Trailer-video and YouTube responsibilities are split at the HTTP boundary: Angular orchestrates selection, progress, private-link presentation, cancellation, retry, replacement-generation guards, Save-time commit requests, and state labels; the API owns validation, authenticated ownership, draft persistence, private provider upload, metadata/publication, provider-video deletion, cleanup reconciliation, canonical naming, promotion, rollback, and persistence. Provider IDs, sessions, credentials, and raw errors remain server-only.
 
 ## Error Handling
 

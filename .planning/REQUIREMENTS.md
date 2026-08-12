@@ -16,13 +16,13 @@
 
 ### YouTube Workflow
 
-- [x] **YOUTUBE-01**: The user can start a server-owned YouTube trailer job for the current finalized trailer using the selected title and summary.
-- [x] **YOUTUBE-02**: The API uploads the trailer to YouTube as non-public and returns a watch link/video identifier without exposing provider credentials to the browser.
+- [x] **YOUTUBE-01**: After trailer staging, the user can start a server-owned private YouTube trailer job from the authenticated draft using the selected title, summary, and hashtags.
+- [x] **YOUTUBE-02**: The API uploads the staged trailer to YouTube as non-public and returns a sanitized watch link without exposing provider credentials or IDs to the browser.
 - [x] **YOUTUBE-03**: The user can see separate progress/state feedback for YouTube transfer, YouTube processing, and readiness to publish.
 - [x] **YOUTUBE-04**: The user can retry recoverable YouTube failures without creating duplicate active jobs or duplicate provider videos when an existing upload can be reconciled.
 - [x] **YOUTUBE-05**: The user can cancel a pending or active YouTube job with honest messaging about work already accepted by YouTube and any resulting private video requiring reconciliation.
-- [ ] **YOUTUBE-06**: After a non-public YouTube video is ready, the user can explicitly publish it publicly with a separate confirmation action.
-- [ ] **YOUTUBE-07**: The existing YouTube link field is populated with the returned non-public link and remains available after public publishing.
+- [x] **YOUTUBE-06**: Saving the episode commits the saved summary/title/hashtags to the private YouTube video and publishes it after private readiness is confirmed.
+- [x] **YOUTUBE-07**: The existing YouTube link field is populated with the returned non-public link and remains available after public publishing.
 
 ### Title and Hashtag Support
 
@@ -80,8 +80,8 @@ Traceability will be filled when the v1.2 roadmap is approved.
 | YOUTUBE-03 | Phase 8 | Complete |
 | YOUTUBE-04 | Phase 8 | Complete |
 | YOUTUBE-05 | Phase 8 | Complete |
-| YOUTUBE-06 | Phase 9 | Pending |
-| YOUTUBE-07 | Phase 9 | Pending |
+| YOUTUBE-06 | Phase 8 | Complete |
+| YOUTUBE-07 | Phase 8 | Complete |
 | TITLE-01 | Phase 9 | Pending |
 | TITLE-02 | Phase 9 | Pending |
 | TITLE-03 | Phase 9 | Pending |

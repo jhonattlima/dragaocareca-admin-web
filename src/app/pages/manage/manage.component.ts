@@ -668,12 +668,17 @@ export class ManageComponent implements OnInit, OnDestroy {
     return this.getYoutubeTrailerJobState(editor).snapshot;
   }
 
+  private getYoutubeSourceIdentity(editor: EpisodeEditorState): string {
+    return editor.formModel.trailerVideoFileName?.trim()
+      || (editor.trailerVideoDraftId ? `draft:${editor.trailerVideoDraftId}` : '');
+  }
+
   canStartYoutubeTrailerJob(editor: EpisodeEditorState): boolean {
     const state = this.getYoutubeTrailerJobState(editor);
     const snapshot = state.snapshot;
     return Number.isInteger(editor.formModel.episodeId)
       && (editor.formModel.episodeId ?? 0) > 0
-      && Boolean(editor.formModel.trailerVideoFileName?.trim())
+      && Boolean(this.getYoutubeSourceIdentity(editor))
       && Boolean(editor.formModel.title?.trim())
       && Boolean(editor.formModel.summary?.trim())
       && state.startInFlight === null
@@ -771,7 +776,7 @@ export class ManageComponent implements OnInit, OnDestroy {
     }
     const state = this.getYoutubeTrailerJobState(editor);
     const episodeId = editor.formModel.episodeId;
-    const sourceFileName = editor.formModel.trailerVideoFileName?.trim() ?? '';
+    const sourceFileName = this.getYoutubeSourceIdentity(editor);
     if (!episodeId || !sourceFileName) {
       return;
     }
@@ -779,7 +784,8 @@ export class ManageComponent implements OnInit, OnDestroy {
     const startToken = Symbol(`youtube-job-start-${episodeId}`);
     state.startInFlight = startToken;
     state.error = '';
-    this.apiService.startYoutubeTrailerJob(episodeId, editor.formModel.title.trim(), editor.formModel.summary.trim()).subscribe({
+    const hashtags = (editor.formModel.tags ?? []).slice(0, 3).map((tag) => tag.startsWith('#') ? tag : `#${tag.replace(/\s+/g, '')}`);
+    this.apiService.startYoutubeTrailerJob(episodeId, editor.formModel.title.trim(), editor.formModel.summary.trim(), editor.trailerVideoDraftId, hashtags).subscribe({
       next: (snapshot) => {
         if (state.startInFlight !== startToken || !this.isCurrentYoutubeSource(editor, state, episodeId, sourceGeneration, sourceFileName)) {
           return;
@@ -800,7 +806,7 @@ export class ManageComponent implements OnInit, OnDestroy {
 
   restoreCurrentYoutubeTrailerJob(editor: EpisodeEditorState): void {
     const episodeId = editor.formModel.episodeId;
-    const sourceFileName = editor.formModel.trailerVideoFileName?.trim() ?? '';
+    const sourceFileName = this.getYoutubeSourceIdentity(editor);
     if (!episodeId || !sourceFileName || !this.apiService.getCurrentYoutubeTrailerJob) {
       return;
     }
@@ -920,6 +926,9 @@ export class ManageComponent implements OnInit, OnDestroy {
     state.jobId = snapshot.jobId;
     state.sourceFileName = sourceFileName;
     state.error = '';
+    if (snapshot.privateWatchUrl) {
+      editor.formModel.youtube = snapshot.privateWatchUrl;
+    }
     if (['ready', 'failed', 'cancelled', 'obsolete'].includes(snapshot.status)) {
       this.stopYoutubeTrailerJobPolling(editor);
     }
@@ -972,7 +981,7 @@ export class ManageComponent implements OnInit, OnDestroy {
       && editor.formModel.episodeId === episodeId
       && state.sourceGeneration === sourceGeneration
       && state.sourceFileName === sourceFileName
-      && editor.formModel.trailerVideoFileName?.trim() === sourceFileName;
+      && this.getYoutubeSourceIdentity(editor) === sourceFileName;
   }
 
   private getYoutubeTrailerJobError(error: any, fallback: string): string {
@@ -1027,6 +1036,17 @@ export class ManageComponent implements OnInit, OnDestroy {
             videoState.priorFinalFileName = episode.trailerVideoFileName;
           }
           videoState.error = '';
+        }
+        const currentYoutubeJob = this.getYoutubeTrailerJob(editor);
+        if (episode.episodeId && currentYoutubeJob) {
+          this.apiService.commitYoutubeTrailerJob(episode.episodeId, currentYoutubeJob.jobId).subscribe({
+            next: (snapshot) => {
+              if (snapshot.privateWatchUrl) editor.formModel.youtube = snapshot.privateWatchUrl;
+            },
+            error: (error) => {
+              this.errorMessage = error?.error?.message ?? 'Episode saved, but YouTube publication could not be queued.';
+            },
+          });
         }
         this.successMessage = editor.editingEpisodeId ? 'Episode updated.' : 'Episode saved.';
         if (editor === this.addEditorState) {
@@ -2384,6 +2404,9 @@ export class ManageComponent implements OnInit, OnDestroy {
         if (response.state === 'staged') {
           state.status = 'staged';
           state.progress = 100;
+          // The draft has a server-issued episode identity, so the private
+          // YouTube transfer can begin before Save promotes local media.
+          this.startYoutubeTrailerJob(editor);
         } else {
           state.status = 'finalized';
           state.progress = 100;
@@ -2545,6 +2568,32 @@ export class ManageComponent implements OnInit, OnDestroy {
 
     this.errorMessage = '';
     this.successMessage = '';
+
+    if (kind === 'trailerVideo') {
+      this.clearYoutubeTrailerJobPolling(editor);
+      this.cancelTrailerVideoWork(editor, 'canceled');
+      // Draft reservations create a hidden server-side episode identity, so
+      // cleanup must go through the API even before the episode is saved.
+      if (!editor.editingEpisodeId && !editor.trailerVideoDraftId) {
+        editor.formModel.trailerVideoFileName = '';
+        this.setTrailerVideoState(editor, { file: null, status: 'selected', priorFinalFileName: '' });
+        this.successMessage = 'Trailer video removed from the draft.';
+        return;
+      }
+      this.apiService.deleteYoutubeTrailerVideo(episodeId).subscribe({
+        next: () => {
+          editor.formModel.trailerVideoFileName = '';
+          editor.trailerVideoDraftId = null;
+          this.setTrailerVideoState(editor, { file: null, status: 'selected', priorFinalFileName: '' });
+          this.successMessage = 'Trailer video and associated YouTube videos removed.';
+        },
+        error: (error) => {
+          this.errorMessage = error?.error?.message ?? 'Could not remove the trailer video and YouTube video.';
+        },
+      });
+      return;
+    }
+
     this.uploadStates[kind] = { ...this.uploadStates[kind], deleting: true };
 
     this.getDeleteRequest(kind, episodeId)
