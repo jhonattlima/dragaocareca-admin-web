@@ -1,7 +1,7 @@
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { environment } from '../../environments/environment';
-import { HttpEventType, HttpResponse } from '@angular/common/http';
+import { HttpEventType, HttpHeaders, HttpResponse } from '@angular/common/http';
 import {
   ApiService,
   EpisodeArtifactJobSnapshot,
@@ -223,12 +223,32 @@ describe('ApiService YouTube trailer lifecycle', () => {
     expect(responses.map(value => value.status)).toEqual(['queued', 'ready']);
   });
 
+  it('keeps the API no-store response compatible with the typed boundary', () => {
+    let response: YoutubeTrailerJobSnapshot | undefined;
+    apiService.startYoutubeTrailerJob(42, 'Title', 'Summary').subscribe(value => response = value);
+
+    const request = httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/42/youtube-trailer-jobs`);
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({ title: 'Title', summary: 'Summary' });
+    request.flush(youtubeSnapshot(), {
+      status: 202,
+      statusText: 'Accepted',
+      headers: new HttpHeaders({ 'Cache-Control': 'no-store' }),
+    });
+
+    expect(response?.jobId).toBe('job-42');
+  });
+
   it('supports current lookup, status, same-job retry, and cancellation with empty control bodies', () => {
     const snapshot = youtubeSnapshot();
     apiService.getCurrentYoutubeTrailerJob(42).subscribe();
-    httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/42/youtube-trailer-jobs/current`).flush(snapshot);
+    const current = httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/42/youtube-trailer-jobs/current`);
+    expect(current.request.method).toBe('GET');
+    current.flush(snapshot);
     apiService.getYoutubeTrailerJobStatus(42, 'job-42').subscribe();
-    httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/42/youtube-trailer-jobs/job-42`).flush(snapshot);
+    const status = httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/42/youtube-trailer-jobs/job-42`);
+    expect(status.request.method).toBe('GET');
+    status.flush(snapshot);
     apiService.retryYoutubeTrailerJob(42, 'job-42').subscribe();
     const retry = httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/42/youtube-trailer-jobs/job-42/retry`);
     expect(retry.request.body).toEqual({});
