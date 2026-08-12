@@ -6,13 +6,13 @@
 
   <ng-container *ngIf="addTabActive">
     <div class="section-block manage-form-block">
-      <app-episode-form [controller]="self" [editor]="addEditorState" [compact]="false"></app-episode-form>
+      <app-episode-form class="manage-youtube-lifecycle-shell" [controller]="self" [editor]="addEditorState" [compact]="false"></app-episode-form>
     </div>
   </ng-container>
 
   <ng-container *ngIf="episodesTabActive">
     <div class="section-block manage-form-block" *ngIf="episodesEditorState.editingEpisodeId !== null">
-      <app-episode-form [controller]="self" [editor]="episodesEditorState" [compact]="false"></app-episode-form>
+      <app-episode-form class="manage-youtube-lifecycle-shell" [controller]="self" [editor]="episodesEditorState" [compact]="false"></app-episode-form>
     </div>
 
     <div class="section-block">
