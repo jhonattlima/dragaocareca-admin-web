@@ -804,7 +804,7 @@ export class ManageComponent implements OnInit, OnDestroy {
     state.startInFlight = startToken;
     state.error = '';
     const hashtags = this.serializeHashtags(editor.formModel.hashtags);
-    const title = this.getTrailerTitle(editor);
+    const title = this.getTrailerTitlePrefix(editor);
     this.apiService.startYoutubeTrailerJob(episodeId, title, editor.formModel.summary.trim(), editor.trailerVideoDraftId, hashtags).subscribe({
       next: (snapshot) => {
         if (state.startInFlight !== startToken || !this.isCurrentYoutubeSource(editor, state, episodeId, sourceGeneration, sourceFileName)) {
@@ -1075,7 +1075,7 @@ export class ManageComponent implements OnInit, OnDestroy {
           this.apiService.commitYoutubeTrailerJob(
             episode.episodeId,
             currentYoutubeJob.jobId,
-            this.getTrailerTitle(editor),
+            this.getTrailerTitlePrefix(editor),
             this.serializeHashtags(editor.formModel.hashtags),
           ).subscribe({
             next: (snapshot) => {
@@ -1431,9 +1431,13 @@ export class ManageComponent implements OnInit, OnDestroy {
   }
 
   getTrailerTitle(editor: EpisodeEditorState): string {
-    const prefix = `Trailer - ${(editor.formModel.title ?? '').trim()}`;
+    const prefix = this.getTrailerTitlePrefix(editor);
     const hashtags = this.serializeHashtags(editor.formModel.hashtags);
     return hashtags.length > 0 ? `${prefix} ${hashtags.join(' ')}` : prefix;
+  }
+
+  getTrailerTitlePrefix(editor: EpisodeEditorState): string {
+    return `Trailer - ${(editor.formModel.title ?? '').trim()}`;
   }
 
   getTrailerTitleCodePointLength(editor: EpisodeEditorState): number {
@@ -1460,6 +1464,10 @@ export class ManageComponent implements OnInit, OnDestroy {
 
   onHashtagHover(editor: EpisodeEditorState, tag: string): void {
     this.scheduleHashtagLookup(editor, tag);
+  }
+
+  onHashtagOutsideClick(editor: EpisodeEditorState): void {
+    this.dismissHashtagLookup(editor);
   }
 
   onHashtagBlur(editor: EpisodeEditorState): void {
@@ -1491,7 +1499,7 @@ export class ManageComponent implements OnInit, OnDestroy {
 
   private scheduleHashtagLookup(editor: EpisodeEditorState, rawTag: string): void {
     const state = this.getHashtagLookupState(editor);
-    const tag = rawTag.trim();
+    const tag = this.serializeHashtags(rawTag)[0] ?? '';
     state.dismissed = false;
     state.response = null;
     state.token += 1;
@@ -2285,8 +2293,32 @@ export class ManageComponent implements OnInit, OnDestroy {
     if (!snapshot || snapshot.status !== 'done') {
       return;
     }
-    const generated = snapshot.suggestions.map((suggestion) => suggestion.displayTag);
-    const merged = this.serializeHashtags(`${editor.formModel.hashtags} ${generated.join(' ')}`);
+    const seen = new Set<string>();
+    const merged: string[] = [];
+    for (const token of String(editor.formModel.hashtags ?? '').trim().split(/\s+/u).filter(Boolean)) {
+      const canonical = this.serializeHashtags(token)[0];
+      if (!canonical || seen.has(canonical)) {
+        continue;
+      }
+      seen.add(canonical);
+      merged.push(token);
+      if (merged.length === 3) {
+        break;
+      }
+    }
+    if (merged.length < 3) {
+      for (const suggestion of snapshot.suggestions) {
+        const canonical = this.serializeHashtags(suggestion.displayTag)[0];
+        if (!canonical || seen.has(canonical)) {
+          continue;
+        }
+        seen.add(canonical);
+        merged.push(canonical);
+        if (merged.length === 3) {
+          break;
+        }
+      }
+    }
     editor.formModel.hashtags = merged.join(' ');
   }
 

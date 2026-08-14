@@ -73,11 +73,11 @@ describe('ApiService title and hashtag authoring contract', () => {
   });
 
   it('commits the computed title and authored hashtags in the required publication body', () => {
-    apiService.commitYoutubeTrailerJob(42, 'job-42', 'Trailer - Episode #rpg', ['#rpg']).subscribe();
+    apiService.commitYoutubeTrailerJob(42, 'job-42', 'Trailer - Episode', ['#rpg']).subscribe();
 
     const request = httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/42/youtube-trailer-jobs/commit`);
     expect(request.request.method).toBe('POST');
-    expect(request.request.body).toEqual({ jobId: 'job-42', title: 'Trailer - Episode #rpg', hashtags: ['#rpg'] });
+    expect(request.request.body).toEqual({ jobId: 'job-42', title: 'Trailer - Episode', hashtags: ['#rpg'] });
     request.flush(youtubeSnapshot());
   });
 });

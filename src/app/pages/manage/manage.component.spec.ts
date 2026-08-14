@@ -570,12 +570,13 @@ describe('ManageComponent YouTube lifecycle RED scaffold', () => {
     editor.formModel.trailerVideoFileName = 'episodes/42/trailer.mp4';
     editor.formModel.title = 'Title';
     editor.formModel.summary = 'Summary';
+    editor.formModel.hashtags = '#rpg';
     apiService.startYoutubeTrailerJob.and.returnValue(of(snapshot()));
     apiService.getYoutubeTrailerJobStatus.and.returnValue(of(snapshot({ status: 'transferring', progress: { confirmedBytes: 25, totalBytes: 100, processingPartsProcessed: null, processingPartsTotal: null, processingTimeLeftMs: null } })));
 
     component.startYoutubeTrailerJob(editor);
 
-    expect(apiService.startYoutubeTrailerJob).toHaveBeenCalledOnceWith(42, 'Title', 'Summary');
+    expect(apiService.startYoutubeTrailerJob).toHaveBeenCalledOnceWith(42, 'Trailer - Title', 'Summary', null, ['#rpg']);
     expect(component.getYoutubeTrailerJobProgress(editor)).toBe(25);
   });
 
