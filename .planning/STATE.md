@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Trailer Video YouTube Publishing
-current_phase: 9
-current_phase_name: Title, Hashtags & Publishing
-status: planning
-stopped_at: Phase 9 plans created and verified
-last_updated: "2026-08-14T13:28:20.950Z"
+current_phase: 09
+current_phase_name: title-hashtag-authoring
+status: executing
+stopped_at: Completed 09-01-PLAN.md
+last_updated: "2026-08-14T13:37:42.878Z"
 last_activity: 2026-08-14
-last_activity_desc: Phase 08.1 complete, transitioned to Phase 9
+last_activity_desc: Phase 09 execution started
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 17
-  completed_plans: 14
+  completed_plans: 15
   percent: 50
 ---
 
@@ -24,16 +24,16 @@ progress:
 See: .planning/PROJECT.md
 
 **Core value:** Keep the admin workflow reliable, legible, and backend-driven so operators can manage episodes and inspect system state without fighting the UI.
-**Current focus:** Phase 08.1 — Episode Form Stability Patch
+**Current focus:** Phase 09 — title-hashtag-authoring
 
 ## Current Position
 
-Phase: 9 — Title, Hashtags & Publishing
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-08-14 — Phase 08.1 complete, transitioned to Phase 9
+Phase: 09 (title-hashtag-authoring) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-08-14 — Phase 09 execution started
 
-Progress: ░░░░░░░░░░ [██████████] 100%
+Progress: ░░░░░░░░░░ [█████████░] 88%
 
 ## Performance Metrics
 
@@ -55,6 +55,7 @@ Progress: ░░░░░░░░░░ [██████████] 100%
 | Phase 08-youtube-job-lifecycle P02 | 25 | 2 tasks | 2 files |
 | Phase 08 P03 | 8 | 2 tasks | 2 files |
 | Phase 08 P04 | 8 | 2 tasks | 4 files |
+| Phase 09 P01 | 18 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -87,6 +88,9 @@ Progress: ░░░░░░░░░░ [██████████] 100%
 - [Phase 8.1]: Configure default participants in frontend environment/configuration and select only configured names present in the participant catalog.
 - [Phase 8.1]: Require at least one music credit with both name and reference link before Save.
 - [Phase 8.1]: Present Duration, Bytes, and Spotify ID as read-only through light-gray styling without hints.
+- [Phase ?]: Save/commit title and hashtags are authoritative and persist through existing YouTube metadata_snapshot_json/requestPublication.
+- [Phase ?]: Shared assembled-title validation counts Unicode code points and runs at start, commit, and publication boundaries.
+- [Phase ?]: Successful and zero-result normalized hashtag lookup caches default to one hour.
 
 ### Pending Todos
 
@@ -109,6 +113,6 @@ Progress: ░░░░░░░░░░ [██████████] 100%
 
 ## Session Continuity
 
-Last session: 2026-08-14T13:28:20.942Z
-Stopped at: Phase 9 plans created and verified
-Resume file: .planning/phases/09-title-hashtag-authoring/09-01-PLAN.md
+Last session: 2026-08-14T13:37:42.871Z
+Stopped at: Completed 09-01-PLAN.md
+Resume file: None

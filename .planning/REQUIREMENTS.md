@@ -26,10 +26,10 @@
 
 ### Title and Hashtag Support
 
-- [ ] **TITLE-01**: The UI shows a read-only trailer title preview using `Trailer - {episode name}` and the selected hashtag values, updating automatically as the episode name or hashtags change.
-- [ ] **TITLE-02**: The API and UI enforce a maximum of 100 Unicode characters for the assembled trailer title and explain invalid titles without silently overwriting the authored episode name or hashtags.
-- [ ] **TITLE-03**: The user can enter a hashtag and request a count of matching public YouTube search results, with the result labeled approximate and showing its retrieval time.
-- [ ] **TITLE-04**: Hashtag lookup is normalized, debounced or explicitly triggered, cached/rate-limited by the API, and exposes a recoverable unavailable/error state.
+- [x] **TITLE-01**: The UI shows a read-only trailer title preview using `Trailer - {episode name}` and the selected hashtag values, updating automatically as the episode name or hashtags change.
+- [x] **TITLE-02**: The API and UI enforce a maximum of 100 Unicode characters for the assembled trailer title and explain invalid titles without silently overwriting the authored episode name or hashtags.
+- [x] **TITLE-03**: The user can enter a hashtag and request a count of matching public YouTube search results, with the result labeled approximate and showing its retrieval time.
+- [x] **TITLE-04**: Hashtag lookup is normalized, debounced or explicitly triggered, cached/rate-limited by the API, and exposes a recoverable unavailable/error state.
 
 ### Artifact Integration
 
@@ -90,10 +90,10 @@ Traceability records the approved v1.2 requirements and the implemented Phase 8.
 | YOUTUBE-05 | Phase 8 | Complete |
 | YOUTUBE-06 | Phase 8 | Complete |
 | YOUTUBE-07 | Phase 8 | Complete |
-| TITLE-01 | Phase 9 | Pending |
-| TITLE-02 | Phase 9 | Pending |
-| TITLE-03 | Phase 9 | Pending |
-| TITLE-04 | Phase 9 | Pending |
+| TITLE-01 | Phase 9 | Complete |
+| TITLE-02 | Phase 9 | Complete |
+| TITLE-03 | Phase 9 | Complete |
+| TITLE-04 | Phase 9 | Complete |
 | ARTIFACT-01 | Phase 11 | Pending |
 | ARTIFACT-02 | Phase 11 | Pending |
 | OPS-01 | Phase 8 | Complete |
