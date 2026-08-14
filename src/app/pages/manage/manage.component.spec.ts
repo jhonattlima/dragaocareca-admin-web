@@ -739,6 +739,33 @@ describe('EpisodeFormComponent trailer video card', () => {
     expect(fixture.nativeElement.textContent).toContain('Uploading trailer video');
     expect(fixture.nativeElement.textContent).toContain('old.mp4');
   });
+
+  it('renders Duration and Bytes as scoped native readonly metadata fields', () => {
+    const fields = Array.from(fixture.nativeElement.querySelectorAll('input')) as HTMLInputElement[];
+    const duration = fields.find((field) => field.previousElementSibling?.textContent?.trim() === 'Duration');
+    const bytes = fields.find((field) => field.previousElementSibling?.textContent?.trim() === 'Bytes');
+    const spotifyId = fields.find((field) => field.previousElementSibling?.textContent?.trim() === 'Spotify ID');
+
+    expect(duration).not.toBeUndefined();
+    expect(bytes).not.toBeUndefined();
+    expect(duration?.readOnly).toBeTrue();
+    expect(bytes?.readOnly).toBeTrue();
+    expect(duration?.classList.contains('readonly-metadata-field')).toBeTrue();
+    expect(bytes?.classList.contains('readonly-metadata-field')).toBeTrue();
+    expect(fixture.nativeElement.querySelector('.form-group:has(input[readonly])')?.textContent).not.toContain('hint');
+    expect(spotifyId?.classList.contains('readonly-metadata-field')).toBeFalse();
+
+    const styles = Array.from(document.head.querySelectorAll('style'))
+      .map((style) => style.textContent || '')
+      .join('\n');
+    expect(styles).toContain('.readonly-metadata-field');
+    expect(styles).toContain('background-color:#dee2e6');
+    expect(styles).toContain('border-color:#adb5bd');
+    expect(styles).toContain('color:#495057');
+    expect(styles).toContain('cursor:default');
+    expect(styles).toContain(':focus');
+    expect(styles).toContain('box-shadow:none');
+  });
 });
 
 describe('Phase 8.1 RED form contracts FORM-01 through FORM-05', () => {
