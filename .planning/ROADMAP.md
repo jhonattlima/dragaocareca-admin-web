@@ -88,7 +88,7 @@ v1.2 extends the existing episode workflow from finalized local trailer video th
 **Goal:** Make Add Episode defaults, episode-audio metadata, participant/music validation, and read-only field presentation reliable without changing trailer-audio behavior.
 **Requirements**: FORM-01, FORM-02, FORM-03, FORM-04, FORM-05
 **Depends on:** Phase 8
-**Plans:** 4/4 plans executed
+**Plans:** 6/6 plans complete
 
 Plans:
 
