@@ -11,6 +11,8 @@ import {
   EpisodeTrailerVideoUploadResponse,
   YoutubeTrailerJobSnapshot,
   StructuredEntryCatalogResponse,
+  HashtagLookupResponse,
+  SuggestedTagsSnapshot,
 } from '../../core/api.service';
 import { environment } from '../../../environments/environment';
 
@@ -74,6 +76,14 @@ interface YoutubeTrailerJobState {
   error: string;
 }
 
+interface HashtagLookupState {
+  timer: number | null;
+  subscription: Subscription | null;
+  token: number;
+  response: HashtagLookupResponse | null;
+  dismissed: boolean;
+}
+
 interface UploadDefinition {
   kind: UploadKind;
   label: string;
@@ -116,6 +126,8 @@ interface EpisodeFormState extends Omit<EpisodeWriteInput, 'guests' | 'musicCred
   summaryError?: string | null;
   summaryProgress?: number | null;
   summaryManuallyEdited?: boolean;
+  hashtags: string;
+  suggestedTags?: SuggestedTagsSnapshot;
 }
 
 export interface EpisodeEditorState {
@@ -201,6 +213,8 @@ export class ManageComponent implements OnInit, OnDestroy {
   private readonly trailerVideoStates = new WeakMap<EpisodeEditorState, TrailerVideoState>();
   private readonly trailerVideoReservations = new WeakMap<EpisodeEditorState, Subscription>();
   private readonly youtubeTrailerJobStates = new WeakMap<EpisodeEditorState, YoutubeTrailerJobState>();
+  private readonly hashtagLookupStates = new WeakMap<EpisodeEditorState, HashtagLookupState>();
+  private readonly generationVersions = new WeakMap<EpisodeEditorState, number>();
   readonly youtubeTrailerJobSourceGeneration = new WeakMap<EpisodeEditorState, number>();
   readonly artifactDefinitions: ArtifactDefinition[] = [
     { selector: 'episode', label: 'Episode audio', formatHint: '.mp3', fileField: 'fileName' },
@@ -363,6 +377,8 @@ export class ManageComponent implements OnInit, OnDestroy {
     this.clearArtifactJobPolling();
     this.clearYoutubeTrailerJobPolling(this.addEditorState);
     this.clearYoutubeTrailerJobPolling(this.episodesEditorState);
+    this.clearHashtagLookup(this.addEditorState);
+    this.clearHashtagLookup(this.episodesEditorState);
     this.cancelTrailerVideoWork(this.addEditorState, 'canceled');
     this.cancelTrailerVideoWork(this.episodesEditorState, 'canceled');
     this.artifactObjectUrls.forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
@@ -619,10 +635,12 @@ export class ManageComponent implements OnInit, OnDestroy {
     this.activeTab = 'episodes';
     const editor = this.episodesEditorState;
     this.clearYoutubeTrailerJobPolling(editor);
+    this.clearHashtagLookup(editor);
     editor.editingEpisodeId = episode.episodeId;
     editor.formModel = {
       episodeId: episode.episodeId,
       title: episode.title,
+      hashtags: '',
       summary: episode.summary,
       pubDate: this.toDateTimeLocalValue(episode.pubDate),
       duration: episode.duration,
@@ -681,6 +699,7 @@ export class ManageComponent implements OnInit, OnDestroy {
     return Number.isInteger(editor.formModel.episodeId)
       && (editor.formModel.episodeId ?? 0) > 0
       && Boolean(this.getYoutubeSourceIdentity(editor))
+      && !this.getTrailerTitleValidationError(editor)
       && state.startInFlight === null
       && !(snapshot && !['failed', 'cancelled', 'obsolete'].includes(snapshot.status));
   }
@@ -784,8 +803,8 @@ export class ManageComponent implements OnInit, OnDestroy {
     const startToken = Symbol(`youtube-job-start-${episodeId}`);
     state.startInFlight = startToken;
     state.error = '';
-    const hashtags = (editor.formModel.tags ?? []).slice(0, 3).map((tag) => tag.startsWith('#') ? tag : `#${tag.replace(/\s+/g, '')}`);
-    const title = editor.formModel.title.trim() || `Trailer - Episode ${episodeId}`;
+    const hashtags = this.serializeHashtags(editor.formModel.hashtags);
+    const title = this.getTrailerTitle(editor);
     this.apiService.startYoutubeTrailerJob(episodeId, title, editor.formModel.summary.trim(), editor.trailerVideoDraftId, hashtags).subscribe({
       next: (snapshot) => {
         if (state.startInFlight !== startToken || !this.isCurrentYoutubeSource(editor, state, episodeId, sourceGeneration, sourceFileName)) {
@@ -999,6 +1018,7 @@ export class ManageComponent implements OnInit, OnDestroy {
   resetForm(): void {
     const editor = this.currentEditorState;
       this.clearYoutubeTrailerJobPolling(editor);
+      this.clearHashtagLookup(editor);
       editor.editingEpisodeId = null;
       editor.formModel = this.buildEmptyFormModel();
       editor.selectedMembers = [];
@@ -1011,6 +1031,12 @@ export class ManageComponent implements OnInit, OnDestroy {
 
     if (!editor.formModel.episodeId || !editor.formModel.title || !editor.formModel.pubDate) {
       this.errorMessage = 'Episode ID, title and pubDate are required.';
+      return;
+    }
+
+    const titleValidationError = this.getTrailerTitleValidationError(editor);
+    if (titleValidationError) {
+      this.errorMessage = titleValidationError;
       return;
     }
 
@@ -1046,7 +1072,12 @@ export class ManageComponent implements OnInit, OnDestroy {
         }
         const currentYoutubeJob = this.getYoutubeTrailerJob(editor);
         if (episode.episodeId && currentYoutubeJob) {
-          this.apiService.commitYoutubeTrailerJob(episode.episodeId, currentYoutubeJob.jobId).subscribe({
+          this.apiService.commitYoutubeTrailerJob(
+            episode.episodeId,
+            currentYoutubeJob.jobId,
+            this.getTrailerTitle(editor),
+            this.serializeHashtags(editor.formModel.hashtags),
+          ).subscribe({
             next: (snapshot) => {
               if (snapshot.privateWatchUrl) editor.formModel.youtube = snapshot.privateWatchUrl;
             },
@@ -1366,6 +1397,7 @@ export class ManageComponent implements OnInit, OnDestroy {
   isEpisodeSaveDisabled(editor: EpisodeEditorState): boolean {
     return editor.formModel.transcriptStatus === 'pending'
       || editor.formModel.transcriptStatus === 'processing'
+      || Boolean(this.getTrailerTitleValidationError(editor))
       || !this.hasCompleteMusicCredit(editor);
   }
 
@@ -1375,6 +1407,144 @@ export class ManageComponent implements OnInit, OnDestroy {
 
   hasCompleteMusicCredit(editor: EpisodeEditorState): boolean {
     return editor.formModel.musicCredits.some((entry) => this.isCompleteMusicCredit(entry));
+  }
+
+  serializeHashtags(value: string | null | undefined): string[] {
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const rawToken of String(value ?? '').trim().split(/\s+/u)) {
+      const body = rawToken.replace(/^#+/u, '').trim();
+      if (!body) {
+        continue;
+      }
+      const canonical = `#${body.toLocaleLowerCase()}`;
+      const identity = canonical.normalize('NFC');
+      if (!seen.has(identity)) {
+        seen.add(identity);
+        result.push(canonical);
+      }
+      if (result.length === 3) {
+        break;
+      }
+    }
+    return result;
+  }
+
+  getTrailerTitle(editor: EpisodeEditorState): string {
+    const prefix = `Trailer - ${(editor.formModel.title ?? '').trim()}`;
+    const hashtags = this.serializeHashtags(editor.formModel.hashtags);
+    return hashtags.length > 0 ? `${prefix} ${hashtags.join(' ')}` : prefix;
+  }
+
+  getTrailerTitleCodePointLength(editor: EpisodeEditorState): number {
+    return [...this.getTrailerTitle(editor)].length;
+  }
+
+  getTrailerTitleValidationError(editor: EpisodeEditorState): string {
+    return this.getTrailerTitleCodePointLength(editor) > 100
+      ? 'Trailer title must be at most 100 Unicode characters.'
+      : '';
+  }
+
+  onHashtagInput(editor: EpisodeEditorState): void {
+    this.scheduleHashtagLookup(editor, this.getCurrentHashtagToken(editor));
+  }
+
+  onHashtagChange(editor: EpisodeEditorState): void {
+    this.onHashtagInput(editor);
+  }
+
+  onHashtagFocus(editor: EpisodeEditorState, tag?: string): void {
+    this.scheduleHashtagLookup(editor, tag ?? this.getCurrentHashtagToken(editor));
+  }
+
+  onHashtagHover(editor: EpisodeEditorState, tag: string): void {
+    this.scheduleHashtagLookup(editor, tag);
+  }
+
+  onHashtagBlur(editor: EpisodeEditorState): void {
+    this.dismissHashtagLookup(editor);
+  }
+
+  dismissHashtagLookup(editor: EpisodeEditorState): void {
+    const state = this.getHashtagLookupState(editor);
+    state.dismissed = true;
+    state.token += 1;
+    if (state.timer !== null) {
+      clearTimeout(state.timer);
+      state.timer = null;
+    }
+    state.subscription?.unsubscribe();
+    state.subscription = null;
+    state.response = null;
+  }
+
+  getHashtagLookup(editor: EpisodeEditorState): HashtagLookupResponse | null {
+    const state = this.getHashtagLookupState(editor);
+    return state.dismissed ? null : state.response;
+  }
+
+  private getCurrentHashtagToken(editor: EpisodeEditorState): string {
+    const tokens = String(editor.formModel.hashtags ?? '').trim().split(/\s+/u).filter(Boolean);
+    return tokens[tokens.length - 1] ?? '';
+  }
+
+  private scheduleHashtagLookup(editor: EpisodeEditorState, rawTag: string): void {
+    const state = this.getHashtagLookupState(editor);
+    const tag = rawTag.trim();
+    state.dismissed = false;
+    state.response = null;
+    state.token += 1;
+    const lookupToken = state.token;
+    if (state.timer !== null) {
+      clearTimeout(state.timer);
+    }
+    state.subscription?.unsubscribe();
+    state.subscription = null;
+    if (!tag || !(editor.formModel.episodeId > 0)) {
+      state.timer = null;
+      return;
+    }
+    state.timer = window.setTimeout(() => {
+      state.timer = null;
+      if (state.token !== lookupToken || state.dismissed) {
+        return;
+      }
+      state.subscription = this.apiService.lookupHashtag(editor.formModel.episodeId, tag).subscribe({
+        next: (response) => {
+          if (state.token === lookupToken && !state.dismissed) {
+            state.response = response;
+          }
+        },
+        error: (error) => {
+          if (state.token === lookupToken && !state.dismissed && error?.error?.state) {
+            state.response = error.error as HashtagLookupResponse;
+          }
+        },
+      });
+    }, 1000);
+  }
+
+  private getHashtagLookupState(editor: EpisodeEditorState): HashtagLookupState {
+    let state = this.hashtagLookupStates.get(editor);
+    if (!state) {
+      state = { timer: null, subscription: null, token: 0, response: null, dismissed: true };
+      this.hashtagLookupStates.set(editor, state);
+    }
+    return state;
+  }
+
+  private clearHashtagLookup(editor: EpisodeEditorState): void {
+    const state = this.getHashtagLookupState(editor);
+    state.token += 1;
+    if (state.timer !== null) {
+      clearTimeout(state.timer);
+      state.timer = null;
+    }
+    state.subscription?.unsubscribe();
+    state.subscription = null;
+    state.response = null;
+    state.dismissed = true;
   }
 
   getTranscriptionStatus(editor: EpisodeEditorState): string {
@@ -1755,6 +1925,8 @@ export class ManageComponent implements OnInit, OnDestroy {
   resetEditor(editor: EpisodeEditorState): void {
     this.cancelTrailerVideoWork(editor, 'canceled');
     this.clearYoutubeTrailerJobPolling(editor);
+    this.clearHashtagLookup(editor);
+    this.generationVersions.set(editor, (this.generationVersions.get(editor) ?? 0) + 1);
     editor.trailerVideoDraftId = null;
     if (editor === this.addEditorState) {
       this.clearEpisodeGenerationPolling();
@@ -1793,6 +1965,7 @@ export class ManageComponent implements OnInit, OnDestroy {
     return {
       episodeId: this.suggestedNextEpisodeId,
       title: '',
+      hashtags: '',
       summary: '',
       pubDate: this.suggestedNextPubDate,
       explicit: 'no',
@@ -2059,11 +2232,13 @@ export class ManageComponent implements OnInit, OnDestroy {
 
     this.clearSummaryStatusPolling();
     this.summaryStatusPollEpisodeId = episodeId;
+    const generation = (this.generationVersions.get(editor) ?? 0) + 1;
+    this.generationVersions.set(editor, generation);
 
     const refresh = (): void => {
       this.apiService.getEpisodeGeneratedSummaryStatus(episodeId).subscribe({
         next: (status) => {
-          if (editor.formModel.episodeId !== episodeId) {
+          if (editor.formModel.episodeId !== episodeId || this.generationVersions.get(editor) !== generation) {
             this.clearEpisodeGenerationPolling();
             return;
           }
@@ -2073,12 +2248,16 @@ export class ManageComponent implements OnInit, OnDestroy {
           editor.formModel.summaryStartedAt = status.summaryStartedAt ?? editor.formModel.summaryStartedAt ?? null;
           editor.formModel.summaryError = status.error ?? '';
           editor.formModel.summaryProgress = status.progress ?? (status.status === 'done' ? 100 : null);
+          editor.formModel.suggestedTags = status.suggestedTags;
+          this.mergeSuggestedTags(editor, status.suggestedTags);
 
           if (typeof status.summaryText === 'string' && status.summaryText.trim().length > 0 && !editor.formModel.summaryManuallyEdited) {
             editor.formModel.summary = status.summaryText.trim();
           }
 
-          if (status.status === 'done' || status.status === 'error') {
+          const suggestedTagsPending = status.suggestedTags?.status === 'pending'
+            || status.suggestedTags?.status === 'processing';
+          if ((status.status === 'done' || status.status === 'error') && !suggestedTagsPending) {
             this.clearSummaryStatusPolling();
           }
         },
@@ -2100,6 +2279,15 @@ export class ManageComponent implements OnInit, OnDestroy {
       this.summaryStatusPollTimer = null;
     }
     this.summaryStatusPollEpisodeId = null;
+  }
+
+  private mergeSuggestedTags(editor: EpisodeEditorState, snapshot: SuggestedTagsSnapshot | undefined): void {
+    if (!snapshot || snapshot.status !== 'done') {
+      return;
+    }
+    const generated = snapshot.suggestions.map((suggestion) => suggestion.displayTag);
+    const merged = this.serializeHashtags(`${editor.formModel.hashtags} ${generated.join(' ')}`);
+    editor.formModel.hashtags = merged.join(' ');
   }
 
   private clearEpisodeGenerationPolling(): void {

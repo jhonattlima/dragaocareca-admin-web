@@ -191,6 +191,47 @@ export interface EpisodeGeneratedSummaryStatus {
   version: number | null;
   promptVersion: string | null;
   summaryText?: string | null;
+  suggestedTags?: SuggestedTagsSnapshot;
+}
+
+export type SuggestedTagsStatus = 'idle' | 'pending' | 'processing' | 'done' | 'unavailable';
+export type SuggestedTagsErrorCategory =
+  | 'disabled'
+  | 'missing_credentials'
+  | 'unauthorized'
+  | 'quota_exhausted'
+  | 'rate_limited'
+  | 'provider_unavailable'
+  | 'invalid_provider_response';
+
+export interface SuggestedTagRetrieval {
+  displayTag: string;
+  normalizedTag: string;
+  approximateCount: number | null;
+  retrievedAt: string | null;
+  cacheStatus: 'hit' | 'miss';
+  regionCode: string;
+  relevanceLanguage: string;
+  relevanceScore?: number;
+}
+
+export interface SuggestedTagsSnapshot {
+  status: SuggestedTagsStatus;
+  version: number;
+  updatedAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  retryAt: string | null;
+  errorCategory: SuggestedTagsErrorCategory | null;
+  promptVersion: string | null;
+  suggestions: SuggestedTagRetrieval[];
+}
+
+export interface HashtagLookupResponse extends SuggestedTagRetrieval {
+  source: 'youtube-search-list' | 'cache' | 'admission' | 'provider';
+  state: 'available' | 'unavailable';
+  errorCategory: SuggestedTagsErrorCategory | null;
+  retryAt: string | null;
 }
 
 export type EpisodeArtifactSelector = 'episode' | 'trailer' | 'image' | 'image-low' | 'transcript';
@@ -420,6 +461,13 @@ export class ApiService {
     return this.http.get<EpisodeGeneratedSummaryStatus>(`${environment.apiBaseUrl}/episodes/${episodeId}/episodes-generated-summary`);
   }
 
+  lookupHashtag(episodeId: number, tag: string): Observable<HashtagLookupResponse> {
+    return this.http.post<HashtagLookupResponse>(
+      `${environment.apiBaseUrl}/episodes/${episodeId}/hashtag-lookup`,
+      { tag },
+    );
+  }
+
   startEpisodeArtifactJob(episodeId: number, artifacts: EpisodeArtifactSelector[]): Observable<EpisodeArtifactJobSnapshot> {
     return this.http.post<EpisodeArtifactJobSnapshot>(`${environment.apiBaseUrl}/episodes/${episodeId}/artifacts/jobs`, { artifacts });
   }
@@ -435,10 +483,10 @@ export class ApiService {
     );
   }
 
-  commitYoutubeTrailerJob(episodeId: number, jobId?: string): Observable<YoutubeTrailerJobSnapshot> {
+  commitYoutubeTrailerJob(episodeId: number, jobId: string | undefined, title: string, hashtags: string[]): Observable<YoutubeTrailerJobSnapshot> {
     return this.http.post<YoutubeTrailerJobSnapshot>(
       `${environment.apiBaseUrl}/episodes/${episodeId}/youtube-trailer-jobs/commit`,
-      jobId ? { jobId } : {},
+      { ...(jobId ? { jobId } : {}), title, hashtags },
     );
   }
 

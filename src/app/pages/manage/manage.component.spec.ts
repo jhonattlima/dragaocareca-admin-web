@@ -87,6 +87,7 @@ describe('ManageComponent summary flow', () => {
     const second = new Subject<HashtagLookupResponse>();
     apiService.lookupHashtag.and.returnValues(first.asObservable(), second.asObservable());
 
+    editor.formModel.hashtags = '#old';
     component.onHashtagInput(editor);
     tick(1000);
     expect(apiService.lookupHashtag).toHaveBeenCalledWith(42, jasmine.any(String));
