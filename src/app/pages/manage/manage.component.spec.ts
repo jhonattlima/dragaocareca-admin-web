@@ -6,6 +6,9 @@ import { of, Subject, throwError } from 'rxjs';
 import { ApiService, Episode, EpisodeArtifactJobSnapshot, EpisodeGeneratedSummaryStatus, EpisodeTrailerVideoUploadResponse, EpisodeTranscriptionStatus, YoutubeTrailerJobSnapshot } from '../../core/api.service';
 import { EpisodeFormComponent } from './episode-form.component';
 import { ManageComponent } from './manage.component';
+import { environment as developmentEnvironment } from '../../../environments/environment';
+import { environment as stagingEnvironment } from '../../../environments/environment.staging';
+import { environment as productionEnvironment } from '../../../environments/environment.prod';
 
 describe('ManageComponent summary flow', () => {
   let apiService: jasmine.SpyObj<ApiService>;
@@ -840,21 +843,32 @@ describe('Phase 8.1 RED form contracts FORM-01 through FORM-05', () => {
     expect(editor.formModel.bytes).toBe(1000000);
   });
 
-  it('FORM-03/D-09/D-10 selects only configured catalog participants and never overwrites an active edit', () => {
+  it('ships the required participant defaults in every frontend environment', () => {
+    const expectedDefaults = ['Jhonatt Lima', 'Diego Broniszak', 'Eric Farias', 'Gabriel Moraes'];
+
+    expect(developmentEnvironment.defaultParticipants).toEqual(expectedDefaults);
+    expect(stagingEnvironment.defaultParticipants).toEqual(expectedDefaults);
+    expect(productionEnvironment.defaultParticipants).toEqual(expectedDefaults);
+  });
+
+  it('FORM-03/D-09/D-10 selects known configured participants and never overwrites an active edit', () => {
     const editor = component.addEditorState;
     editor.editingEpisodeId = null;
-    editor.selectedMembers = ['Diego Broniszak'];
+    editor.selectedMembers = [];
     (component as unknown as { configuredParticipantNames: string[] }).configuredParticipantNames = [
-      'Jhonatt Lima',
-      'Unknown configured participant',
+      ...developmentEnvironment.defaultParticipants,
     ];
     (component as unknown as { applyConfiguredParticipantDefaults: (target: typeof editor) => void })
       .applyConfiguredParticipantDefaults(editor);
 
-    expect(editor.selectedMembers).toEqual(['Jhonatt Lima']);
+    expect(editor.selectedMembers).toEqual(developmentEnvironment.defaultParticipants);
 
     editor.editingEpisodeId = 42;
     editor.selectedMembers = ['Diego Broniszak'];
+    (component as unknown as { configuredParticipantNames: string[] }).configuredParticipantNames = [
+      ...developmentEnvironment.defaultParticipants,
+      'Unknown configured participant',
+    ];
     (component as unknown as { applyConfiguredParticipantDefaults: (target: typeof editor) => void })
       .applyConfiguredParticipantDefaults(editor);
     expect(editor.selectedMembers).toEqual(['Diego Broniszak']);
