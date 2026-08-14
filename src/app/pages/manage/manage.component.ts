@@ -12,6 +12,7 @@ import {
   YoutubeTrailerJobSnapshot,
   StructuredEntryCatalogResponse,
 } from '../../core/api.service';
+import { environment } from '../../../environments/environment';
 
 type EpisodeListField = 'coverCredits' | 'tags';
 type UploadKind = 'audio' | 'trailer' | 'trailerVideo' | 'cover' | 'coverLow';
@@ -153,6 +154,7 @@ export class ManageComponent implements OnInit, OnDestroy {
     { name: 'Diogo Truylio', character: 'Aurin' },
     { name: 'Gabriel Moraes', character: 'Galdrim' },
   ];
+  readonly configuredParticipantNames: string[] = [...environment.defaultParticipants];
 
   episodes: Episode[] = [];
   errorMessage = '';
@@ -1362,7 +1364,17 @@ export class ManageComponent implements OnInit, OnDestroy {
   }
 
   isEpisodeSaveDisabled(editor: EpisodeEditorState): boolean {
-    return editor.formModel.transcriptStatus === 'pending' || editor.formModel.transcriptStatus === 'processing';
+    return editor.formModel.transcriptStatus === 'pending'
+      || editor.formModel.transcriptStatus === 'processing'
+      || !this.hasCompleteMusicCredit(editor);
+  }
+
+  isCompleteMusicCredit(entry: Pick<StructuredEntry, 'name' | 'links'>): boolean {
+    return entry.name.trim().length > 0 && entry.links.some((link) => link.url.trim().length > 0);
+  }
+
+  hasCompleteMusicCredit(editor: EpisodeEditorState): boolean {
+    return editor.formModel.musicCredits.some((entry) => this.isCompleteMusicCredit(entry));
   }
 
   getTranscriptionStatus(editor: EpisodeEditorState): string {
@@ -1833,6 +1845,17 @@ export class ManageComponent implements OnInit, OnDestroy {
 
     this.syncAddEditorId();
     this.syncAddEditorEpisodeNumber();
+    this.addEditorState.formModel.pubDate = this.suggestedNextPubDate;
+    this.applyConfiguredParticipantDefaults(this.addEditorState);
+  }
+
+  private applyConfiguredParticipantDefaults(editor: EpisodeEditorState): void {
+    if (editor.editingEpisodeId !== null) {
+      return;
+    }
+
+    const availableNames = new Set(this.memberOptions.map((member) => member.name));
+    editor.selectedMembers = this.configuredParticipantNames.filter((name) => availableNames.has(name));
   }
 
   private scheduleAddEditorDefaults(): void {
@@ -1884,7 +1907,9 @@ export class ManageComponent implements OnInit, OnDestroy {
       trailerFileName: editor.formModel.trailerFileName,
       youtube: editor.formModel.youtube,
       spotifyId: editor.formModel.spotifyId,
-      musicCredits: this.serializeStructuredEntries(editor.formModel.musicCredits),
+      musicCredits: this.serializeStructuredEntries(
+        editor.formModel.musicCredits.filter((entry) => this.isCompleteMusicCredit(entry))
+      ),
       coverCredits: editor.formModel.coverCredits ?? [],
     };
   }
@@ -2512,6 +2537,11 @@ export class ManageComponent implements OnInit, OnDestroy {
             if (!episode) {
               return;
             }
+            if (kind === 'audio' && !this.hasConfirmedAudioMetadata(episode)) {
+              this.errorMessage = 'Episode audio upload did not return confirmed duration and bytes metadata.';
+              this.uploadStates[kind] = { ...this.uploadStates[kind], progress: 0 };
+              return;
+            }
             const returnedFileName = episode[definition.fileField];
             if (typeof returnedFileName === 'string') {
               editor.formModel[definition.fileField] = returnedFileName;
@@ -2534,6 +2564,8 @@ export class ManageComponent implements OnInit, OnDestroy {
               editor.formModel.transcriptProgress = 100;
             }
             if (kind === 'audio') {
+              editor.formModel.duration = episode.duration as string;
+              editor.formModel.bytes = episode.bytes as number;
               this.syncTranscriptionStatusPolling(episodeId, editor);
               if (episode.transcriptStatus === 'error') {
                 this.clearEpisodeGenerationPolling();
@@ -2702,17 +2734,31 @@ export class ManageComponent implements OnInit, OnDestroy {
   }
 
   private computeSuggestedNextPubDate(episodes: Episode[]): string {
-    if (episodes.length === 0) {
+    const validEpisodes = episodes.filter((episode) => Number.isFinite(new Date(episode.pubDate).getTime()));
+    if (validEpisodes.length === 0) {
       return this.toDateTimeLocalValue(new Date().toISOString());
     }
 
-    const latest = episodes.reduce((acc, current) => {
+    const latest = validEpisodes.reduce((acc, current) => {
       return new Date(current.pubDate).getTime() > new Date(acc.pubDate).getTime() ? current : acc;
     });
 
     const next = new Date(latest.pubDate);
     next.setDate(next.getDate() + 7);
     return this.toDateTimeLocalValue(next.toISOString());
+  }
+
+  private hasConfirmedAudioMetadata(episode: Episode): boolean {
+    return typeof episode.duration === 'string'
+      && /^\d{2}:\d{2}:\d{2}$/.test(episode.duration)
+      && typeof episode.bytes === 'number'
+      && Number.isInteger(episode.bytes)
+      && episode.bytes >= 0;
+  }
+
+  formatBytesAsMegabytes(bytes: number): string {
+    const hundredths = Math.floor((bytes * 100 + 500000) / 1000000);
+    return `${Math.floor(hundredths / 100)}.${String(hundredths % 100).padStart(2, '0')} MB`;
   }
 
   private computeSuggestedNextEpisodeId(episodes: Episode[]): number {
