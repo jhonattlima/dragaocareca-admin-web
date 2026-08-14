@@ -14,6 +14,7 @@ Shared keys:
 - `apiBaseUrl`
 - `googleClientId`
 - `authBypass`
+- `defaultParticipants`
 
 ## Local Development
 
@@ -23,6 +24,7 @@ Current development settings in `src/environments/environment.ts`:
 - `apiBaseUrl: http://localhost:3000/v1`
 - `googleClientId: 598182825783-bfujs22hdvor0v807d7tkfb2v6d1qga8.apps.googleusercontent.com`
 - `authBypass: true`
+- `defaultParticipants: ['Jhonatt Lima']`
 
 `authBypass` changes both the auth guard and login behavior:
 
@@ -40,6 +42,9 @@ Current production settings in `src/environments/environment.prod.ts`:
 - `apiBaseUrl: https://api.dragaocareca.com/v1`
 - `googleClientId: 598182825783-bfujs22hdvor0v807d7tkfb2v6d1qga8.apps.googleusercontent.com`
 - `authBypass: false`
+- `defaultParticipants: ['Jhonatt Lima']`
+
+`defaultParticipants` is a frontend-only ordered list of participant names used when opening a new episode. The Manage page intersects it with the current member catalog and ignores names that are not available; changing it does not bypass API validation or alter existing episode edits.
 
 ## Backend Contract
 
@@ -84,6 +89,12 @@ The new-episode upload returns `state: "staged"` with no finalized filename and 
 If the browser retries reservation after an interrupted upload, an active reservation owned by the same authenticated user is reused. Stale expired/consumed reservation rows are replaced; an existing saved episode cannot be reserved as a new draft.
 
 `authBypass=true` remains a local frontend/backend development mode and does not change the contract or remove server-side validation. YouTube OAuth, provider deletion, publication, and cleanup remain backend-owned; the browser never receives provider IDs, sessions, credentials, paths, or raw provider errors.
+
+### Episode-audio contract
+
+`POST /v1/episodes/:episodeId/audio` returns backend-confirmed `duration` and `bytes` after the staged file has been validated. `duration` is normalized to `HH:MM:SS`; `bytes` is a nonnegative integer from the staged file. If either value cannot be confirmed, the API fails the upload and cleans up staged output rather than returning a partial success. The Angular form applies the values only on completed upload response, retains raw bytes for the write payload, and displays decimal MB with exactly two decimal places (`1 MB = 1,000,000 bytes`) using nonnegative half-up rounding.
+
+The complete music-credit invariant is shared by the UI and API: at least one credit must have a trimmed name and at least one trimmed reference URL. Duration, Bytes, and Spotify ID are read-only light-gray fields in the form; there are no hint-text requirements. Trailer-audio remains on its existing filename/message contract and does not invoke episode-audio metadata extraction.
 
 ## Login and Session
 

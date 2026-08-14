@@ -34,7 +34,7 @@ The frontend stays thin:
 
 - `src/app/core/api.service.ts`
   - episode list/create/update/delete
-  - episode media uploads and deletes
+  - episode media uploads and deletes, including backend-confirmed episode-audio metadata
   - feed status and preview
   - transcription status
   - generated-summary status and text
@@ -101,6 +101,14 @@ When `authBypass=true`:
 - the guard treats the user as authenticated
 - the login screen redirects immediately to the dashboard
 - `getProfile()` returns a local mock profile
+
+### Episode form contract
+
+- New Episode publication defaults use the latest valid episode publication date/time plus seven calendar days, preserving its local clock; an empty or invalid list falls back to the current local date/time.
+- `POST /v1/episodes/:episodeId/audio` is the authority for episode-audio metadata. A completed response must include `duration` as `HH:MM:SS` and a nonnegative integer `bytes`; the browser does not infer either value from the selected file. Missing or invalid metadata fails the upload.
+- The Angular form displays bytes as decimal megabytes (`1 MB = 1,000,000 bytes`) with exactly two decimal places using deterministic nonnegative half-up rounding. Duration, Bytes, and Spotify ID are native read-only fields with light-gray styling and no hint text.
+- Frontend environments expose `defaultParticipants`. The editor intersects those configured names with the loaded member catalog and ignores unknown names; component logic and the API contract remain unchanged when the list is edited.
+- Save requires at least one music credit with a trimmed name and at least one trimmed reference URL. The frontend gates Save early, while the API validates the same invariant on create/update.
 
 ## Backend Contract Assumptions
 
@@ -183,10 +191,7 @@ Known current notes:
 - Angular reports a metrics stylesheet budget warning
 - Angular reports an initial bundle budget warning
 
-## Known Gaps
-
-- Legacy advanced credits subflows are not fully restored.
-- The root component test is stale and should be replaced.
+The root shell spec is not the feature-verification source of truth. Use the focused ManageComponent, ApiService, and sibling API contract tests described in `docs/TESTING.md`.
 
 ## AI Prompt Starter
 

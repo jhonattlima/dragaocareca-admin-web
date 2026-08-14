@@ -61,6 +61,15 @@
 6. Other media upload/delete flows call their matching episode endpoints and patch local file-name state from the response. After draft transcription reaches `done`, the manage page polls `GET /v1/episodes/:episodeId/episodes-generated-summary` and fills the summary field when generated text is available.
 7. Delete episode uses `DELETE /v1/episodes/:episodeId` and refreshes the list.
 
+### Episode form stability contract
+
+- `ManageComponent` derives the new publication default from the latest valid `pubDate`, adds seven calendar days with `Date.setDate()`, and preserves the local time through the `datetime-local` conversion. With no valid prior episode it uses the current local date/time.
+- Only the episode-audio upload invokes the API metadata contract. After a completed response, Angular requires API-confirmed `duration` in `HH:MM:SS` and a nonnegative integer `bytes`; metadata is not calculated from browser file properties. Trailer-audio continues to use its existing filename/message response path.
+- The API persists and returns raw confirmed bytes. Angular formats them as decimal MB with fixed two-decimal nonnegative half-up rounding for display, while the raw integer remains in the create/update payload.
+- `environment.defaultParticipants` supplies editable defaults. The component filters these names against `memberOptions`, so unknown configuration values never enter `authors` and active edits are not overwritten.
+- A complete music credit has a trimmed name and at least one trimmed reference URL. The browser disables/announces Save without replacing the API’s authoritative create/update validation.
+- Duration, Bytes, and Spotify ID remain native `readonly` controls and receive the shared light-gray field style; no helper copy is required.
+
 **Operational Views:**
 1. `FeedComponent` loads preview XML and feed status in parallel.
 2. `MetricsComponent` loads Spotify and YouTube snapshots and derives chart state locally.

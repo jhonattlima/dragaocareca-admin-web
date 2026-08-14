@@ -13,6 +13,12 @@
 ```bash
 npm test
 npm test -- --watch
+npm test -- --watch=false --browsers=ChromeHeadless
+npm run build
+
+# Run from /home/jhonatt/repos/jhonatt_projects/dragaocareca-admin-api
+npm run build
+NODE_ENV=development DISABLE_BACKGROUND_WORKERS=true node dist/scripts/verify-episode-audio-contract.js
 ```
 
 ## Current Layout
@@ -23,6 +29,13 @@ Current coverage is concentrated in the phase-focused tests listed by each phase
 plan. The root shell spec is not treated as the source of truth for feature
 verification; feature contracts should be covered by colocated component,
 service, and API contract tests.
+
+Phase 8.1 verification focuses on `src/app/pages/manage/manage.component.spec.ts`,
+`src/app/core/api.service.spec.ts`, and the sibling API
+`dist/scripts/verify-episode-audio-contract.js`. The API verifier covers the
+draft/upload response, Angular payload shape, create response and persisted DTO,
+reload equivalence, upload/probe/create cleanup failures, complete music-credit
+validation, and trailer-audio compatibility.
 
 ## Suggested Coverage Priorities
 
@@ -36,6 +49,12 @@ service, and API contract tests.
 - No separate E2E setup is present.
 - Playwright is installed, but it is only used by `scripts/capture-metrics-screenshot.js`.
 - The repo currently has no dedicated coverage script.
+- ChromeHeadless is an independent browser gate. A nonzero Angular test status is
+  limited only when output explicitly reports a missing ChromeHeadless/Chrome
+  binary or launcher; Karma/Jasmine assertion failures and compilation failures
+  remain failed gates. When the runner is unavailable, record the exact output and
+  keep the build and both API gates independent—build success does not mean tests
+  passed.
 
 ---
 

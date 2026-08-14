@@ -44,6 +44,14 @@
 - [x] **OPS-04**: The API handles YouTube OAuth, quota, provider, proxy-size, and timeout failures with stable user-facing error states and bounded retry behavior.
 - [ ] **OPS-05**: Existing authentication modes, `authBypass`, episode editing, summary behavior, artifact downloads, frontend tests, and `npm run build` remain compatible.
 
+### Episode Form Stability Patch
+
+- [x] **FORM-01**: Add Episode publication defaults use the latest valid publication date/time plus seven calendar days, or the current local date/time when no valid prior episode exists.
+- [x] **FORM-02**: Episode-audio upload responses contain backend-confirmed `HH:MM:SS` duration and nonnegative byte metadata; missing metadata fails the upload and trailer-audio behavior remains unchanged.
+- [x] **FORM-03**: Configured participant defaults select only names present in the loaded participant catalog.
+- [x] **FORM-04**: Save and API writes require at least one complete music credit with a non-empty name and reference link.
+- [x] **FORM-05**: Duration, Bytes, and Spotify ID remain read-only and use light-gray styling without hint text.
+
 ## Future Requirements
 
 Deferred beyond v1.2:
@@ -66,7 +74,7 @@ Deferred beyond v1.2:
 
 ## Traceability
 
-Traceability will be filled when the v1.2 roadmap is approved.
+Traceability records the approved v1.2 requirements and the implemented Phase 8.1 form-stability patch.
 
 | Requirement | Phase | Status |
 |---|---|---|
@@ -93,6 +101,11 @@ Traceability will be filled when the v1.2 roadmap is approved.
 | OPS-03 | Phase 8 | Complete |
 | OPS-04 | Phase 8 | Complete |
 | OPS-05 | Phase 10 | Pending |
+| FORM-01 | Phase 8.1 (08.1-00 through 08.1-03) | Complete |
+| FORM-02 | Phase 8.1 (08.1-00 through 08.1-03) | Complete |
+| FORM-03 | Phase 8.1 (08.1-00 through 08.1-03) | Complete |
+| FORM-04 | Phase 8.1 (08.1-00 through 08.1-03) | Complete |
+| FORM-05 | Phase 8.1 (08.1-00 through 08.1-03) | Complete |
 
 ---
 *Requirements defined: 2026-08-03*
