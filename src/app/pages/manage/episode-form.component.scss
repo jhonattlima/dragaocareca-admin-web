@@ -28,3 +28,85 @@
   outline: 2px solid #6c757d;
   outline-offset: 1px;
 }
+
+.hashtag-authoring-field {
+  position: relative;
+}
+
+.hashtag-authoring-field .form-control:disabled {
+  background-color: #dee2e6;
+  border-color: #adb5bd;
+  color: #495057;
+  cursor: wait;
+}
+
+.hashtag-authoring-field .form-control:focus-visible,
+.hashtag-token:focus-visible,
+.trailer-title-preview .form-control:focus-visible {
+  outline: 3px solid #0d6efd;
+  outline-offset: 2px;
+}
+
+.hashtag-authoring-status,
+.trailer-title-count {
+  color: #6c757d;
+  font-size: 0.8rem;
+  margin-top: 0.35rem;
+}
+
+.hashtag-token-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+}
+
+.hashtag-token {
+  background: #e7f1ff;
+  border: 1px solid #9ec5fe;
+  border-radius: 999px;
+  color: #084298;
+  cursor: help;
+  display: inline-flex;
+  position: relative;
+  padding: 0.2rem 0.55rem;
+}
+
+.hashtag-token-popup {
+  background: #212529;
+  border-radius: 0.35rem;
+  bottom: calc(100% + 0.45rem);
+  color: #fff;
+  display: none;
+  font-size: 0.8rem;
+  left: 0;
+  min-width: 13rem;
+  padding: 0.45rem 0.6rem;
+  position: absolute;
+  white-space: normal;
+  z-index: 5;
+}
+
+.hashtag-token:hover .hashtag-token-popup,
+.hashtag-token:focus .hashtag-token-popup,
+.hashtag-token:focus-visible .hashtag-token-popup {
+  display: block;
+}
+
+.trailer-title-preview .form-control[readonly] {
+  background-color: #f1f3f5;
+  color: #495057;
+}
+
+.trailer-title-preview .error {
+  color: #b02a37;
+  font-weight: 600;
+  margin-top: 0.35rem;
+}
+
+@media (max-width: 767.98px) {
+  .hashtag-token-popup {
+    left: auto;
+    right: 0;
+  }
+}
