@@ -1658,6 +1658,10 @@ export class ManageComponent implements OnInit, OnDestroy {
   }
 
   getGenerationStatus(editor: EpisodeEditorState): string {
+    if (editor.formModel.transcriptStatus === 'error') {
+      return this.getTranscriptionStatus(editor);
+    }
+
     if (this.hasTranscriptionProgress(editor)) {
       return this.getTranscriptionStatus(editor);
     }
@@ -1672,6 +1676,10 @@ export class ManageComponent implements OnInit, OnDestroy {
     }
 
     return this.getTranscriptionStatus(editor);
+  }
+
+  isGenerationError(editor: EpisodeEditorState): boolean {
+    return editor.formModel.transcriptStatus === 'error' || editor.formModel.summaryStatus === 'error';
   }
 
   getTranscriptionProgress(editor: EpisodeEditorState): number {
@@ -2208,6 +2216,9 @@ export class ManageComponent implements OnInit, OnDestroy {
           editor.formModel.transcriptProgress = status.progress ?? (status.status === 'done' ? 100 : null);
 
           if (status.status === 'error') {
+            editor.formModel.summaryStatus = 'idle';
+            editor.formModel.summaryProgress = null;
+            editor.formModel.summaryError = '';
             this.clearEpisodeGenerationPolling();
             return;
           }

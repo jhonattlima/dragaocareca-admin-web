@@ -109,7 +109,11 @@
               </button>
             </div>
           </div>
-          <div class="alert alert-info py-1 px-2 mt-2 mb-0 small" *ngIf="upload.kind === 'audio' && controller.getGenerationStatus(editor)">
+          <div
+            class="alert py-1 px-2 mt-2 mb-0 small"
+            [class.alert-danger]="controller.isGenerationError(editor)"
+            [class.alert-info]="!controller.isGenerationError(editor)"
+            *ngIf="upload.kind === 'audio' && controller.getGenerationStatus(editor)">
             {{ controller.getGenerationStatus(editor) }}
           </div>
           <div class="progress upload-progress mt-2" *ngIf="upload.kind === 'audio' && controller.hasGenerationProgress(editor)">

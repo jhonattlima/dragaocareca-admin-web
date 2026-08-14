@@ -198,6 +198,18 @@ describe('ManageComponent summary flow', () => {
     );
   });
 
+  it('surfaces transcription failure even when the summary cycle was initialized', () => {
+    const editor = component.addEditorState;
+    editor.formModel.transcriptStatus = 'error';
+    editor.formModel.transcriptError = 'Gemini request failed (403): The caller does not have permission';
+    editor.formModel.summaryStatus = 'pending';
+
+    expect(component.isGenerationError(editor)).toBeTrue();
+    expect(component.getGenerationStatus(editor)).toBe(
+      'Transcription failed: Gemini request failed (403): The caller does not have permission'
+    );
+  });
+
   it('surfaces summary polling failures without blocking the episode form', () => {
     const editor = component.addEditorState;
     editor.formModel.episodeId = 42;
