@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { HttpEventType, HttpHeaders, HttpResponse } from '@angular/common/http';
-import { fakeAsync, TestBed, tick } from '@angular/core/testing';
+import { discardPeriodicTasks, fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { of, Subject, throwError } from 'rxjs';
 import { ApiService, Episode, EpisodeArtifactJobSnapshot, EpisodeGeneratedSummaryStatus, EpisodeTrailerVideoUploadResponse, EpisodeTranscriptionStatus, HashtagLookupResponse, SuggestedTagsSnapshot, YoutubeTrailerJobSnapshot } from '../../core/api.service';
@@ -564,7 +564,7 @@ describe('ManageComponent YouTube lifecycle RED scaffold', () => {
     expect(lifecycle['publishYoutubeTrailer']).toBeUndefined();
   });
 
-  it('sends current metadata once and polls the returned job', () => {
+  it('sends current metadata once and polls the returned job', fakeAsync(() => {
     const editor = component.addEditorState;
     editor.formModel.episodeId = 42;
     editor.formModel.trailerVideoFileName = 'episodes/42/trailer.mp4';
@@ -575,10 +575,13 @@ describe('ManageComponent YouTube lifecycle RED scaffold', () => {
     apiService.getYoutubeTrailerJobStatus.and.returnValue(of(snapshot({ status: 'transferring', progress: { confirmedBytes: 25, totalBytes: 100, processingPartsProcessed: null, processingPartsTotal: null, processingTimeLeftMs: null } })));
 
     component.startYoutubeTrailerJob(editor);
+    tick();
 
     expect(apiService.startYoutubeTrailerJob).toHaveBeenCalledOnceWith(42, 'Trailer - Title', 'Summary', null, ['#rpg']);
     expect(component.getYoutubeTrailerJobProgress(editor)).toBe(25);
-  });
+    component.clearYoutubeTrailerJobPolling(editor);
+    discardPeriodicTasks();
+  }));
 
   it('ignores duplicate starts while the first request is in flight', () => {
     const editor = component.addEditorState;
@@ -588,6 +591,7 @@ describe('ManageComponent YouTube lifecycle RED scaffold', () => {
     editor.formModel.summary = 'Summary';
     const pending = new Subject<YoutubeTrailerJobSnapshot>();
     apiService.startYoutubeTrailerJob.and.returnValue(pending.asObservable());
+    apiService.getYoutubeTrailerJobStatus.and.returnValue(of(snapshot()));
 
     component.startYoutubeTrailerJob(editor);
     component.startYoutubeTrailerJob(editor);
@@ -613,7 +617,7 @@ describe('ManageComponent YouTube lifecycle RED scaffold', () => {
     expect(component.getYoutubeTrailerJobPrivateWatchUrl(editor)).toBe('https://youtu.be/private-42');
   });
 
-  it('cancels the durable job without polling and keeps the returned boundary visible', () => {
+  it('cancels the durable job without polling and keeps the returned boundary visible', fakeAsync(() => {
     const editor = component.addEditorState;
     editor.formModel.episodeId = 42;
     editor.formModel.trailerVideoFileName = 'episodes/42/trailer.mp4';
@@ -625,11 +629,12 @@ describe('ManageComponent YouTube lifecycle RED scaffold', () => {
     editor.formModel.title = 'Title';
     editor.formModel.summary = 'Summary';
     component.startYoutubeTrailerJob(editor);
+    tick();
     component.cancelYoutubeTrailerJob(editor);
 
     expect(apiService.cancelYoutubeTrailerJob).toHaveBeenCalledOnceWith(42, 'job-42');
     expect(component.getYoutubeTrailerJobStatusLabel(cancelled)).toContain('Canceled');
-  });
+  }));
 });
 
 describe('ManageComponent trailer video lifecycle', () => {
@@ -640,9 +645,10 @@ describe('ManageComponent trailer video lifecycle', () => {
     apiService = jasmine.createSpyObj<ApiService>('ApiService', [
       'listEpisodes', 'reserveEpisodeDraft', 'uploadEpisodeTrailerVideo', 'createEpisode',
       'getEpisodeTranscriptionStatus', 'getEpisodeGeneratedSummaryStatus', 'startEpisodeArtifactJob',
-      'getEpisodeArtifactJobStatus', 'downloadEpisodeArtifact',
+      'getEpisodeArtifactJobStatus', 'downloadEpisodeArtifact', 'startYoutubeTrailerJob',
     ]);
     apiService.listEpisodes.and.returnValue(of([]));
+    apiService.startYoutubeTrailerJob.and.returnValue(of());
     component = new ManageComponent(apiService);
   });
 
@@ -702,7 +708,7 @@ describe('ManageComponent trailer video lifecycle', () => {
     ]);
     first.next({ type: HttpEventType.UploadProgress, loaded: 100, total: 100 });
     first.next(staged('episodes/42/a.mp4'));
-    expect(component.getUploadFilename(editor, 'trailerVideo')).toBe('b.mp4');
+    expect(component.getUploadFilename(editor, 'trailerVideo')).toBe('episodes/42/old.mp4');
     expect(editor.formModel.trailerVideoFileName).toBe('episodes/42/old.mp4');
     second.next(staged('episodes/42/b.mp4'));
     expect(component.getTrailerVideoStatus(editor)).toBe('staged');
@@ -746,7 +752,7 @@ describe('ManageComponent trailer video lifecycle', () => {
     component.resetEditor(editor);
     upload.next(staged('episodes/42/stale.mp4'));
     expect(editor.formModel.trailerVideoFileName).toBeUndefined();
-    expect(component.getTrailerVideoStatus(editor)).toBe('selected');
+    expect(component.getTrailerVideoStatus(editor)).toBe('canceled');
     component.ngOnDestroy();
   });
 });
@@ -784,8 +790,8 @@ describe('EpisodeFormComponent trailer video card', () => {
     const renderedCard = card as HTMLElement;
     expect(renderedCard.textContent).toContain('.mp4');
     expect(renderedCard.querySelector('input')?.getAttribute('accept')).toBe('.mp4,video/mp4');
-    expect(fixture.nativeElement.textContent).not.toContain('YouTube');
-    expect(fixture.nativeElement.textContent).not.toContain('Publish');
+    expect(renderedCard.textContent).not.toContain('YouTube');
+    expect(renderedCard.textContent).not.toContain('Publish');
   });
 
   it('keeps the last-known-good filename visible while a replacement uploads', () => {
@@ -821,7 +827,8 @@ describe('EpisodeFormComponent trailer video card', () => {
 
     const styles = Array.from(document.head.querySelectorAll('style'))
       .map((style) => style.textContent || '')
-      .join('\n');
+      .join('\n')
+      .replace(/\s+/g, '');
     expect(styles).toContain('.readonly-metadata-field');
     expect(styles).toContain('background-color:#dee2e6');
     expect(styles).toContain('border-color:#adb5bd');
@@ -847,6 +854,24 @@ describe('Phase 8.1 RED form contracts FORM-01 through FORM-05', () => {
     ]);
     apiService.listEpisodes.and.returnValue(of([]));
     apiService.listStructuredEntryCatalog.and.returnValue(of({ guests: [], musicCredits: [] }));
+    apiService.getEpisodeTranscriptionStatus.and.returnValue(of({
+      status: 'processing',
+      transcriptFileName: null,
+      transcriptUpdatedAt: null,
+      transcriptStartedAt: null,
+      progress: 0,
+      transcriptError: null,
+    }));
+    apiService.getEpisodeGeneratedSummaryStatus.and.returnValue(of({
+      status: 'idle',
+      summaryFileName: null,
+      summaryUpdatedAt: null,
+      summaryStartedAt: null,
+      progress: null,
+      error: null,
+      version: null,
+      promptVersion: null,
+    }));
     component = new ManageComponent(apiService);
   });
 

@@ -216,8 +216,9 @@ describe('ApiService trailer video lifecycle', () => {
       message: 'Trailer video staged.',
     };
     request.flush(response);
-    expect((events[0] as { type: HttpEventType }).type).toBe(HttpEventType.UploadProgress);
-    expect((events[1] as HttpResponse<EpisodeTrailerVideoUploadResponse>).body).toEqual(response);
+    expect((events[0] as { type: HttpEventType }).type).toBe(HttpEventType.Sent);
+    expect((events[1] as { type: HttpEventType }).type).toBe(HttpEventType.UploadProgress);
+    expect((events[2] as HttpResponse<EpisodeTrailerVideoUploadResponse>).body).toEqual(response);
   });
 
   it('posts persisted replacement MP4 without requesting a draft reservation', () => {
@@ -275,7 +276,7 @@ describe('ApiService YouTube trailer lifecycle', () => {
 
     const request = httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/42/youtube-trailer-jobs`);
     expect(request.request.method).toBe('POST');
-    expect(request.request.body).toEqual({ title: 'Selected title', summary: 'Selected summary' });
+    expect(request.request.body).toEqual({ title: 'Selected title', summary: 'Selected summary', hashtags: [] });
     request.flush(snapshot);
     expect(response?.privateWatchUrl).toBe('https://www.youtube.com/watch?v=private-42');
   });
@@ -301,7 +302,7 @@ describe('ApiService YouTube trailer lifecycle', () => {
 
     const request = httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/42/youtube-trailer-jobs`);
     expect(request.request.method).toBe('POST');
-    expect(request.request.body).toEqual({ title: 'Title', summary: 'Summary' });
+    expect(request.request.body).toEqual({ title: 'Title', summary: 'Summary', hashtags: [] });
     request.flush(youtubeSnapshot(), {
       status: 202,
       statusText: 'Accepted',

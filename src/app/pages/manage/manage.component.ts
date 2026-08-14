@@ -802,6 +802,7 @@ export class ManageComponent implements OnInit, OnDestroy {
     const sourceGeneration = state.sourceGeneration;
     const startToken = Symbol(`youtube-job-start-${episodeId}`);
     state.startInFlight = startToken;
+    state.sourceFileName = sourceFileName;
     state.error = '';
     const hashtags = this.serializeHashtags(editor.formModel.hashtags);
     const title = this.getTrailerTitlePrefix(editor);
