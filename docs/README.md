@@ -50,6 +50,7 @@ The frontend stays thin:
   - episode form + table
   - file staging cards for audio, trailer, trailer video, and covers
   - upload progress bars
+  - automatic YouTube private-transfer status, progress, private link, cancellation, and retry controls displayed inside the trailer-video card
   - delete controls only when a file is present or staged
   - guest search filter
   - pagination footer separated from rows-per-page control

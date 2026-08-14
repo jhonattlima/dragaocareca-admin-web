@@ -102,7 +102,7 @@
 
 The transcript-to-summary flow remains backend-owned: the frontend only polls the two status endpoints and presents progress, errors, and generated text.
 
-Trailer-video and YouTube responsibilities are split at the HTTP boundary: Angular orchestrates selection, progress, private-link presentation, cancellation, retry, replacement-generation guards, Save-time commit requests, and state labels; the API owns validation, authenticated ownership, draft persistence, private provider upload, metadata/publication, provider-video deletion, cleanup reconciliation, canonical naming, promotion, rollback, and persistence. Provider IDs, sessions, credentials, and raw errors remain server-only.
+Trailer-video and YouTube responsibilities are split at the HTTP boundary: Angular orchestrates selection, progress, inline private-link presentation inside the trailer card, cancellation, retry, replacement-generation guards, Save-time commit requests, and state labels; the API owns validation, authenticated ownership, draft persistence, private provider upload, metadata/publication, provider-video deletion, cleanup reconciliation, canonical naming, promotion, rollback, and persistence. Provider IDs, sessions, credentials, and raw errors remain server-only.
 
 ## Error Handling
 

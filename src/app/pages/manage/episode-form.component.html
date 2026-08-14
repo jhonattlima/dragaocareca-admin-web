@@ -72,6 +72,35 @@
               (click)="controller.retryTrailerVideo(editor)">
               Retry upload
             </button>
+            <div *ngIf="editor.formModel.trailerVideoFileName || editor.trailerVideoDraftId" class="youtube-inline-status mt-3" aria-live="polite">
+              <div class="small fw-semibold">YouTube: {{ controller.getYoutubeTrailerJobStatusLabel(controller.getYoutubeTrailerJob(editor)) || 'Starting private transfer…' }}</div>
+              <div class="progress upload-progress mt-2" *ngIf="controller.isYoutubeTrailerJobProgressDeterminate(editor)" role="progressbar" [attr.aria-valuenow]="controller.getYoutubeTrailerJobProgress(editor)" aria-valuemin="0" aria-valuemax="100">
+                <div class="progress-bar" [style.width.%]="controller.getYoutubeTrailerJobProgress(editor)">
+                  {{ controller.getYoutubeTrailerJobProgress(editor) }}%
+                </div>
+              </div>
+              <div class="progress upload-progress mt-2" *ngIf="controller.getYoutubeTrailerJob(editor)?.status === 'processing' && !controller.isYoutubeTrailerJobProgressDeterminate(editor)">
+                <div class="progress-bar progress-bar-indeterminate" style="width: 100%"><span class="visually-hidden">Processing privately on YouTube</span></div>
+              </div>
+              <p class="small mt-2 mb-0" *ngIf="controller.getYoutubeTrailerJobErrorMessage(editor)">{{ controller.getYoutubeTrailerJobErrorMessage(editor) }}</p>
+              <p class="small mt-2 mb-0" *ngIf="controller.getYoutubeTrailerJobPrivateWatchUrl(editor) as privateWatchUrl">
+                Private video: <a [href]="privateWatchUrl" target="_blank" rel="noopener noreferrer">Open private watch URL</a>
+              </p>
+              <button
+                class="btn btn-sm btn-outline-warning mt-2"
+                type="button"
+                *ngIf="controller.canCancelYoutubeTrailerJob(editor)"
+                (click)="controller.cancelYoutubeTrailerJob(editor)">
+                Cancel transfer
+              </button>
+              <button
+                class="btn btn-sm btn-outline-secondary mt-2"
+                type="button"
+                *ngIf="controller.canRetryYoutubeTrailerJob(editor)"
+                (click)="controller.retryYoutubeTrailerJob(editor)">
+                Retry transfer
+              </button>
+            </div>
           </div>
           <div class="alert alert-info py-1 px-2 mt-2 mb-0 small" *ngIf="upload.kind === 'audio' && controller.getGenerationStatus(editor)">
             {{ controller.getGenerationStatus(editor) }}
@@ -94,81 +123,6 @@
             [accept]="upload.accept"
             (change)="controller.onUploadInputChange(editor, $event, upload.kind)">
         </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="section-block youtube-lifecycle-section" *ngIf="editor.formModel.trailerVideoFileName || editor.trailerVideoDraftId">
-    <h2 class="manage-section-title">YouTube private transfer</h2>
-    <p class="section-hint">The trailer can upload privately as soon as staging completes. Saving the episode finalizes its metadata and publishes the video.</p>
-    <div class="youtube-lifecycle-card" aria-live="polite">
-      <div class="d-flex align-items-center justify-content-between gap-2">
-        <strong>{{ controller.getYoutubeTrailerJobStatusLabel(controller.getYoutubeTrailerJob(editor)) || 'Ready to send privately' }}</strong>
-        <span class="text-muted small" *ngIf="controller.getYoutubeTrailerJob(editor)?.error?.category">
-          {{ controller.getYoutubeTrailerJob(editor)?.error?.category }}
-        </span>
-      </div>
-      <p class="small mb-2" *ngIf="!controller.getYoutubeTrailerJob(editor)">
-        The current title and summary will be accepted by the API when the private transfer starts.
-      </p>
-      <div
-        class="progress upload-progress mt-2"
-        *ngIf="controller.isYoutubeTrailerJobProgressDeterminate(editor)"
-        role="progressbar"
-        [attr.aria-valuenow]="controller.getYoutubeTrailerJobProgress(editor)"
-        aria-valuemin="0"
-        aria-valuemax="100">
-        <div class="progress-bar" [style.width.%]="controller.getYoutubeTrailerJobProgress(editor)">
-          {{ controller.getYoutubeTrailerJobProgress(editor) }}%
-        </div>
-      </div>
-      <div
-        class="progress upload-progress mt-2"
-        *ngIf="controller.getYoutubeTrailerJob(editor)?.status === 'processing' && !controller.isYoutubeTrailerJobProgressDeterminate(editor)">
-        <div class="progress-bar progress-bar-indeterminate" style="width: 100%">
-          <span class="visually-hidden">Processing privately on YouTube</span>
-        </div>
-      </div>
-      <p class="small mt-2 mb-0" *ngIf="controller.getYoutubeTrailerJobRetryMessage(editor)">
-        {{ controller.getYoutubeTrailerJobRetryMessage(editor) }}
-      </p>
-      <p class="small mt-2 mb-0" *ngIf="controller.getYoutubeTrailerJobErrorMessage(editor)">
-        {{ controller.getYoutubeTrailerJobErrorMessage(editor) }}
-      </p>
-      <p class="small mt-2 mb-0" *ngIf="controller.getYoutubeTrailerJob(editor)?.status === 'cancel_requested'">
-        Cancellation was accepted locally; provider work may still finish.
-      </p>
-      <p class="small mt-2 mb-0" *ngIf="controller.getYoutubeTrailerJob(editor)?.cancellation?.boundary === 'provider-video-retained'">
-        The private provider video was retained. Reconcile it before any later workflow; this screen will not delete or publish it.
-      </p>
-      <p class="small mt-2 mb-0" *ngIf="controller.getYoutubeTrailerJobPrivateWatchUrl(editor) as privateWatchUrl">
-        Private video: <a [href]="privateWatchUrl" target="_blank" rel="noopener noreferrer">Open private watch URL</a>
-      </p>
-      <p class="small mt-2 mb-0" *ngIf="controller.getYoutubeTrailerJob(editor)?.publicationStatus === 'public_confirmed'">
-        YouTube publication confirmed.
-      </p>
-      <div class="d-flex gap-2 mt-3">
-        <button
-          class="btn btn-sm btn-primary"
-          type="button"
-          [disabled]="!controller.canStartYoutubeTrailerJob(editor)"
-          (click)="controller.startYoutubeTrailerJob(editor)">
-          Upload to YouTube
-        </button>
-        <button
-          class="btn btn-sm btn-outline-secondary"
-          type="button"
-          *ngIf="controller.canRetryYoutubeTrailerJob(editor)"
-          (click)="controller.retryYoutubeTrailerJob(editor)">
-          Retry transfer
-        </button>
-        <button
-          class="btn btn-sm btn-outline-warning"
-          type="button"
-          *ngIf="controller.canCancelYoutubeTrailerJob(editor)"
-          (click)="controller.cancelYoutubeTrailerJob(editor)">
-          Cancel transfer
-        </button>
       </div>
     </div>
   </div>
