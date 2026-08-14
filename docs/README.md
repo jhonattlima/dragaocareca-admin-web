@@ -156,6 +156,8 @@ Media flow:
 
 The trailer workflow starts private YouTube transfer after staged upload. Save-time metadata/publication and provider-video cleanup are API-owned; richer hashtag authoring and artifact-download integration remain separate workflow surfaces.
 
+Hashtag authoring uses Gemini's episode-specific semantic relevance score to rank suggestions. YouTube Data API `search.list` results are advisory availability signals only: `pageInfo.totalResults` is approximate and capped at 1,000,000, so it must not be used as a popularity or hashtag-inventory ranking. The UI displays capped values as `1M+` YouTube search results.
+
 ## UI Direction
 
 Keep the legacy-inspired sectioned layout:

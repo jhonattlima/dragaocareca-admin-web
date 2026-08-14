@@ -234,7 +234,7 @@
             <span class="hashtag-token-popup" *ngIf="controller.hasHashtagLookup(editor, tag)" role="status">
               <ng-container *ngIf="controller.getHashtagLookup(editor) as lookup">
                 <ng-container *ngIf="lookup.state === 'available'; else hashtagUnavailable">
-                  Approx. {{ lookup.approximateCount === null ? 'count unavailable' : (lookup.approximateCount | number) }} public results
+                  Approx. {{ lookup.approximateCount === null ? 'count unavailable' : (lookup.approximateCount >= 1000000 ? '1M+' : (lookup.approximateCount | number)) }} YouTube search results
                   <span *ngIf="lookup.retrievedAt">· retrieved {{ lookup.retrievedAt | date:'short' }}</span>
                 </ng-container>
                 <ng-template #hashtagUnavailable>
