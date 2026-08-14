@@ -81,6 +81,8 @@ The local MP4 lifecycle is API-owned. Before a new-episode upload, the frontend 
 
 The new-episode upload returns `state: "staged"` with no finalized filename. The reservation also creates a hidden draft episode row, allowing a private YouTube job to begin before Save. When YouTube accepts the video, the public DTO exposes only a sanitized private watch URL. `POST /v1/episodes` carries the same `episodeId` and `draftId`; successful creation consumes the reservation, converts the draft row, and promotes staged bytes to `episodes/{episodeId}/trailer.mp4`. Save-time commit waits for private readiness, updates metadata, and publishes. Replacement/deletion invokes idempotent provider-video deletion and records retryable cleanup reconciliation when necessary.
 
+If the browser retries reservation after an interrupted upload, an active reservation owned by the same authenticated user is reused. Stale expired/consumed reservation rows are replaced; an existing saved episode cannot be reserved as a new draft.
+
 `authBypass=true` remains a local frontend/backend development mode and does not change the contract or remove server-side validation. YouTube OAuth, provider deletion, publication, and cleanup remain backend-owned; the browser never receives provider IDs, sessions, credentials, paths, or raw provider errors.
 
 ## Login and Session
