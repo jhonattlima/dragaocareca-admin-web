@@ -152,7 +152,7 @@
       </div>
       <div class="form-group col-md-3 mb-3">
         <label>Duration</label>
-        <input class="form-control" type="text" [(ngModel)]="editor.formModel.duration" readonly>
+        <input class="form-control readonly-field" type="text" [(ngModel)]="editor.formModel.duration" readonly>
       </div>
       <div class="form-group col-md-3 mb-3">
         <label>Explicit</label>
@@ -174,7 +174,7 @@
       </div>
       <div class="form-group col-md-3 mb-3">
         <label>Bytes</label>
-        <input class="form-control" type="number" [(ngModel)]="editor.formModel.bytes" readonly>
+        <input class="form-control readonly-field" type="number" [value]="editor.formModel.bytes == null ? '' : controller.formatBytesAsMegabytes(editor.formModel.bytes)" readonly>
       </div>
     </div>
 
@@ -195,7 +195,7 @@
       </div>
       <div class="form-group col-md-4 mb-3">
         <label>Spotify ID</label>
-        <input class="form-control" type="text" [(ngModel)]="editor.formModel.spotifyId">
+        <input class="form-control readonly-field" type="text" [(ngModel)]="editor.formModel.spotifyId" readonly>
       </div>
     </div>
 
@@ -284,6 +284,9 @@
   <div class="section-block">
     <h2 class="manage-section-title">Music Credits</h2>
     <p class="section-hint mb-2">Same structure as invitees, with name plus one or more links.</p>
+    <p class="error mb-2" *ngIf="!controller.hasCompleteMusicCredit(editor)">
+      Add at least one music credit with a name and reference link before saving.
+    </p>
     <div class="entry-box mb-3" *ngFor="let music of editor.formModel.musicCredits; let i = index">
       <div class="row">
         <div class="col-md-5 mb-2 position-relative">
