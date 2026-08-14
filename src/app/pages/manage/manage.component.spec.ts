@@ -3,7 +3,7 @@ import { HttpEventType, HttpHeaders, HttpResponse } from '@angular/common/http';
 import { fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { of, Subject, throwError } from 'rxjs';
-import { ApiService, Episode, EpisodeArtifactJobSnapshot, EpisodeGeneratedSummaryStatus, EpisodeTrailerVideoUploadResponse, EpisodeTranscriptionStatus, YoutubeTrailerJobSnapshot } from '../../core/api.service';
+import { ApiService, Episode, EpisodeArtifactJobSnapshot, EpisodeGeneratedSummaryStatus, EpisodeTrailerVideoUploadResponse, EpisodeTranscriptionStatus, HashtagLookupResponse, SuggestedTagsSnapshot, YoutubeTrailerJobSnapshot } from '../../core/api.service';
 import { EpisodeFormComponent } from './episode-form.component';
 import { ManageComponent } from './manage.component';
 import { environment as developmentEnvironment } from '../../../environments/environment';
@@ -28,6 +28,7 @@ describe('ManageComponent summary flow', () => {
       'uploadEpisodeAudio',
       'uploadEpisodeTrailer',
       'createEpisode',
+      'lookupHashtag',
     ]);
     apiService.listEpisodes.and.returnValue(of([]));
     apiService.downloadEpisodeArtifact.and.returnValue(of(new HttpResponse<Blob>({
@@ -36,6 +37,67 @@ describe('ManageComponent summary flow', () => {
     })));
     component = new ManageComponent(apiService);
   });
+
+  it('merges generated suggestions additively without touching generic episode tags', () => {
+    const editor = component.addEditorState;
+    editor.formModel.episodeId = 42;
+    editor.formModel.tags = ['podcast', 'rpg'];
+    editor.formModel.hashtags = '#manual #rpg';
+    const suggestedTags: SuggestedTagsSnapshot = {
+      status: 'done', version: 2, updatedAt: '2026-08-14T00:00:00.000Z', startedAt: null,
+      finishedAt: '2026-08-14T00:00:00.000Z', retryAt: null, errorCategory: null,
+      promptVersion: 'hashtags-v1', suggestions: [
+        { displayTag: '#rpg', normalizedTag: '#rpg', approximateCount: 10, retrievedAt: null, cacheStatus: 'miss', regionCode: 'BR', relevanceLanguage: 'pt', relevanceScore: 90 },
+        { displayTag: '#fantasy', normalizedTag: '#fantasy', approximateCount: 9, retrievedAt: null, cacheStatus: 'miss', regionCode: 'BR', relevanceLanguage: 'pt', relevanceScore: 80 },
+        { displayTag: '#podcast', normalizedTag: '#podcast', approximateCount: 8, retrievedAt: null, cacheStatus: 'miss', regionCode: 'BR', relevanceLanguage: 'pt', relevanceScore: 70 },
+      ],
+    };
+    apiService.getEpisodeGeneratedSummaryStatus.and.returnValue(of({
+      status: 'done', summaryFileName: null, summaryUpdatedAt: null, summaryStartedAt: null,
+      progress: 100, error: null, version: 1, promptVersion: 'summary-v1', summaryText: 'Generated', suggestedTags,
+    }));
+
+    (component as unknown as { syncSummaryStatusPolling: (episodeId: number, targetEditor: typeof editor) => void })
+      .syncSummaryStatusPolling(42, editor);
+
+    expect(editor.formModel.hashtags).toBe('#manual #rpg #fantasy');
+    expect(editor.formModel.tags).toEqual(['podcast', 'rpg']);
+    expect(editor.formModel.summary).toBe('Generated');
+  });
+
+  it('derives a Unicode-aware read-only title and rejects an assembled title over 100 code points', () => {
+    const editor = component.addEditorState;
+    editor.formModel.title = 'Episode 😀';
+    editor.formModel.hashtags = '#rpg #fantasy';
+
+    expect(component.getTrailerTitle(editor)).toBe('Trailer - Episode 😀 #rpg #fantasy');
+    expect(component.getTrailerTitleCodePointLength(editor)).toBe([...component.getTrailerTitle(editor)].length);
+    expect(component.getTrailerTitleValidationError(editor)).toBe('');
+
+    editor.formModel.title = 'x'.repeat(90);
+    editor.formModel.hashtags = '#rpg';
+    expect(component.getTrailerTitleValidationError(editor)).toContain('100 Unicode characters');
+    expect(component.isEpisodeSaveDisabled(editor)).toBeTrue();
+  });
+
+  it('debounces hashtag lookup and ignores a late response after a newer token', fakeAsync(() => {
+    const editor = component.addEditorState;
+    editor.formModel.episodeId = 42;
+    const first = new Subject<HashtagLookupResponse>();
+    const second = new Subject<HashtagLookupResponse>();
+    apiService.lookupHashtag.and.returnValues(first.asObservable(), second.asObservable());
+
+    component.onHashtagInput(editor);
+    tick(1000);
+    expect(apiService.lookupHashtag).toHaveBeenCalledWith(42, jasmine.any(String));
+    editor.formModel.hashtags = '#new';
+    component.onHashtagInput(editor);
+    tick(1000);
+    first.next({ displayTag: '#old', normalizedTag: '#old', approximateCount: 1, retrievedAt: null, cacheStatus: 'miss', regionCode: 'BR', relevanceLanguage: 'pt', source: 'provider', state: 'available', errorCategory: null, retryAt: null });
+    second.next({ displayTag: '#new', normalizedTag: '#new', approximateCount: 2, retrievedAt: null, cacheStatus: 'miss', regionCode: 'BR', relevanceLanguage: 'pt', source: 'provider', state: 'available', errorCategory: null, retryAt: null });
+
+    expect(component.getHashtagLookup(editor)?.normalizedTag).toBe('#new');
+  }));
 
   it('marks the summary as manually edited when the field changes', () => {
     const editor = component.addEditorState;

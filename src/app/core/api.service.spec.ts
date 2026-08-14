@@ -8,8 +8,79 @@ import {
   EpisodeArtifactJobSnapshot,
   EpisodeArtifactSelector,
   EpisodeTrailerVideoUploadResponse,
+  EpisodeGeneratedSummaryStatus,
+  HashtagLookupResponse,
+  SuggestedTagsSnapshot,
   YoutubeTrailerJobSnapshot,
 } from './api.service';
+
+describe('ApiService title and hashtag authoring contract', () => {
+  let apiService: ApiService;
+  let httpTestingController: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [HttpClientTestingModule],
+      providers: [ApiService],
+    });
+    apiService = TestBed.inject(ApiService);
+    httpTestingController = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => httpTestingController.verify());
+
+  it('maps suggestedTags metadata and safe terminal/error state from the summary snapshot', () => {
+    const suggestedTags: SuggestedTagsSnapshot = {
+      status: 'unavailable',
+      version: 4,
+      updatedAt: '2026-08-14T00:00:00.000Z',
+      startedAt: '2026-08-13T23:59:00.000Z',
+      finishedAt: '2026-08-14T00:00:00.000Z',
+      retryAt: '2026-08-14T01:00:00.000Z',
+      errorCategory: 'rate_limited',
+      promptVersion: 'hashtags-v1',
+      suggestions: [],
+    };
+    let response: EpisodeGeneratedSummaryStatus | undefined;
+    apiService.getEpisodeGeneratedSummaryStatus(42).subscribe(value => response = value);
+
+    const request = httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/42/episodes-generated-summary`);
+    request.flush({
+      status: 'done', summaryFileName: null, summaryUpdatedAt: null, summaryStartedAt: null,
+      progress: 100, error: null, version: 2, promptVersion: 'summary-v2', summaryText: 'Summary', suggestedTags,
+    });
+
+    expect(response?.suggestedTags).toEqual(suggestedTags);
+    expect(response?.suggestedTags?.errorCategory).toBe('rate_limited');
+  });
+
+  it('posts one hashtag to the authenticated lookup route and exposes safe unavailable responses', () => {
+    const lookup: HashtagLookupResponse = {
+      displayTag: '#rpg', normalizedTag: '#rpg', approximateCount: null, retrievedAt: null,
+      cacheStatus: 'miss', regionCode: 'BR', relevanceLanguage: 'pt', source: 'provider',
+      state: 'unavailable', errorCategory: 'quota_exhausted', retryAt: '2026-08-14T01:00:00.000Z',
+    };
+    let response: HashtagLookupResponse | undefined;
+    apiService.lookupHashtag(42, '#rpg').subscribe({ error: error => response = error.error });
+
+    const request = httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/42/hashtag-lookup`);
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({ tag: '#rpg' });
+    request.flush(lookup, { status: 429, statusText: 'Too Many Requests' });
+
+    expect(response?.state).toBe('unavailable');
+    expect(response?.errorCategory).toBe('quota_exhausted');
+  });
+
+  it('commits the computed title and authored hashtags in the required publication body', () => {
+    apiService.commitYoutubeTrailerJob(42, 'job-42', 'Trailer - Episode #rpg', ['#rpg']).subscribe();
+
+    const request = httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/42/youtube-trailer-jobs/commit`);
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({ jobId: 'job-42', title: 'Trailer - Episode #rpg', hashtags: ['#rpg'] });
+    request.flush(youtubeSnapshot());
+  });
+});
 
 describe('ApiService artifact jobs', () => {
   let apiService: ApiService;
