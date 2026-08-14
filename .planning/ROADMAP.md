@@ -36,7 +36,7 @@ v1.2 extends the existing episode workflow from finalized local trailer video th
 
 - [ ] **Phase 7: Final Trailer Video Upload** - Select, upload, cancel, retry, and safely replace a final MP4 through the existing trailer-video API route.
 - [ ] **Phase 8: YouTube Job Lifecycle** - Persist and execute resumable server-side YouTube uploads through private readiness with safe retry and cancellation boundaries.
-- [ ] **Phase 9: Title, Hashtags & Publishing** - Finalize YouTube metadata and publish the already private-ready trailer through the existing Save boundary.
+- [ ] **Phase 9: Title & Hashtag Authoring** - Finalize the operator-facing trailer title and hashtag lookup/counting before the existing Phase 8 Save publication boundary.
 - [ ] **Phase 10: Operator Workflow Integration** - Connect the API contracts to the sectioned Angular workflow with thin orchestration and stale-state protection.
 - [ ] **Phase 11: Trailer Artifact & Compatibility Release** - Make only finalized trailer videos downloadable and preserve existing application behavior and release gates.
 
@@ -97,16 +97,18 @@ Plans:
 - [x] 08.1-02-PLAN.md — Integrate Angular defaults, upload mapping, participant config, and form validation
 - [x] 08.1-03-PLAN.md — Synchronize docs and run cross-repository verification gates
 
-### Phase 9: Title, Hashtags & Publishing
+### Phase 9: Title & Hashtag Authoring
 
-**Goal**: Operators can edit the final YouTube title and hashtags, request approximate hashtag counts, and have Save commit metadata before publishing the already private-ready trailer.
+**Goal**: Operators can edit and validate the final YouTube trailer title and hashtags, then rely on the existing Phase 8 Save publication boundary for the already private-ready video.
 **Depends on**: Phase 8
 **Requirements**: TITLE-01, TITLE-02, TITLE-03, TITLE-04
 **Success Criteria** (what must be TRUE):
 
   1. User receives an editable `Trailer - {episode name}` title suggestion containing selected hashtag values, with a shared 100-Unicode-character limit and clear forbidden-character validation that preserves edits.
   2. User can request a normalized hashtag lookup and see an explicitly approximate public-result count with retrieval time, or a recoverable unavailable/error state.
-  3. Saving the episode commits the summary, title, and hashtags before the API changes the already private-ready video to public; repeated Save/commit requests are safely idempotent.
+  3. The authored title and hashtags are included in the existing Save/start/commit metadata contract without adding browser-side YouTube provider calls or a second publication flow.
+
+**Phase 8 handoff**: Private transfer, private-ready link population, Save-time summary/title/hashtag commit, and idempotent public publication are already implemented by Phase 8. The remaining Phase 8 live checkpoint is validation of that Save-time publication sequence after the episode-save patch fixes; it is not new Phase 9 implementation scope.
 
 **Plans**: TBD
 **UI hint**: yes

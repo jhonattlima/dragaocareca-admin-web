@@ -21,9 +21,9 @@ locked decisions from `08-CONTEXT.md`.
 | Logs/DTO/OpenAPI sanitization | Serialized evidence omits credentials, session URLs, raw provider payloads/messages/reasons, filesystem paths, provider IDs, leases, and stack traces. | Verifier negative serialized-field assertions plus safe OpenAPI schema. | Covered: OPS-01, T-08-06, D-11 |
 | Existing API publish idempotency | Retain the authenticated API publish route; repeated requests reconcile the same provider video and publication row. Phase 8 verifier proves route presence/boundary; publication-specific fake-provider evidence remains in the sibling publication verifier. | `/youtube-trailer-jobs/{jobId}/publish`, `publishYoutubeTrailer`, publication verifier. | Covered API seam: OPS-03; no Angular publish control in Phase 8 |
 | Browser OAuth/direct provider calls | Browser never receives OAuth credentials or calls YouTube; Angular calls only the authenticated sibling API. | Architecture contract and API-only provider boundary. | Explicit opt-out: Phase 8 security boundary; API owns OAuth |
-| Angular publish controls | No Angular Publish action or publication workflow is added. | Lifecycle verifier boundary assertion and Manage scope. | Explicit opt-out: Phase 9/10 own publication authoring/UI; API publish route remains |
+| Angular publish controls | No separate Angular Publish action or provider workflow is added; Save remains the publication boundary. | Manage Save calls the API commit route after episode persistence. | Covered by Phase 8; Phase 9 owns title/hashtag authoring only |
 | Automatic deletion/publication | No automatic public transition or deletion of a retained/private provider video. | Cancellation/service/provider contract. | Explicit opt-out: Phase 8 only reports status/link/guidance; publication is explicit and deletion is future scope |
-| Rich title authoring and 100-Unicode validation | Phase 8 accepts basic title/summary only; richer title assembly and Unicode validation are not part of job start. | Start schema and Phase 9 handoff. | Explicit opt-out: Phase 9 |
+| Rich title authoring and 100-Unicode validation | Phase 8 accepts/publishes basic title/summary metadata, but richer title assembly and Unicode validation are not part of job start. | Start schema and Phase 9 handoff. | Explicit opt-out: Phase 9 |
 | Hashtag lookup/count | Not part of the private upload lifecycle. | Requirements/roadmap boundary. | Explicit opt-out: Phase 9 |
 | Trailer artifact download | Existing artifact routes are unchanged by YouTube jobs. | Phase 7 artifact contract and regression verifier. | Explicit opt-out: Phase 11 |
 | Final workflow-wide integration | Backend lifecycle evidence is complete, but full placement and compatibility release integration is not claimed here. | Phase 8 verifier/build; roadmap handoff. | Explicit opt-out: Phase 10; OPS-05 remains there |
@@ -33,9 +33,9 @@ locked decisions from `08-CONTEXT.md`.
 
 Phase 8 provides a durable private-ready job, accepted title/summary input,
 normalized status/error/cancellation data, an optional sanitized `privateWatchUrl`,
-and the existing API-owned idempotent publish route. Phase 9 owns richer title
-validation, hashtag authoring/counting, link persistence after publication, and
-publication UI. Phase 10 owns final Angular workflow integration. Phase 11 owns
+Save-time metadata commit, and the existing API-owned idempotent publish route.
+Phase 9 owns richer title validation and hashtag authoring/counting; it does not
+introduce a second publication flow. Phase 10 owns final Angular workflow integration. Phase 11 owns
 adding finalized `trailer-video` to the artifact modal and ZIP flow.
 
 No capability above is silently omitted: every unsupported provider/API surface is
