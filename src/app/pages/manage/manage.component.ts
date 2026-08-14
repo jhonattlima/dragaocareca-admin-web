@@ -2539,6 +2539,7 @@ export class ManageComponent implements OnInit, OnDestroy {
             }
             if (kind === 'audio' && !this.hasConfirmedAudioMetadata(episode)) {
               this.errorMessage = 'Episode audio upload did not return confirmed duration and bytes metadata.';
+              this.successMessage = '';
               this.uploadStates[kind] = { ...this.uploadStates[kind], progress: 0 };
               return;
             }
