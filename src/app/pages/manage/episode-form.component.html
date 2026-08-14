@@ -198,7 +198,7 @@
         <input class="form-control readonly-field" type="text" [(ngModel)]="editor.formModel.spotifyId" readonly>
       </div>
       <div class="form-group col-md-5 mb-3 hashtag-authoring-field" (click)="$event.stopPropagation()">
-        <label [attr.for]="'episode-hashtags-' + (editor.editingEpisodeId || 'new')">Hashtags</label>
+        <label [attr.for]="'episode-hashtags-' + (editor.editingEpisodeId || 'new')">Youtube Trailer Hashtags</label>
         <input
           [attr.id]="'episode-hashtags-' + (editor.editingEpisodeId || 'new')"
           class="form-control"
