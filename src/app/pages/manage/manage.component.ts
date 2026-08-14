@@ -929,6 +929,11 @@ export class ManageComponent implements OnInit, OnDestroy {
     if (snapshot.privateWatchUrl) {
       editor.formModel.youtube = snapshot.privateWatchUrl;
     }
+    if (snapshot.status === 'ready') {
+      this.successMessage = 'Trailer uploaded privately to YouTube.';
+    } else if (snapshot.publicationStatus === 'public_confirmed') {
+      this.successMessage = 'Trailer published publicly on YouTube.';
+    }
     if (['ready', 'failed', 'cancelled', 'obsolete'].includes(snapshot.status)) {
       this.stopYoutubeTrailerJobPolling(editor);
     }

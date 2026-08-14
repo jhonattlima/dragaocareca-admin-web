@@ -100,6 +100,13 @@
                 (click)="controller.retryYoutubeTrailerJob(editor)">
                 Retry transfer
               </button>
+              <button
+                class="btn btn-sm btn-primary mt-2"
+                type="button"
+                *ngIf="controller.getYoutubeTrailerJob(editor)?.status === 'cancelled'"
+                (click)="controller.startYoutubeTrailerJob(editor)">
+                Upload to YouTube
+              </button>
             </div>
           </div>
           <div class="alert alert-info py-1 px-2 mt-2 mb-0 small" *ngIf="upload.kind === 'audio' && controller.getGenerationStatus(editor)">
