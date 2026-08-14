@@ -19,32 +19,17 @@ npm test -- --watch
 
 Tests are colocated with source files as `*.spec.ts`.
 
-Current visible test coverage is very small:
-
-- `src/app/app.component.spec.ts`
-
-## Current Test Gap
-
-The current root spec is stale relative to the app implementation:
-
-- It expects `app.title`.
-- It expects `.content span` text in the template.
-
-The current `AppComponent` instead renders:
-
-- the mosaic background
-- the router outlet
-- no title property
-
-So the existing test should be replaced before relying on the suite for correctness.
+Current coverage is concentrated in the phase-focused tests listed by each phase
+plan. The root shell spec is not treated as the source of truth for feature
+verification; feature contracts should be covered by colocated component,
+service, and API contract tests.
 
 ## Suggested Coverage Priorities
 
-1. Root shell rendering and mosaic fetch fallback.
-2. Auth bypass and login redirect behavior.
-3. Episode save/upload/delete flows in `ManageComponent`.
-4. Feed XML parsing and fallback error handling.
-5. Health and metrics rendering from backend responses.
+1. Auth bypass and login redirect behavior.
+2. Episode save/upload/delete flows in `ManageComponent`.
+3. Feed XML parsing and fallback error handling.
+4. Health and metrics rendering from backend responses.
 
 ## Notes
 
