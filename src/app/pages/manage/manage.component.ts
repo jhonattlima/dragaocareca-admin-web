@@ -679,7 +679,6 @@ export class ManageComponent implements OnInit, OnDestroy {
     return Number.isInteger(editor.formModel.episodeId)
       && (editor.formModel.episodeId ?? 0) > 0
       && Boolean(this.getYoutubeSourceIdentity(editor))
-      && Boolean(editor.formModel.title?.trim())
       && state.startInFlight === null
       && !(snapshot && !['failed', 'cancelled', 'obsolete'].includes(snapshot.status));
   }
@@ -784,7 +783,8 @@ export class ManageComponent implements OnInit, OnDestroy {
     state.startInFlight = startToken;
     state.error = '';
     const hashtags = (editor.formModel.tags ?? []).slice(0, 3).map((tag) => tag.startsWith('#') ? tag : `#${tag.replace(/\s+/g, '')}`);
-    this.apiService.startYoutubeTrailerJob(episodeId, editor.formModel.title.trim(), editor.formModel.summary.trim(), editor.trailerVideoDraftId, hashtags).subscribe({
+    const title = editor.formModel.title.trim() || `Trailer - Episode ${episodeId}`;
+    this.apiService.startYoutubeTrailerJob(episodeId, title, editor.formModel.summary.trim(), editor.trailerVideoDraftId, hashtags).subscribe({
       next: (snapshot) => {
         if (state.startInFlight !== startToken || !this.isCurrentYoutubeSource(editor, state, episodeId, sourceGeneration, sourceFileName)) {
           return;
