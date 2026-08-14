@@ -963,6 +963,33 @@ describe('Phase 8.1 RED form contracts FORM-01 through FORM-05', () => {
     expect(component.errorMessage).toContain('metadata');
   });
 
+  it('retains the selected audio file and exposes Try again after transcription failure', () => {
+    const editor = component.addEditorState;
+    editor.formModel.episodeId = 42;
+    editor.formModel.transcriptStatus = 'error';
+    const audio = new File(['browser bytes'], 'episode.mp3', { type: 'audio/mpeg' });
+    apiService.uploadEpisodeAudio.and.returnValue(of(new HttpResponse<Episode>({
+      body: {
+        episodeId: 42,
+        title: 'Episode',
+        summary: '',
+        pubDate: '2026-05-06T09:10:00.000Z',
+        explicit: 'no',
+        fileName: 'episodes/42/episode.mp3',
+        duration: '01:02:03',
+        bytes: 1234567,
+      },
+    })));
+
+    component.uploadMedia(editor, 'audio', audio);
+    editor.formModel.transcriptStatus = 'error';
+
+    expect(component.canRetryUpload(editor, 'audio')).toBeTrue();
+    component.retryUpload(editor, 'audio');
+    expect(apiService.uploadEpisodeAudio).toHaveBeenCalledTimes(2);
+    expect(apiService.uploadEpisodeAudio.calls.mostRecent().args[1]).toBe(audio);
+  });
+
   it('FORM-02/D-04 keeps trailer-audio mapping filename-only', () => {
     const editor = component.addEditorState;
     editor.formModel.episodeId = 42;

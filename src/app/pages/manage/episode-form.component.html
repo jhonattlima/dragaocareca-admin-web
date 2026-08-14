@@ -116,6 +116,13 @@
             *ngIf="upload.kind === 'audio' && controller.getGenerationStatus(editor)">
             {{ controller.getGenerationStatus(editor) }}
           </div>
+          <button
+            class="btn btn-sm btn-outline-warning mt-2"
+            type="button"
+            *ngIf="upload.kind === 'audio' && controller.canRetryUpload(editor, 'audio')"
+            (click)="controller.retryUpload(editor, 'audio')">
+            Try again
+          </button>
           <div class="progress upload-progress mt-2" *ngIf="upload.kind === 'audio' && controller.hasGenerationProgress(editor)">
             <div
               class="progress-bar"

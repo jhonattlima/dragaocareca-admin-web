@@ -212,6 +212,7 @@ export class ManageComponent implements OnInit, OnDestroy {
   readonly addEditorState: EpisodeEditorState = this.buildEditorState();
   readonly episodesEditorState: EpisodeEditorState = this.buildEditorState();
   private readonly trailerVideoStates = new WeakMap<EpisodeEditorState, TrailerVideoState>();
+  private readonly retryableUploadFiles = new WeakMap<EpisodeEditorState, Partial<Record<UploadKind, File>>>();
   private readonly trailerVideoReservations = new WeakMap<EpisodeEditorState, Subscription>();
   private readonly youtubeTrailerJobStates = new WeakMap<EpisodeEditorState, YoutubeTrailerJobState>();
   private readonly hashtagLookupStates = new WeakMap<EpisodeEditorState, HashtagLookupState>();
@@ -1780,6 +1781,20 @@ export class ManageComponent implements OnInit, OnDestroy {
     return this.uploadStates[kind].busy || this.uploadStates[kind].deleting;
   }
 
+  canRetryUpload(editor: EpisodeEditorState, kind: UploadKind): boolean {
+    return kind === 'audio'
+      && Boolean(this.retryableUploadFiles.get(editor)?.[kind])
+      && this.isGenerationError(editor)
+      && !this.isUploadBusy(kind);
+  }
+
+  retryUpload(editor: EpisodeEditorState, kind: UploadKind): void {
+    const file = this.retryableUploadFiles.get(editor)?.[kind];
+    if (file && this.canRetryUpload(editor, kind)) {
+      this.uploadMedia(editor, kind, file);
+    }
+  }
+
   getTrailerVideoStatus(editor: EpisodeEditorState): TrailerVideoLifecycle {
     return this.getTrailerVideoState(editor).status;
   }
@@ -2746,6 +2761,9 @@ export class ManageComponent implements OnInit, OnDestroy {
     }
 
     if (kind === 'audio') {
+      const retryFiles = this.retryableUploadFiles.get(editor) ?? {};
+      retryFiles[kind] = file;
+      this.retryableUploadFiles.set(editor, retryFiles);
       this.transcriptionTerminalFailures.delete(episodeId);
       editor.formModel.transcriptStatus = 'pending';
       editor.formModel.transcriptUpdatedAt = new Date().toISOString();
