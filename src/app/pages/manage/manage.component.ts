@@ -2406,7 +2406,12 @@ export class ManageComponent implements OnInit, OnDestroy {
           state.progress = 100;
           // The draft has a server-issued episode identity, so the private
           // YouTube transfer can begin before Save promotes local media.
-          this.startYoutubeTrailerJob(editor);
+          if (response.youtubeJob) {
+            this.storeYoutubeTrailerJob(editor, response.youtubeJob, this.getYoutubeSourceIdentity(editor));
+            this.ensureYoutubeTrailerJobPolling(editor, response.youtubeJob.jobId);
+          } else {
+            this.startYoutubeTrailerJob(editor);
+          }
         } else {
           state.status = 'finalized';
           state.progress = 100;

@@ -286,6 +286,7 @@ export interface EpisodeTrailerVideoUploadResponse {
   trailerVideoFileName: string | null;
   trailerVideoSyncStatus?: 'unpublished' | 'manual-sync-required' | 'synced';
   message: string;
+  youtubeJob?: YoutubeTrailerJobSnapshot | null;
 }
 
 export interface HealthStatus {
