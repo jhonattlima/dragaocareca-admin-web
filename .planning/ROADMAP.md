@@ -99,12 +99,12 @@ Plans:
 
 ### Phase 9: Title & Hashtag Authoring
 
-**Goal**: Operators can edit and validate the final YouTube trailer title and hashtags, then rely on the existing Phase 8 Save publication boundary for the already private-ready video.
+**Goal**: Operators can author and validate trailer hashtags, review the computed final YouTube trailer title, and rely on the existing Phase 8 Save publication boundary for the already private-ready video.
 **Depends on**: Phase 8
 **Requirements**: TITLE-01, TITLE-02, TITLE-03, TITLE-04
 **Success Criteria** (what must be TRUE):
 
-  1. User receives an editable `Trailer - {episode name}` title suggestion containing selected hashtag values, with a shared 100-Unicode-character limit and clear forbidden-character validation that preserves edits.
+  1. User receives a read-only computed `Trailer - {episode name}` title preview containing selected hashtag values, with a shared 100-Unicode-character limit and clear validation that preserves authored episode-name and hashtag edits.
   2. User can request a normalized hashtag lookup and see an explicitly approximate public-result count with retrieval time, or a recoverable unavailable/error state.
   3. The authored title and hashtags are included in the existing Save/start/commit metadata contract without adding browser-side YouTube provider calls or a second publication flow.
 
@@ -120,7 +120,7 @@ Plans:
 **Requirements**: OPS-05
 **Success Criteria** (what must be TRUE):
 
-  1. User can complete local upload, YouTube status polling, title editing, hashtag lookup, link review, and explicit publish from the existing New Episode workflow without browser-side YouTube OAuth or provider calls.
+  1. User can complete local upload, YouTube status polling, title-preview review, hashtag lookup, link review, and Save-time publication from the existing New Episode workflow without browser-side YouTube OAuth or provider calls.
   2. Closing or reloading the page does not create duplicate jobs, and late responses for an older trailer cannot overwrite the current episode's title, link, or status.
   3. Existing authentication and `authBypass` modes continue to protect or enable the workflow appropriately, while episode editing and generated-summary behavior remain usable.
   4. The sectioned, legacy-inspired layout presents separate local and YouTube stages, actionable errors, cancellation boundaries, and replacement warnings instead of a misleading single progress state.

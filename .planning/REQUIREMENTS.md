@@ -26,8 +26,8 @@
 
 ### Title and Hashtag Support
 
-- [ ] **TITLE-01**: The UI suggests a trailer title using `Trailer - {episode name}` and the selected hashtag values while allowing the user to edit it before upload or publish.
-- [ ] **TITLE-02**: The API and UI enforce a maximum of 100 Unicode characters and reject or explain invalid title characters without silently overwriting the user's edited title.
+- [ ] **TITLE-01**: The UI shows a read-only trailer title preview using `Trailer - {episode name}` and the selected hashtag values, updating automatically as the episode name or hashtags change.
+- [ ] **TITLE-02**: The API and UI enforce a maximum of 100 Unicode characters for the assembled trailer title and explain invalid titles without silently overwriting the authored episode name or hashtags.
 - [ ] **TITLE-03**: The user can enter a hashtag and request a count of matching public YouTube search results, with the result labeled approximate and showing its retrieval time.
 - [ ] **TITLE-04**: Hashtag lookup is normalized, debounced or explicitly triggered, cached/rate-limited by the API, and exposes a recoverable unavailable/error state.
 
