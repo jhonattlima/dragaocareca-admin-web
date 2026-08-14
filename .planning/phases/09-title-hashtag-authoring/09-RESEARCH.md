@@ -301,27 +301,27 @@ YouTube documents `search.list` `pageInfo.totalResults` as approximate, with a m
 | A2 | A monotonically increasing lookup token plus unsubscribe is sufficient stale-response protection for the Angular lookup flow. [ASSUMED] | Pattern 2 | A late response could show the wrong count if the guard is incomplete. |
 | A3 | The new separate hashtag field should replace or coexist with existing generic `tags` persistence without a data migration. [ASSUMED] | Pitfall 2 / State of the Art | Existing episode tags may be lost or unrelated tags may publish; planner needs a locked mapping decision. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **D-01/D-02 versus TITLE-01: is the trailer title strictly read-only or directly editable?**
    - What we know: context explicitly locks a separate editable hashtag field and read-only computed trailer-name field; REQUIREMENTS.md says “while allowing the user to edit it.” [VERIFIED: 09-CONTEXT.md] [VERIFIED: .planning/REQUIREMENTS.md]
    - What's unclear: which wording governs the implementation and API payload.
-   - Recommendation: resolve in planning/discussion before tasks; do not implement an editable title control while D-01/D-02 remain locked.
+   - Resolution: D-01/D-02 are authoritative. The title is a read-only computed preview; only the separate hashtag field is editable. Requirements and roadmap were corrected accordingly.
 
 2. **Where is authored hashtag state persisted for Save/commit?**
    - What we know: current episode DTO has `tags`; current commit reads `episode.tags`, while start accepts transient hashtags. [VERIFIED: src/app/core/api.service.ts] [VERIFIED: ../dragaocareca-admin-api/src/routes/episodes.routes.ts]
    - What's unclear: whether `tags` becomes the canonical trailer hashtag field or a new API/database property is required.
-   - Recommendation: use one canonical API-owned representation and update create/update/commit DTOs together; add contract tests for start, save, commit, and reload.
+   - Resolution: keep the existing episode schema unchanged and make the authenticated Save/commit request body (`title`, `hashtags`) the canonical publication input. The API persists it in the existing YouTube job `metadata_snapshot_json` through `requestPublication`; start metadata remains the pre-Save snapshot and commit metadata is the final Save-time override. This avoids mixing trailer hashtags with legacy episode taxonomy tags while preserving reload/retry durability.
 
 3. **What exact TTL should deployed API use?**
    - What we know: code supports configurable TTL and `.env.example` defaults are 24h success/6h zero, not approximately one hour. [VERIFIED: ../dragaocareca-admin-api/src/config/env.ts] [VERIFIED: ../dragaocareca-admin-api/.env.example]
    - What's unclear: whether deployment env overrides those defaults.
-   - Recommendation: inspect deployment configuration and set/test the intended one-hour freshness explicitly.
+   - Resolution: set the checked-in API defaults for successful and zero-result lookups to one hour, retain environment configurability, and document that deployed environments must override only deliberately. Error/unavailable responses remain non-cacheable or use the API's existing retry policy.
 
 4. **Should automatic authoring be enabled in the target environment?**
    - What we know: `.env.example` sets `YOUTUBE_HASHTAG_AUTHORING_ENABLED=false`; missing Gemini/YouTube credentials yield recoverable unavailable states. [VERIFIED: ../dragaocareca-admin-api/.env.example] [VERIFIED: ../dragaocareca-admin-api/src/services/episode-hashtag-authoring.service.ts]
    - What's unclear: whether Phase 9 is expected to validate only disabled/unavailable UI or live generated suggestions.
-   - Recommendation: test both; do not block manual authoring when automatic work is unavailable.
+   - Resolution: automatic authoring remains API-configured and may be unavailable without blocking manual hashtag entry. Tests cover enabled/fake-provider and unavailable/disabled states.
 
 ## Environment Availability
 

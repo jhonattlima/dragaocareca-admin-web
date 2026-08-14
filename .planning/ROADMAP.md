@@ -110,7 +110,11 @@ Plans:
 
 **Phase 8 handoff**: Private transfer, private-ready link population, Save-time summary/title/hashtag commit, and idempotent public publication are already implemented by Phase 8. The remaining Phase 8 live checkpoint is validation of that Save-time publication sequence after the episode-save patch fixes; it is not new Phase 9 implementation scope.
 
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 09-01-PLAN.md — Correct API title/hashtag publication contract, validation, and one-hour lookup cache
+- [ ] 09-02-PLAN.md — Add Angular DTOs, summary suggestion merge, title validation, debounce, and payload orchestration
+- [ ] 09-03-PLAN.md — Wire the sectioned hashtag/title UI and accessible lookup feedback styling
 **UI hint**: yes
 
 ### Phase 10: Operator Workflow Integration
