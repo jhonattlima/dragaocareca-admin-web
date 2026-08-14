@@ -4,6 +4,7 @@ import { environment } from '../../environments/environment';
 import { HttpEventType, HttpHeaders, HttpResponse } from '@angular/common/http';
 import {
   ApiService,
+  Episode,
   EpisodeArtifactJobSnapshot,
   EpisodeArtifactSelector,
   EpisodeTrailerVideoUploadResponse,
@@ -287,6 +288,113 @@ describe('ApiService YouTube trailer lifecycle', () => {
       request.flush(youtubeSnapshot({ status }));
       expect(response?.status).toBe(status);
     });
+  });
+});
+
+describe('ApiService Phase 8.1 RED audio contract seams', () => {
+  let apiService: ApiService;
+  let httpTestingController: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [HttpClientTestingModule],
+      providers: [ApiService],
+    });
+    apiService = TestBed.inject(ApiService);
+    httpTestingController = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => httpTestingController.verify());
+
+  it('FORM-02/D-04/D-05/D-06 sends episode audio as multipart and preserves backend-confirmed metadata', () => {
+    const file = new File(['browser bytes'], 'episode.mp3', { type: 'audio/mpeg' });
+    let response: Episode | undefined;
+    apiService.uploadEpisodeAudio(42, file).subscribe(event => {
+      if (event.type === HttpEventType.Response) {
+        response = event.body ?? undefined;
+      }
+    });
+
+    const request = httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/42/audio`);
+    expect(request.request.method).toBe('POST');
+    expect(request.request.reportProgress).toBeTrue();
+    expect(request.request.body instanceof FormData).toBeTrue();
+    expect((request.request.body as FormData).get('file')).toEqual(file);
+    request.flush({
+      episodeId: 42,
+      title: 'Episode',
+      summary: '',
+      pubDate: '2026-05-06T09:10:00.000Z',
+      explicit: 'no',
+      duration: '01:02:03',
+      bytes: 1234567,
+    });
+
+    expect(response?.duration).toBe('01:02:03');
+    expect(response?.bytes).toBe(1234567);
+  });
+
+  it('FORM-02/D-05/D-08 does not invent missing confirmed metadata in the API response seam', () => {
+    let response: Episode | undefined;
+    apiService.uploadEpisodeAudio(42, new File(['audio'], 'episode.mp3', { type: 'audio/mpeg' }))
+      .subscribe(event => {
+        if (event.type === HttpEventType.Response) {
+          response = event.body ?? undefined;
+        }
+      });
+    const request = httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/42/audio`);
+    request.flush({
+      episodeId: 42,
+      title: 'Episode',
+      summary: '',
+      pubDate: '2026-05-06T09:10:00.000Z',
+      explicit: 'no',
+    });
+
+    expect(response?.duration).toBeUndefined();
+    expect(response?.bytes).toBeUndefined();
+  });
+
+  it('FORM-02/D-04 keeps trailer audio on the filename/message response contract', () => {
+    let response: Episode & { message?: string } | undefined;
+    apiService.uploadEpisodeTrailer(42, new File(['trailer'], 'trailer.mp3', { type: 'audio/mpeg' }))
+      .subscribe(event => {
+        if (event.type === HttpEventType.Response) {
+          response = event.body ?? undefined;
+        }
+      });
+    const request = httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/42/trailer`);
+    request.flush({
+      episodeId: 42,
+      title: 'Episode',
+      summary: '',
+      pubDate: '2026-05-06T09:10:00.000Z',
+      explicit: 'no',
+      trailerFileName: 'episodes/42/trailer.mp3',
+      message: 'Trailer staged.',
+    });
+
+    expect(response?.trailerFileName).toBe('episodes/42/trailer.mp3');
+    expect(response?.message).toBe('Trailer staged.');
+  });
+
+  it('FORM-03/D-09/D-10 carries raw confirmed bytes through the create payload', () => {
+    const payload = {
+      episodeId: 42,
+      title: 'Episode',
+      summary: '',
+      pubDate: '2026-05-06T09:10:00.000Z',
+      explicit: 'no' as const,
+      duration: '01:02:03',
+      bytes: 1234567,
+      authors: ['Jhonatt Lima'],
+      musicCredits: [],
+    };
+    apiService.createEpisode(payload).subscribe();
+    const request = httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes`);
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual(payload);
+    request.flush({ ...payload });
   });
 });
 

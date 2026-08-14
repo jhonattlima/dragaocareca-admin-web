@@ -19,8 +19,11 @@ describe('ManageComponent summary flow', () => {
       'getEpisodeArtifactJobStatus',
       'downloadEpisodeArtifact',
       'listEpisodes',
+      'listStructuredEntryCatalog',
       'reserveEpisodeDraft',
       'uploadEpisodeTrailerVideo',
+      'uploadEpisodeAudio',
+      'uploadEpisodeTrailer',
       'createEpisode',
     ]);
     apiService.listEpisodes.and.returnValue(of([]));
@@ -732,5 +735,154 @@ describe('EpisodeFormComponent trailer video card', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Uploading trailer video');
     expect(fixture.nativeElement.textContent).toContain('old.mp4');
+  });
+});
+
+describe('Phase 8.1 RED form contracts FORM-01 through FORM-05', () => {
+  let apiService: jasmine.SpyObj<ApiService>;
+  let component: ManageComponent;
+
+  beforeEach(() => {
+    apiService = jasmine.createSpyObj<ApiService>('ApiService', [
+      'listEpisodes',
+      'listStructuredEntryCatalog',
+      'uploadEpisodeAudio',
+      'uploadEpisodeTrailer',
+      'getEpisodeTranscriptionStatus',
+      'getEpisodeGeneratedSummaryStatus',
+    ]);
+    apiService.listEpisodes.and.returnValue(of([]));
+    apiService.listStructuredEntryCatalog.and.returnValue(of({ guests: [], musicCredits: [] }));
+    component = new ManageComponent(apiService);
+  });
+
+  it('FORM-01/D-01 preserves the latest publication local clock while adding seven calendar days', () => {
+    const compute = (component as unknown as { computeSuggestedNextPubDate: (episodes: Episode[]) => string })
+      .computeSuggestedNextPubDate.bind(component);
+    const latest = '2026-01-31T13:45:00';
+
+    expect(compute([{ episodeId: 1, title: 'Latest', summary: '', pubDate: latest, explicit: 'no' }]))
+      .toBe('2026-02-07T13:45');
+  });
+
+  it('FORM-01/D-02/D-03 falls back safely to the current local datetime for empty and invalid lists', () => {
+    jasmine.clock().install();
+    const now = new Date(2026, 4, 6, 9, 10, 11);
+    jasmine.clock().mockDate(now);
+    const compute = (component as unknown as { computeSuggestedNextPubDate: (episodes: Episode[]) => string })
+      .computeSuggestedNextPubDate.bind(component);
+
+    expect(compute([])).toBe('2026-05-06T09:10');
+    expect(compute([{ episodeId: 2, title: 'Broken date', summary: '', pubDate: 'not-a-date', explicit: 'no' }]))
+      .toBe('2026-05-06T09:10');
+    jasmine.clock().uninstall();
+  });
+
+  it('FORM-02/D-04/D-05/D-06/D-08 maps only backend-confirmed audio metadata and rejects missing metadata', () => {
+    const editor = component.addEditorState;
+    editor.formModel.episodeId = 42;
+    const audio = new File(['browser bytes'], 'episode.mp3', { type: 'audio/mpeg' });
+    apiService.uploadEpisodeAudio.and.returnValue(of(new HttpResponse<Episode>({
+      body: {
+        episodeId: 42,
+        title: 'Episode',
+        summary: '',
+        pubDate: '2026-05-06T09:10:00.000Z',
+        explicit: 'no',
+        fileName: 'episodes/42/episode.mp3',
+        duration: '01:02:03',
+        bytes: 1234567,
+      },
+    })));
+
+    component.uploadMedia(editor, 'audio', audio);
+
+    expect(editor.formModel.duration).toBe('01:02:03');
+    expect(editor.formModel.bytes).toBe(1234567);
+    expect(editor.formModel.bytes).not.toBe(audio.size);
+
+    apiService.uploadEpisodeAudio.and.returnValue(of(new HttpResponse<Episode>({
+      body: {
+        episodeId: 42,
+        title: 'Episode',
+        summary: '',
+        pubDate: '2026-05-06T09:10:00.000Z',
+        explicit: 'no',
+        fileName: 'episodes/42/episode.mp3',
+      },
+    })));
+    component.uploadMedia(editor, 'audio', audio);
+    expect(component.errorMessage).toContain('metadata');
+  });
+
+  it('FORM-02/D-04 keeps trailer-audio mapping filename-only', () => {
+    const editor = component.addEditorState;
+    editor.formModel.episodeId = 42;
+    editor.formModel.duration = '00:10:00';
+    editor.formModel.bytes = 1000000;
+    apiService.uploadEpisodeTrailer.and.returnValue(of(new HttpResponse<Episode>({
+      body: {
+        episodeId: 42,
+        title: 'Episode',
+        summary: '',
+        pubDate: '2026-05-06T09:10:00.000Z',
+        explicit: 'no',
+        trailerFileName: 'episodes/42/trailer.mp3',
+        duration: '99:99:99',
+        bytes: 9999999,
+      },
+    })));
+
+    component.uploadMedia(editor, 'trailer', new File(['trailer'], 'trailer.mp3', { type: 'audio/mpeg' }));
+
+    expect(editor.formModel.trailerFileName).toBe('episodes/42/trailer.mp3');
+    expect(editor.formModel.duration).toBe('00:10:00');
+    expect(editor.formModel.bytes).toBe(1000000);
+  });
+
+  it('FORM-03/D-09/D-10 selects only configured catalog participants and never overwrites an active edit', () => {
+    const editor = component.addEditorState;
+    editor.editingEpisodeId = null;
+    editor.selectedMembers = ['Diego Broniszak'];
+    (component as unknown as { configuredParticipantNames: string[] }).configuredParticipantNames = [
+      'Jhonatt Lima',
+      'Unknown configured participant',
+    ];
+    (component as unknown as { applyConfiguredParticipantDefaults: (target: typeof editor) => void })
+      .applyConfiguredParticipantDefaults(editor);
+
+    expect(editor.selectedMembers).toEqual(['Jhonatt Lima']);
+
+    editor.editingEpisodeId = 42;
+    editor.selectedMembers = ['Diego Broniszak'];
+    (component as unknown as { applyConfiguredParticipantDefaults: (target: typeof editor) => void })
+      .applyConfiguredParticipantDefaults(editor);
+    expect(editor.selectedMembers).toEqual(['Diego Broniszak']);
+  });
+
+  it('FORM-04/D-11 requires a trimmed music name and at least one trimmed non-empty reference URL', () => {
+    const editor = component.addEditorState;
+    editor.formModel.transcriptStatus = 'idle';
+    editor.formModel.musicCredits[0].name = '  ';
+    editor.formModel.musicCredits[0].links = [{ label: 'Spotify', url: ' https://example.test/song ' }];
+    expect(component.isEpisodeSaveDisabled(editor)).toBeTrue();
+
+    editor.formModel.musicCredits[0].name = '  Song  ';
+    editor.formModel.musicCredits[0].links = [{ label: 'Spotify', url: '   ' }];
+    expect(component.isEpisodeSaveDisabled(editor)).toBeTrue();
+
+    editor.formModel.musicCredits[0].name = '  Song  ';
+    editor.formModel.musicCredits[0].links = [{ label: 'Spotify', url: ' https://example.test/song ' }];
+    expect(component.isEpisodeSaveDisabled(editor)).toBeFalse();
+  });
+
+  it('FORM-05/D-07 exposes fixed two-decimal decimal-MB presentation at exact and fractional byte boundaries', () => {
+    const format = (component as unknown as { formatBytesAsMegabytes: (bytes: number) => string })
+      .formatBytesAsMegabytes.bind(component);
+
+    expect(format(0)).toBe('0.00 MB');
+    expect(format(1000000)).toBe('1.00 MB');
+    expect(format(1234567)).toBe('1.23 MB');
+    expect(format(1235000)).toBe('1.24 MB');
   });
 });
