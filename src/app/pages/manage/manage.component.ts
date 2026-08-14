@@ -680,7 +680,6 @@ export class ManageComponent implements OnInit, OnDestroy {
       && (editor.formModel.episodeId ?? 0) > 0
       && Boolean(this.getYoutubeSourceIdentity(editor))
       && Boolean(editor.formModel.title?.trim())
-      && Boolean(editor.formModel.summary?.trim())
       && state.startInFlight === null
       && !(snapshot && !['failed', 'cancelled', 'obsolete'].includes(snapshot.status));
   }
@@ -800,6 +799,7 @@ export class ManageComponent implements OnInit, OnDestroy {
         }
         state.startInFlight = null;
         state.error = this.getYoutubeTrailerJobError(error, 'Could not start the private YouTube transfer.');
+        this.errorMessage = state.error;
       },
     });
   }
