@@ -152,7 +152,7 @@
       </div>
       <div class="form-group col-md-3 mb-3">
         <label>Duration</label>
-        <input class="form-control readonly-field" type="text" [(ngModel)]="editor.formModel.duration" readonly>
+        <input class="form-control readonly-field readonly-metadata-field" type="text" [(ngModel)]="editor.formModel.duration" readonly>
       </div>
       <div class="form-group col-md-3 mb-3">
         <label>Explicit</label>
@@ -174,7 +174,7 @@
       </div>
       <div class="form-group col-md-3 mb-3">
         <label>Bytes</label>
-        <input class="form-control readonly-field" type="text" [value]="editor.formModel.bytes == null ? '' : controller.formatBytesAsMegabytes(editor.formModel.bytes)" readonly>
+        <input class="form-control readonly-field readonly-metadata-field" type="text" [value]="editor.formModel.bytes == null ? '' : controller.formatBytesAsMegabytes(editor.formModel.bytes)" readonly>
       </div>
     </div>
 

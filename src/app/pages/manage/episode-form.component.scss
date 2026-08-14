@@ -9,3 +9,22 @@
   background-color: #f1f3f5;
   color: #6c757d;
 }
+
+.form-control.readonly-metadata-field[readonly] {
+  background-color: #dee2e6;
+  border-color: #adb5bd;
+  color: #495057;
+  cursor: default;
+  box-shadow: none;
+}
+
+.form-control.readonly-metadata-field[readonly]:focus,
+.form-control.readonly-metadata-field[readonly]:focus-visible {
+  background-color: #dee2e6;
+  border-color: #6c757d;
+  color: #495057;
+  cursor: default;
+  box-shadow: none;
+  outline: 2px solid #6c757d;
+  outline-offset: 1px;
+}
