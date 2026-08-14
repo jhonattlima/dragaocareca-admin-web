@@ -83,6 +83,17 @@ v1.2 extends the existing episode workflow from finalized local trailer video th
 - [x] 08-03-PLAN.md — Add Angular YouTube API wrappers and DTO tests
 - [x] 08-04-PLAN.md — Integrate Manage lifecycle state, UI, and tests
 
+### Phase 08.1: Episode Form Stability Patch: fix Add Episode defaults, audio metadata, validation, and read-only field presentation (INSERTED)
+
+**Goal:** Make Add Episode defaults, episode-audio metadata, participant/music validation, and read-only field presentation reliable without changing trailer-audio behavior.
+**Requirements**: FORM-01, FORM-02, FORM-03, FORM-04, FORM-05
+**Depends on:** Phase 8
+**Plans:** 0 plans (context gathered 2026-08-14)
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 08.1 to break down)
+
 ### Phase 9: Title, Hashtags & Publishing
 
 **Goal**: Operators can review the private result, keep the link in the episode form, and have Save commit metadata and publish the ready video.

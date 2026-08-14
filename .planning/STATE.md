@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Trailer Video YouTube Publishing
-current_phase: 8
-current_phase_name: YouTube Job Lifecycle
+current_phase: 8.1
+current_phase_name: Episode Form Stability Patch
 status: human_needed
 stopped_at: Completed 08-04-PLAN.md
-last_updated: "2026-08-12T01:45:19.628Z"
-last_activity: 2026-08-12
-last_activity_desc: user-validated trailer upload and private YouTube transfer; Save/publication checkpoint deferred to patch milestone
+last_updated: "2026-08-14T02:55:22.717Z"
+last_activity: 2026-08-14
+last_activity_desc: inserted urgent Episode Form Stability Patch after Phase 8
 progress:
-  total_phases: 5
+  total_phases: 6
   completed_phases: 2
   total_plans: 8
   completed_plans: 8
-  percent: 40
+  percent: 33
 ---
 
 # Project State
@@ -24,14 +24,14 @@ progress:
 See: .planning/PROJECT.md
 
 **Core value:** Keep the admin workflow reliable, legible, and backend-driven so operators can manage episodes and inspect system state without fighting the UI.
-**Current focus:** Phase 8 — YouTube Job Lifecycle
+**Current focus:** Phase 8.1 — Episode Form Stability Patch
 
 ## Current Position
 
-Phase: 8 of 11 (YouTube Job Lifecycle)
+Phase: 8.1 of 11 (Episode Form Stability Patch)
 Plan: 4 of 05
 Status: Upload/private-transfer validated; Save/publication checkpoint deferred to patch milestone
-Last activity: 2026-08-14 — recorded user validation and deferred unrelated Save blockers
+Last activity: 2026-08-14 — inserted urgent Episode Form Stability Patch after Phase 8
 
 Progress: ░░░░░░░░░░ [██████████] 100%
 
@@ -82,6 +82,11 @@ Progress: ░░░░░░░░░░ [██████████] 100%
 - [Phase ?]: Allowlist browser DTO fields to lifecycle progress, cancellation, normalized errors, retry timing, timestamps, and sanitized privateWatchUrl; exclude provider/session/source/raw-error/publication fields.
 - [Phase ?]: Keep YouTube job state separate from local MP4 upload state and guard callbacks by episode, job, source generation, and source filename.
 - [Phase ?]: Expose private-ready and provider-video-retained reconciliation only; Angular has no publish control or raw provider fields.
+- [Phase 8.1]: Add Episode publication date is latest episode date/time plus seven calendar days, falling back to current date/time when no prior episode exists.
+- [Phase 8.1]: Populate episode-audio Duration and decimal-MB Bytes only after backend-confirmed upload completion; metadata failure fails the upload.
+- [Phase 8.1]: Configure default participants in frontend environment/configuration and select only configured names present in the participant catalog.
+- [Phase 8.1]: Require at least one music credit with both name and reference link before Save.
+- [Phase 8.1]: Present Duration, Bytes, and Spotify ID as read-only through light-gray styling without hints.
 
 ### Pending Todos
 
@@ -91,6 +96,10 @@ Progress: ░░░░░░░░░░ [██████████] 100%
 
 - v1.2 implementation depends on coordinating the new YouTube job and publication contracts with the sibling API repository.
 - Provider quota, resumable-session recovery, and live cancellation/reconciliation require explicit verification before release.
+
+### Roadmap Evolution
+
+- Phase 8.1 inserted after Phase 8: Episode Form Stability Patch: fix Add Episode defaults, audio metadata, validation, and read-only field presentation (URGENT)
 
 ## Deferred Items
 
