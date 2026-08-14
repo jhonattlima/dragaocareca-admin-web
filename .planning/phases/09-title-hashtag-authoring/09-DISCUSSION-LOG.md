@@ -21,7 +21,7 @@
 ## Hashtag relevance feedback
 
 **User's choice:** Show approximate relevance counts after manual typing settles and on hover for both automatic and manual hashtags.
-**Notes:** Use approximately a one-second typing pause. The temporary popup dismisses on tab, further typing, or clicking elsewhere. Lookup failure does not block manual hashtag use.
+**Notes:** Use approximately a one-second typing pause. The temporary popup dismisses on tab, further typing, or clicking elsewhere. Lookup failure does not block manual hashtag use. Cache normalized relevance results in the API for approximately one hour to avoid unnecessary YouTube API calls.
 
 ## the agent's Discretion
 

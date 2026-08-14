@@ -30,11 +30,13 @@ Add the operator-facing trailer metadata authoring experience to the existing Ne
 - **D-10:** For manual input, wait until the operator stops typing for approximately one second, then request/display the hashtag's approximate public YouTube-result relevance count.
 - **D-11:** The same approximate count must be discoverable by hovering a hashtag, regardless of whether it was generated automatically or entered manually.
 - **D-12:** The temporary count popup should dismiss when the operator tabs away, types again, or clicks elsewhere. Lookup failures are non-blocking because the operator can continue with manually entered hashtags.
+- **D-13:** The API should cache normalized hashtag relevance results for approximately one hour, including results reused across repeated typing/hover lookups, to avoid unnecessary YouTube API calls.
 
 ### the agent's Discretion
 - Exact tooltip/popover positioning and accessible hover/focus equivalent.
 - Exact normalization, duplicate handling, and visual tokenization used to represent the space-separated hashtag field, provided manual text is preserved and the API contract remains authoritative.
 - Whether automatic suggestions are exposed through the existing summary/status polling response or a dedicated typed API wrapper, based on the sibling API contract.
+- Exact cache storage/eviction mechanics, provided the normalized hashtag key has an approximately one-hour freshness window and the API remains the authority.
 
 </decisions>
 
