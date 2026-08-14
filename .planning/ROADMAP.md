@@ -36,7 +36,7 @@ v1.2 extends the existing episode workflow from finalized local trailer video th
 
 - [ ] **Phase 7: Final Trailer Video Upload** - Select, upload, cancel, retry, and safely replace a final MP4 through the existing trailer-video API route.
 - [ ] **Phase 8: YouTube Job Lifecycle** - Persist and execute resumable server-side YouTube uploads through private readiness with safe retry and cancellation boundaries.
-- [ ] **Phase 9: Title, Hashtags & Publishing** - Validate editable titles, provide approximate hashtag counts, and expose an explicit public-publish boundary.
+- [ ] **Phase 9: Title, Hashtags & Publishing** - Finalize YouTube metadata and publish the already private-ready trailer through the existing Save boundary.
 - [ ] **Phase 10: Operator Workflow Integration** - Connect the API contracts to the sectioned Angular workflow with thin orchestration and stale-state protection.
 - [ ] **Phase 11: Trailer Artifact & Compatibility Release** - Make only finalized trailer videos downloadable and preserve existing application behavior and release gates.
 
@@ -99,15 +99,14 @@ Plans:
 
 ### Phase 9: Title, Hashtags & Publishing
 
-**Goal**: Operators can review the private result, keep the link in the episode form, and have Save commit metadata and publish the ready video.
+**Goal**: Operators can edit the final YouTube title and hashtags, request approximate hashtag counts, and have Save commit metadata before publishing the already private-ready trailer.
 **Depends on**: Phase 8
-**Requirements**: YOUTUBE-06, YOUTUBE-07, TITLE-01, TITLE-02, TITLE-03, TITLE-04
+**Requirements**: TITLE-01, TITLE-02, TITLE-03, TITLE-04
 **Success Criteria** (what must be TRUE):
 
   1. User receives an editable `Trailer - {episode name}` title suggestion containing selected hashtag values, with a shared 100-Unicode-character limit and clear forbidden-character validation that preserves edits.
   2. User can request a normalized hashtag lookup and see an explicitly approximate public-result count with retrieval time, or a recoverable unavailable/error state.
-  3. Once YouTube processing is ready, the existing YouTube link field shows the returned private watch link and remains usable after publication.
-  4. Saving the episode commits the summary, title, and hashtags before the API changes the private video to public; repeated Save/commit requests are safely idempotent.
+  3. Saving the episode commits the summary, title, and hashtags before the API changes the already private-ready video to public; repeated Save/commit requests are safely idempotent.
 
 **Plans**: TBD
 **UI hint**: yes
