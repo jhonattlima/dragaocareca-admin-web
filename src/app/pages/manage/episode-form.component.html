@@ -1,4 +1,4 @@
-<div class="episode-form" [class.compact]="compact">
+<div class="episode-form" [class.compact]="compact" (click)="controller.onHashtagOutsideClick(editor)">
   <div class="episode-form-header d-flex align-items-center justify-content-between gap-3">
     <div>
       <h2 class="episode-form-title">{{ editor.editingEpisodeId ? 'Update Episode Details' : 'Episode Details' }}</h2>
@@ -193,10 +193,74 @@
         <label>YouTube Link</label>
         <input class="form-control" type="text" [(ngModel)]="editor.formModel.youtube" placeholder="https://www.youtube.com/...">
       </div>
-      <div class="form-group col-md-4 mb-3">
+      <div class="form-group col-md-3 mb-3">
         <label>Spotify ID</label>
         <input class="form-control readonly-field" type="text" [(ngModel)]="editor.formModel.spotifyId" readonly>
       </div>
+      <div class="form-group col-md-5 mb-3 hashtag-authoring-field" (click)="$event.stopPropagation()">
+        <label [attr.for]="'episode-hashtags-' + (editor.editingEpisodeId || 'new')">Hashtags</label>
+        <input
+          [attr.id]="'episode-hashtags-' + (editor.editingEpisodeId || 'new')"
+          class="form-control"
+          type="text"
+          [(ngModel)]="editor.formModel.hashtags"
+          [disabled]="editor.formModel.suggestedTags?.status === 'pending' || editor.formModel.suggestedTags?.status === 'processing'"
+          aria-label="Trailer hashtags"
+          [attr.aria-describedby]="'episode-hashtag-status-' + (editor.editingEpisodeId || 'new')"
+          placeholder="#hashtag1 #hashtag2 #hashtag3"
+          (ngModelChange)="controller.onHashtagChange(editor)"
+          (input)="controller.onHashtagInput(editor)"
+          (focus)="controller.onHashtagFocus(editor)"
+          (blur)="controller.onHashtagBlur(editor)">
+        <div class="hashtag-authoring-status" [attr.id]="'episode-hashtag-status-' + (editor.editingEpisodeId || 'new')" aria-live="polite">
+          <span *ngIf="editor.formModel.suggestedTags?.status === 'pending' || editor.formModel.suggestedTags?.status === 'processing'">
+            Automatic hashtag research in progress; editing is temporarily disabled.
+          </span>
+          <span *ngIf="editor.formModel.suggestedTags?.status === 'unavailable'">
+            Automatic hashtag research is unavailable. You can continue with manual hashtags.
+          </span>
+        </div>
+        <div class="hashtag-token-list" *ngIf="controller.serializeHashtags(editor.formModel.hashtags).length > 0" aria-label="Authored hashtags">
+          <span
+            class="hashtag-token"
+            *ngFor="let tag of controller.serializeHashtags(editor.formModel.hashtags)"
+            tabindex="0"
+            (mouseenter)="controller.onHashtagHover(editor, tag)"
+            (focus)="controller.onHashtagFocus(editor, tag)"
+            (blur)="controller.onHashtagBlur(editor)"
+            (click)="$event.stopPropagation()">
+            {{ tag }}
+            <span class="hashtag-token-popup" *ngIf="controller.getHashtagLookup(editor)?.normalizedTag === tag" role="status">
+              <ng-container *ngIf="controller.getHashtagLookup(editor) as lookup">
+                <ng-container *ngIf="lookup.state === 'available'; else hashtagUnavailable">
+                  Approx. {{ lookup.approximateCount === null ? 'count unavailable' : (lookup.approximateCount | number) }} public results
+                  <span *ngIf="lookup.retrievedAt">· retrieved {{ lookup.retrievedAt | date:'short' }}</span>
+                </ng-container>
+                <ng-template #hashtagUnavailable>
+                  Approximate count unavailable. Manual authoring is still available.
+                </ng-template>
+              </ng-container>
+            </span>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group trailer-title-preview mb-3">
+      <label [attr.for]="'trailer-title-preview-' + (editor.editingEpisodeId || 'new')">Trailer title preview</label>
+      <input
+        [attr.id]="'trailer-title-preview-' + (editor.editingEpisodeId || 'new')"
+        class="form-control readonly-field"
+        type="text"
+        [value]="controller.getTrailerTitle(editor)"
+        readonly
+        [attr.aria-describedby]="'trailer-title-validation-' + (editor.editingEpisodeId || 'new') + ' trailer-title-count-' + (editor.editingEpisodeId || 'new')">
+      <div [attr.id]="'trailer-title-count-' + (editor.editingEpisodeId || 'new')" class="trailer-title-count" aria-live="polite">
+        {{ controller.getTrailerTitleCodePointLength(editor) }} / 100 Unicode characters
+      </div>
+      <p [attr.id]="'trailer-title-validation-' + (editor.editingEpisodeId || 'new')" class="error mb-0" *ngIf="controller.getTrailerTitleValidationError(editor)" role="alert">
+        {{ controller.getTrailerTitleValidationError(editor) }}
+      </p>
     </div>
 
   </div>
