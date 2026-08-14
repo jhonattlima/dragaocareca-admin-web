@@ -189,6 +189,7 @@ export class ManageComponent implements OnInit, OnDestroy {
   private episodeNumberValidationTimer: number | null = null;
   private transcriptionStatusPollTimer: number | null = null;
   private transcriptionStatusPollEpisodeId: number | null = null;
+  private readonly transcriptionTerminalFailures = new Set<number>();
   private summaryStatusPollTimer: number | null = null;
   private summaryStatusPollEpisodeId: number | null = null;
   private artifactJobPollTimer: number | null = null;
@@ -2194,6 +2195,10 @@ export class ManageComponent implements OnInit, OnDestroy {
   }
 
   private syncTranscriptionStatusPolling(episodeId: number, editor: EpisodeEditorState): void {
+    if (this.transcriptionTerminalFailures.has(episodeId)) {
+      return;
+    }
+
     if (this.transcriptionStatusPollEpisodeId === episodeId && this.transcriptionStatusPollTimer !== null) {
       return;
     }
@@ -2216,6 +2221,7 @@ export class ManageComponent implements OnInit, OnDestroy {
           editor.formModel.transcriptProgress = status.progress ?? (status.status === 'done' ? 100 : null);
 
           if (status.status === 'error') {
+            this.transcriptionTerminalFailures.add(episodeId);
             editor.formModel.summaryStatus = 'idle';
             editor.formModel.summaryProgress = null;
             editor.formModel.summaryError = '';
@@ -2231,6 +2237,7 @@ export class ManageComponent implements OnInit, OnDestroy {
           }
         },
         error: (error) => {
+          this.transcriptionTerminalFailures.add(episodeId);
           editor.formModel.transcriptStatus = 'error';
           editor.formModel.transcriptError = error?.error?.message ?? error?.message ?? 'Could not check transcription status.';
           this.clearTranscriptionStatusPolling();
@@ -2739,6 +2746,7 @@ export class ManageComponent implements OnInit, OnDestroy {
     }
 
     if (kind === 'audio') {
+      this.transcriptionTerminalFailures.delete(episodeId);
       editor.formModel.transcriptStatus = 'pending';
       editor.formModel.transcriptUpdatedAt = new Date().toISOString();
       editor.formModel.transcriptStartedAt = null;

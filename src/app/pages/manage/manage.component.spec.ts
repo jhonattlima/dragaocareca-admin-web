@@ -210,6 +210,22 @@ describe('ManageComponent summary flow', () => {
     );
   });
 
+  it('stops transcription polling after a terminal provider failure', () => {
+    const editor = component.addEditorState;
+    editor.formModel.episodeId = 42;
+    apiService.getEpisodeTranscriptionStatus.and.returnValue(throwError(() => ({
+      error: { message: 'Gemini request failed (503): temporary overload' },
+    })));
+
+    (component as unknown as { syncTranscriptionStatusPolling: (episodeId: number, targetEditor: typeof editor) => void })
+      .syncTranscriptionStatusPolling(42, editor);
+    (component as unknown as { syncTranscriptionStatusPolling: (episodeId: number, targetEditor: typeof editor) => void })
+      .syncTranscriptionStatusPolling(42, editor);
+
+    expect(apiService.getEpisodeTranscriptionStatus).toHaveBeenCalledTimes(1);
+    expect(editor.formModel.transcriptStatus).toBe('error');
+  });
+
   it('surfaces summary polling failures without blocking the episode form', () => {
     const editor = component.addEditorState;
     editor.formModel.episodeId = 42;
