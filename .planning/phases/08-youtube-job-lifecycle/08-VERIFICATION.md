@@ -2,10 +2,13 @@
 phase: 08-youtube-job-lifecycle
 verified: 2026-08-12T01:49:33Z
 status: human_needed
-score: 0/5 must-haves verified
+score: 2/5 must-haves verified by user; remaining lifecycle evidence is automated or deferred
 behavior_unverified: 5
 overrides_applied: 0
 deferred:
+  - truth: "Save promotes the local episode and publishes the YouTube video with final title and summary metadata."
+    addressed_in: "Patch milestone after unrelated episode-save bugs are resolved"
+    evidence: "User validated upload/private-ready flow; Save/publication checkpoint intentionally deferred to avoid conflating unrelated episode-save defects with this phase."
   - truth: "The existing API publish route has behaviorally verified repeated-request idempotency."
     addressed_in: "Phase 9: Title, Hashtags & Publishing"
     evidence: "Phase 9 success criterion 4 explicitly requires repeated Publish requests to be safely idempotent; COVERAGE.md assigns the publication-specific fake-provider verifier to that later boundary. Phase 8 only checks route presence and documents the handoff."

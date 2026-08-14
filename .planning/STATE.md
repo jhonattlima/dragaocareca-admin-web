@@ -4,11 +4,11 @@ milestone: v1.2
 milestone_name: Trailer Video YouTube Publishing
 current_phase: 8
 current_phase_name: YouTube Job Lifecycle
-status: executing
+status: human_needed
 stopped_at: Completed 08-04-PLAN.md
 last_updated: "2026-08-12T01:45:19.628Z"
 last_activity: 2026-08-12
-last_activity_desc: completed Phase 8 Wave 0 RED acceptance scaffold
+last_activity_desc: user-validated trailer upload and private YouTube transfer; Save/publication checkpoint deferred to patch milestone
 progress:
   total_phases: 5
   completed_phases: 2
@@ -30,8 +30,8 @@ See: .planning/PROJECT.md
 
 Phase: 8 of 11 (YouTube Job Lifecycle)
 Plan: 4 of 05
-Status: Wave 0 RED scaffold complete — ready for Wave 1
-Last activity: 2026-08-12 — completed Phase 8 Wave 0 RED acceptance scaffold
+Status: Upload/private-transfer validated; Save/publication checkpoint deferred to patch milestone
+Last activity: 2026-08-14 — recorded user validation and deferred unrelated Save blockers
 
 Progress: ░░░░░░░░░░ [██████████] 100%
 
