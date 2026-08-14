@@ -1493,6 +1493,11 @@ export class ManageComponent implements OnInit, OnDestroy {
     return state.dismissed ? null : state.response;
   }
 
+  hasHashtagLookup(editor: EpisodeEditorState, tag: string): boolean {
+    const lookup = this.getHashtagLookup(editor);
+    return lookup?.normalizedTag === tag.normalize('NFKC').toLocaleLowerCase('en-US');
+  }
+
   private getCurrentHashtagToken(editor: EpisodeEditorState): string {
     const tokens = String(editor.formModel.hashtags ?? '').trim().split(/\s+/u).filter(Boolean);
     return tokens[tokens.length - 1] ?? '';

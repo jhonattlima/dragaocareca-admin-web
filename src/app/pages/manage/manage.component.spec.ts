@@ -98,6 +98,7 @@ describe('ManageComponent summary flow', () => {
     second.next({ displayTag: '#new', normalizedTag: '#new', approximateCount: 2, retrievedAt: null, cacheStatus: 'miss', regionCode: 'BR', relevanceLanguage: 'pt', source: 'provider', state: 'available', errorCategory: null, retryAt: null });
 
     expect(component.getHashtagLookup(editor)?.normalizedTag).toBe('#new');
+    expect(component.hasHashtagLookup(editor, '#NEW')).toBeTrue();
   }));
 
   it('marks the summary as manually edited when the field changes', () => {

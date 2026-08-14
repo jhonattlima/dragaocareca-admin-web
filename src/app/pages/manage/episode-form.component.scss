@@ -89,7 +89,8 @@
 
 .hashtag-token:hover .hashtag-token-popup,
 .hashtag-token:focus .hashtag-token-popup,
-.hashtag-token:focus-visible .hashtag-token-popup {
+.hashtag-token:focus-visible .hashtag-token-popup,
+.hashtag-token-active .hashtag-token-popup {
   display: block;
 }
 

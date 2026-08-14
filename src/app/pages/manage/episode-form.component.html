@@ -223,6 +223,7 @@
         <div class="hashtag-token-list" *ngIf="controller.serializeHashtags(editor.formModel.hashtags).length > 0" aria-label="Authored hashtags">
           <span
             class="hashtag-token"
+            [class.hashtag-token-active]="controller.hasHashtagLookup(editor, tag)"
             *ngFor="let tag of controller.serializeHashtags(editor.formModel.hashtags)"
             tabindex="0"
             (mouseenter)="controller.onHashtagHover(editor, tag)"
@@ -230,7 +231,7 @@
             (blur)="controller.onHashtagBlur(editor)"
             (click)="$event.stopPropagation()">
             {{ tag }}
-            <span class="hashtag-token-popup" *ngIf="controller.getHashtagLookup(editor)?.normalizedTag === tag" role="status">
+            <span class="hashtag-token-popup" *ngIf="controller.hasHashtagLookup(editor, tag)" role="status">
               <ng-container *ngIf="controller.getHashtagLookup(editor) as lookup">
                 <ng-container *ngIf="lookup.state === 'available'; else hashtagUnavailable">
                   Approx. {{ lookup.approximateCount === null ? 'count unavailable' : (lookup.approximateCount | number) }} public results
