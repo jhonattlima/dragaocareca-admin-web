@@ -110,12 +110,12 @@ Plans:
 
 **Phase 8 handoff**: Private transfer, private-ready link population, Save-time summary/title/hashtag commit, and idempotent public publication are already implemented by Phase 8. The remaining Phase 8 live checkpoint is validation of that Save-time publication sequence after the episode-save patch fixes; it is not new Phase 9 implementation scope.
 
-**Plans**: 2/3 plans executed
+**Plans**: 3/3 plans executed
 Plans:
 
 - [x] 09-01-PLAN.md — Correct API title/hashtag publication contract, validation, and one-hour lookup cache
 - [x] 09-02-PLAN.md — Add Angular DTOs, summary suggestion merge, title validation, debounce, and payload orchestration
-- [ ] 09-03-PLAN.md — Wire the sectioned hashtag/title UI and accessible lookup feedback styling
+- [x] 09-03-PLAN.md — Wire the sectioned hashtag/title UI and accessible lookup feedback styling
 
 **UI hint**: yes
 
@@ -160,6 +160,6 @@ Plans:
 | 6 | v1.1 Episode Artifact Downloads | 4/4 | Complete | 2026-07-31 |
 | 7. Final Trailer Video Upload | v1.2 | 3/3 | In Progress|  |
 | 8. YouTube Job Lifecycle | v1.2 | 5/5 | In Progress|  |
-| 9. Title, Hashtags & Publishing | v1.2 | 2/3 | In Progress|  |
+| 9. Title, Hashtags & Publishing | v1.2 | 3/3 | In Progress|  |
 | 10. Operator Workflow Integration | v1.2 | 0/TBD | Not started | - |
 | 11. Trailer Artifact & Compatibility Release | v1.2 | 0/TBD | Not started | - |
