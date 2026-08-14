@@ -88,11 +88,11 @@ v1.2 extends the existing episode workflow from finalized local trailer video th
 **Goal:** Make Add Episode defaults, episode-audio metadata, participant/music validation, and read-only field presentation reliable without changing trailer-audio behavior.
 **Requirements**: FORM-01, FORM-02, FORM-03, FORM-04, FORM-05
 **Depends on:** Phase 8
-**Plans:** 4 plans (context gathered 2026-08-14)
+**Plans:** 1/4 plans executed
 
 Plans:
 
-- [ ] 08.1-00-PLAN.md — Establish Wave 0 RED coverage for FORM-01 through FORM-05
+- [x] 08.1-00-PLAN.md — Establish Wave 0 RED coverage for FORM-01 through FORM-05
 - [ ] 08.1-01-PLAN.md — Add API-owned episode-audio metadata and complete music-credit validation
 - [ ] 08.1-02-PLAN.md — Integrate Angular defaults, upload mapping, participant config, and form validation
 - [ ] 08.1-03-PLAN.md — Synchronize docs and run cross-repository verification gates
