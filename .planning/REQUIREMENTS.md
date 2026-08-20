@@ -42,7 +42,7 @@
 - [x] **OPS-02**: YouTube jobs persist their episode/source identity, state, progress, provider identifiers, and failure information so polling, reload, restart recovery, and stale-response protection cannot update a newer trailer.
 - [x] **OPS-03**: Duplicate starts, retries, publish requests, and concurrent replacement actions are idempotent or safely rejected with actionable state.
 - [x] **OPS-04**: The API handles YouTube OAuth, quota, provider, proxy-size, and timeout failures with stable user-facing error states and bounded retry behavior.
-- [ ] **OPS-05**: Existing authentication modes, `authBypass`, episode editing, summary behavior, frontend tests, and `npm run build` remain compatible. New trailer-video artifact selector/download integration is tracked separately by ARTIFACT-01 and ARTIFACT-02 in Phase 11.
+- [x] **OPS-05**: Existing authentication modes, `authBypass`, episode editing, summary behavior, frontend tests, and `npm run build` remain compatible. New trailer-video artifact selector/download integration is tracked separately by ARTIFACT-01 and ARTIFACT-02 in Phase 11.
 
 ### Episode Form Stability Patch
 
@@ -100,7 +100,7 @@ Traceability records the approved v1.2 requirements and the implemented Phase 8.
 | OPS-02 | Phase 8 | Complete |
 | OPS-03 | Phase 8 | Complete |
 | OPS-04 | Phase 8 | Complete |
-| OPS-05 | Phase 10 | Pending |
+| OPS-05 | Phase 10 | Complete |
 | FORM-01 | Phase 8.1 (08.1-00 through 08.1-03) | Complete |
 | FORM-02 | Phase 8.1 (08.1-00 through 08.1-03) | Complete |
 | FORM-03 | Phase 8.1 (08.1-00 through 08.1-03) | Complete |

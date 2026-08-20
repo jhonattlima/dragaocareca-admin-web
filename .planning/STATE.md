@@ -5,15 +5,15 @@ milestone_name: Trailer Video YouTube Publishing
 current_phase: 09
 current_phase_name: title-hashtag-authoring
 status: verifying
-stopped_at: Phase 9 browser verification complete; provider-aware status and episode-form layout amendments integrated
-last_updated: "2026-08-20T19:30:00.000Z"
+stopped_at: Completed 10-01-PLAN.md
+last_updated: "2026-08-20T21:51:40.281Z"
 last_activity: 2026-08-20
-last_activity_desc: Reconciled API provider fallback/status contract and final form layout
+last_activity_desc: provider-aware messages and layout adjustment reconciled
 progress:
   total_phases: 6
   completed_phases: 4
-  total_plans: 17
-  completed_plans: 17
+  total_plans: 20
+  completed_plans: 18
   percent: 67
 ---
 
@@ -30,10 +30,10 @@ See: .planning/PROJECT.md
 
 Phase: 09 (title-hashtag-authoring) — VERIFIED
 Plan: 3 of 3
-Status: Phase complete — ChromeHeadless verification passed; post-verification amendments build-verified
+Status: Phase complete — ready for verification
 Last activity: 2026-08-20 — provider-aware messages and layout adjustment reconciled
 
-Progress: ░░░░░░░░░░ [██████████] 100%
+Progress: ░░░░░░░░░░ [█████████░] 90%
 
 ## Performance Metrics
 
@@ -58,6 +58,7 @@ Progress: ░░░░░░░░░░ [██████████] 100%
 | Phase 09 P01 | 18 | 2 tasks | 7 files |
 | Phase 09 P02 | 27 | 2 tasks | 4 files |
 | Phase 09 P03 | 8 | 2 tasks | 2 files |
+| Phase 10 P1 | 45 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -97,6 +98,7 @@ Progress: ░░░░░░░░░░ [██████████] 100%
 - [Phase ?]: Frontend sends the sibling API title prefix and canonical hashtag array separately; preview validation counts assembled Unicode code points.
 - [Phase ?]: Keep all authoring and lookup behavior in ManageComponent while the episode-form template provides accessible presentation bindings.
 - [Phase ?]: Use editor-derived IDs and keyboard-focusable hashtag tokens for accessible add/edit form feedback.
+- [Phase ?]: Restore persisted transcript-first or summary-stage polling from startEdit after clearing both shared pollers; preserve manual summaries and editor generation guards.
 
 ### Pending Todos
 
@@ -119,6 +121,6 @@ Progress: ░░░░░░░░░░ [██████████] 100%
 
 ## Session Continuity
 
-Last session: 2026-08-20T19:30:00.000Z
-Stopped at: Phase 9 verification complete; final live cross-repository smoke test remains
-Resume file: .planning/phases/09-title-hashtag-authoring/09-VERIFICATION.md
+Last session: 2026-08-20T21:51:40.271Z
+Stopped at: Completed 10-01-PLAN.md
+Resume file: .planning/phases/10-operator-workflow-integration/10-01-SUMMARY.md
