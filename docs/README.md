@@ -125,6 +125,7 @@ Expected endpoints include:
 - `GET /v1/feed`
 - `GET /v1/feed/preview`
 - `GET /v1/episodes/:episodeId/transcription`
+- `POST /v1/episodes/:episodeId/transcription/whisper` — explicitly retries available episode audio with the faster-whisper provider after a Gemini failure
 - `GET /v1/episodes/:episodeId/episodes-generated-summary`
 - `POST /v1/episodes/drafts` — authenticated trailer-video draft reservation
 - `POST /v1/episodes/:episodeId/audio`
@@ -156,7 +157,7 @@ Media flow:
 
 The trailer workflow starts private YouTube transfer after staged upload. Save-time metadata/publication and provider-video cleanup are API-owned; richer hashtag authoring and artifact-download integration remain separate workflow surfaces.
 
-Hashtag authoring uses Gemini's episode-specific semantic relevance score to rank suggestions. YouTube Data API `search.list` results are advisory availability signals only: `pageInfo.totalResults` is approximate and capped at 1,000,000, so it must not be used as a popularity or hashtag-inventory ranking. The UI displays capped values as `1M+` YouTube search results.
+Summary and automatic hashtag authoring use backend-owned provider selection. Gemini is attempted first and Groq is the automatic fallback; the frontend consumes the actual `provider` returned in each status DTO and does not infer it from environment defaults. YouTube Data API `search.list` results are advisory availability signals only: `pageInfo.totalResults` is approximate and capped at 1,000,000, so it must not be used as a popularity or hashtag-inventory ranking. The UI displays capped values as `1M+` YouTube search results.
 
 ## UI Direction
 

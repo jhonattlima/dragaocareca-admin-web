@@ -61,6 +61,7 @@ The frontend expects the backend to expose:
 - `GET /v1/feed`
 - `GET /v1/feed/preview`
 - `GET /v1/episodes/:episodeId/transcription`
+- `POST /v1/episodes/:episodeId/transcription/whisper` — queues faster-whisper transcription for existing staged/final audio
 - `GET /v1/episodes/:episodeId/episodes-generated-summary`
 - `POST /v1/episodes/drafts` — authenticated `{episodeId}` reservation returning `{draftId, episodeId, state, expiresAt}`
 - `POST /v1/episodes/:episodeId/audio`
@@ -79,6 +80,27 @@ The frontend expects the backend to expose:
 - `GET /v1/assets/cover-mosaic.json`
 - `GET /v1/metrics/spotify`
 - `GET /v1/metrics/youtube`
+
+Transcription providers are selected by the API through `EPISODE_TRANSCRIPTION_PROVIDER`. Supported values are `gemini`, `groq`, `faster-whisper`, and `internal`. The Groq provider uses `whisper-large-v3-turbo` by default, splits long audio into five-minute chunks to stay below Groq's upload limit, and joins the resulting Portuguese transcript before summary generation. Configure `GROQ_API_KEY` and `EPISODE_TRANSCRIPTION_GROQ_MODEL`; the browser contract is unchanged.
+
+### AI authoring provider
+
+The frontend only polls the summary and hashtag-authoring state; provider selection and credentials remain backend-owned. The API attempts Gemini first for summary and automatic hashtag candidates, then falls back to Groq. The UI displays the actual provider in the existing status messages. Summary prompt version 6 follows the published feed style: concise 550–1500 character descriptions, “o grupo/os aventureiros/a guilda” voice, two focused paragraphs, and 3–5 highlights:
+
+```text
+EPISODE_SUMMARY_PROVIDER=groq
+GROQ_API_KEY=<server-only key>
+EPISODE_SUMMARY_GROQ_MODEL=openai/gpt-oss-120b
+GROQ_API_BASE_URL=https://api.groq.com/openai/v1
+GROQ_MIN_INTERVAL_MS=60000
+GROQ_TOKENS_PER_MINUTE=8000
+GROQ_DAILY_TOKEN_LIMIT=200000
+GROQ_RATE_LIMIT_RETRIES=1
+```
+
+Gemini/Groq selection is configured only in the API with `EPISODE_SUMMARY_PRIMARY_PROVIDER`, `EPISODE_SUMMARY_PROVIDER`, `YOUTUBE_HASHTAG_PRIMARY_PROVIDER`, and `YOUTUBE_HASHTAG_PROVIDER`. This affects summary and automatic hashtag candidate generation; episode transcription keeps its own `EPISODE_TRANSCRIPTION_PROVIDER` configuration. Never place the Groq or Gemini API key in Angular environment files.
+
+Groq requests share one backend queue. The default configuration allows an estimated 8,000 tokens per minute, spaces calls by at least 60 seconds, enforces a 200,000-token daily budget, and retries one time using the provider's `Retry-After` or token-reset header after a `429`. The summary and hashtag jobs therefore run sequentially; a completed summary is persisted and is not regenerated when only hashtag authoring needs a retry.
 
 ### Trailer-video contract
 
