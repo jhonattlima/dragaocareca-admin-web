@@ -17,6 +17,7 @@ describe('ManageComponent summary flow', () => {
   beforeEach(() => {
     apiService = jasmine.createSpyObj<ApiService>('ApiService', [
       'getEpisodeTranscriptionStatus',
+      'transcribeEpisodeWithWhisper',
       'getEpisodeGeneratedSummaryStatus',
       'startEpisodeArtifactJob',
       'getEpisodeArtifactJobStatus',
@@ -33,6 +34,7 @@ describe('ManageComponent summary flow', () => {
       'lookupHashtag',
     ]);
     apiService.listEpisodes.and.returnValue(of([]));
+    apiService.transcribeEpisodeWithWhisper = jasmine.createSpy('transcribeEpisodeWithWhisper');
     apiService.downloadEpisodeArtifact.and.returnValue(of(new HttpResponse<Blob>({
       body: new Blob(['zip'], { type: 'application/zip' }),
       headers: new HttpHeaders({ 'Content-Disposition': 'attachment; filename="episode-42-artifacts.zip"' }),
@@ -48,7 +50,7 @@ describe('ManageComponent summary flow', () => {
     const suggestedTags: SuggestedTagsSnapshot = {
       status: 'done', version: 2, updatedAt: '2026-08-14T00:00:00.000Z', startedAt: null,
       finishedAt: '2026-08-14T00:00:00.000Z', retryAt: null, errorCategory: null,
-      promptVersion: 'hashtags-v1', suggestions: [
+      promptVersion: 'hashtags-v1', provider: null, suggestions: [
         { displayTag: '#rpg', normalizedTag: '#rpg', approximateCount: 10, retrievedAt: null, cacheStatus: 'miss', regionCode: 'BR', relevanceLanguage: 'pt', relevanceScore: 90 },
         { displayTag: '#fantasy', normalizedTag: '#fantasy', approximateCount: 9, retrievedAt: null, cacheStatus: 'miss', regionCode: 'BR', relevanceLanguage: 'pt', relevanceScore: 80 },
         { displayTag: '#podcast', normalizedTag: '#podcast', approximateCount: 8, retrievedAt: null, cacheStatus: 'miss', regionCode: 'BR', relevanceLanguage: 'pt', relevanceScore: 70 },
@@ -56,7 +58,7 @@ describe('ManageComponent summary flow', () => {
     };
     apiService.getEpisodeGeneratedSummaryStatus.and.returnValue(of({
       status: 'done', summaryFileName: null, summaryUpdatedAt: null, summaryStartedAt: null,
-      progress: 100, error: null, version: 1, promptVersion: 'summary-v1', summaryText: 'Generated', suggestedTags,
+      progress: 100, error: null, version: 1, promptVersion: 'summary-v1', provider: null, summaryText: 'Generated', suggestedTags,
     }));
 
     (component as unknown as { syncSummaryStatusPolling: (episodeId: number, targetEditor: typeof editor) => void })
@@ -158,6 +160,71 @@ describe('ManageComponent summary flow', () => {
     expect(component.errorMessage).toContain('YouTube commit failed (quota)');
   }));
 
+  it('keeps a successful hashtag lookup actionable through the save and commit boundaries', fakeAsync(() => {
+    const editor = component.addEditorState;
+    editor.formModel.episodeId = 42;
+    editor.formModel.title = 'Saved title';
+    editor.formModel.pubDate = '2026-08-20T10:00';
+    editor.formModel.hashtags = '#rpg';
+    editor.formModel.musicCredits[0] = {
+      name: 'Artist', links: [{ label: 'Bandcamp', url: 'https://example.test/music' }],
+      draftLabel: '', draftUrl: '', suggestions: [], suggestionsOpen: false,
+    };
+    const createResponse = new Subject<Episode>();
+    const commitResponse = new Subject<YoutubeTrailerJobSnapshot>();
+    apiService.lookupHashtag.and.returnValue(of({
+      displayTag: '#rpg', normalizedTag: '#rpg', approximateCount: 12, retrievedAt: null,
+      cacheStatus: 'miss', regionCode: 'BR', relevanceLanguage: 'pt', source: 'provider',
+      state: 'available', errorCategory: null, retryAt: null,
+    }));
+    apiService.createEpisode.and.returnValue(createResponse);
+    apiService.commitYoutubeTrailerJob.and.returnValue(commitResponse);
+    (component as any).youtubeTrailerJobStates.set(editor, {
+      snapshot: { jobId: 'job-42', episodeId: 42, status: 'ready', progress: { confirmedBytes: 1, totalBytes: 1, processingPartsProcessed: null, processingPartsTotal: null, processingTimeLeftMs: null }, cancellation: { requestedAt: null, cancelledAt: null, boundary: null }, error: { category: null, occurredAt: null }, retry: { count: 0, nextAttemptAt: null }, createdAt: '', updatedAt: '', completedAt: '', privateWatchUrl: null, publicationStatus: 'not_started' },
+      episodeId: 42, jobId: 'job-42', sourceGeneration: 0, sourceFileName: 'draft:draft-42', pollingTimer: null, pollingSubscription: null, startInFlight: null, error: '',
+    });
+
+    component.onHashtagInput(editor);
+    tick(1000);
+    expect(component.getHashtagLookup(editor)?.state).toBe('available');
+    component.saveEpisode(editor);
+    createResponse.next({ episodeId: 42 } as Episode);
+
+    expect(component.getHashtagLookup(editor)?.normalizedTag).toBe('#rpg');
+    expect(component.getSaveTransaction(editor)?.phase).toBe('committing');
+    expect(apiService.commitYoutubeTrailerJob).toHaveBeenCalledWith(42, 'job-42', 'Trailer - Saved title', ['#rpg']);
+  }));
+
+  it('keeps a hashtag lookup error visible while an ordinary save remains unchanged', fakeAsync(() => {
+    const editor = component.addEditorState;
+    editor.formModel.episodeId = 42;
+    editor.formModel.title = 'Ordinary save';
+    editor.formModel.pubDate = '2026-08-20T10:00';
+    editor.formModel.musicCredits[0] = {
+      name: 'Artist', links: [{ label: 'Bandcamp', url: 'https://example.test/music' }],
+      draftLabel: '', draftUrl: '', suggestions: [], suggestionsOpen: false,
+    };
+    apiService.lookupHashtag.and.returnValue(throwError(() => ({ error: {
+      displayTag: '#broken', normalizedTag: '#broken', approximateCount: null, retrievedAt: null,
+      cacheStatus: 'miss', regionCode: 'BR', relevanceLanguage: 'pt', source: 'provider',
+      state: 'unavailable', errorCategory: 'provider_unavailable', retryAt: null,
+    } })));
+    apiService.updateEpisode.and.returnValue(of({ episodeId: 42 } as Episode));
+
+    editor.formModel.hashtags = '#broken';
+    component.onHashtagInput(editor);
+    tick(1000);
+    expect(component.getHashtagLookup(editor)?.state).toBe('unavailable');
+    expect(component.getHashtagLookup(editor)?.errorCategory).toBe('provider_unavailable');
+
+    component.saveEpisode(editor);
+
+    expect(apiService.updateEpisode).toHaveBeenCalled();
+    expect(apiService.commitYoutubeTrailerJob).not.toHaveBeenCalled();
+    expect(component.getHashtagLookup(editor)?.state).toBe('unavailable');
+    expect(component.getHashtagLookup(editor)?.errorCategory).toBe('provider_unavailable');
+  }));
+
   it('ignores a save response after the editor is explicitly reset', () => {
     const editor = component.addEditorState;
     editor.formModel.episodeId = 42;
@@ -190,6 +257,7 @@ describe('ManageComponent summary flow', () => {
       transcriptStartedAt: '2026-07-24T00:00:00.000Z',
       progress: 100,
       transcriptError: null,
+      provider: null,
     };
     const summaryResponse: EpisodeGeneratedSummaryStatus = {
       status: 'done',
@@ -200,6 +268,7 @@ describe('ManageComponent summary flow', () => {
       error: null,
       version: 2,
       promptVersion: '1',
+      provider: null,
       summaryText: 'Generated summary text',
     };
 
@@ -230,6 +299,7 @@ describe('ManageComponent summary flow', () => {
       transcriptStartedAt: '2026-07-24T00:00:00.000Z',
       progress: 100,
       transcriptError: null,
+      provider: null,
     };
     const summaryResponse: EpisodeGeneratedSummaryStatus = {
       status: 'done',
@@ -240,6 +310,7 @@ describe('ManageComponent summary flow', () => {
       error: null,
       version: 2,
       promptVersion: '1',
+      provider: null,
       summaryText: 'Backend generated summary',
     };
 
@@ -323,6 +394,7 @@ describe('ManageComponent summary flow', () => {
       transcriptStartedAt: '2026-07-26T00:00:00.000Z',
       progress: 100,
       transcriptError: null,
+      provider: null,
     }));
     apiService.getEpisodeGeneratedSummaryStatus.and.returnValue(of({
       status: 'done',
@@ -333,6 +405,7 @@ describe('ManageComponent summary flow', () => {
       error: null,
       version: 2,
       promptVersion: '1',
+      provider: null,
       summaryText: 'Generated summary for the edited episode',
     }));
 
@@ -1088,6 +1161,7 @@ describe('Phase 8.1 RED form contracts FORM-01 through FORM-05', () => {
       transcriptStartedAt: null,
       progress: 0,
       transcriptError: null,
+      provider: null,
     }));
     apiService.getEpisodeGeneratedSummaryStatus.and.returnValue(of({
       status: 'idle',
@@ -1098,6 +1172,7 @@ describe('Phase 8.1 RED form contracts FORM-01 through FORM-05', () => {
       error: null,
       version: null,
       promptVersion: null,
+      provider: null,
     }));
     component = new ManageComponent(apiService);
   });
@@ -1186,6 +1261,38 @@ describe('Phase 8.1 RED form contracts FORM-01 through FORM-05', () => {
     component.retryUpload(editor, 'audio');
     expect(apiService.uploadEpisodeAudio).toHaveBeenCalledTimes(2);
     expect(apiService.uploadEpisodeAudio.calls.mostRecent().args[1]).toBe(audio);
+  });
+
+  it('offers Whisper fallback after a Gemini transcription failure', () => {
+    const editor = component.addEditorState;
+    editor.formModel.episodeId = 42;
+    editor.formModel.transcriptStatus = 'error';
+    const whisperSpy = jasmine.createSpy('transcribeEpisodeWithWhisper').and.returnValue(of({
+      episodeId: 42,
+      queued: true,
+      version: 4,
+      status: 'pending',
+      progress: 0,
+      transcriptError: null,
+      message: 'Whisper transcription started.',
+    }));
+    apiService.transcribeEpisodeWithWhisper = whisperSpy;
+    apiService.getEpisodeTranscriptionStatus.and.returnValue(of({
+      status: 'processing',
+      transcriptFileName: null,
+      transcriptUpdatedAt: null,
+      transcriptStartedAt: new Date().toISOString(),
+      progress: 0,
+      transcriptError: null,
+      provider: null,
+    }));
+
+    expect(component.canTranscribeWithWhisper(editor)).toBeTrue();
+    component.transcribeWithWhisper(editor);
+
+    expect(whisperSpy).toHaveBeenCalledWith(42);
+    expect(editor.formModel.transcriptStatus).toBe('processing');
+    expect(component.canTranscribeWithWhisper(editor)).toBeFalse();
   });
 
   it('FORM-02/D-04 keeps trailer-audio mapping filename-only', () => {
