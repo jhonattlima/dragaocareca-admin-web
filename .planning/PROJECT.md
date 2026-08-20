@@ -21,6 +21,8 @@ Keep the admin workflow reliable, legible, and backend-driven so operators can m
 - add public YouTube hashtag search-count lookup beside the YouTube link and generate an editable, 100-character-safe trailer title
 - include the final trailer video in the Episodes artifact-download modal
 
+**Cross-repository provider contract:** The API owns Gemini-first/Groq-fallback selection for transcript-adjacent summary and hashtag authoring. The UI consumes the provider reported in each existing status DTO and displays it in the existing workflow messages; it never infers provider identity or calls Gemini/Groq directly.
+
 ## Current State
 
 **Shipped:** v1.1 Episode Artifact Downloads (2026-07-31)
@@ -48,6 +50,8 @@ The next milestone extends the existing final trailer-video API upload contract 
 - ✓ VAL-01: supplied DC334 fixture staged and restored during retained validation.
 - ✓ VAL-03: frontend tests/build and dependency gates pass.
 - ✓ VAL-04: API lifecycle, security, failure, partial-result, cleanup, and OpenAPI verification.
+- ✓ Provider-aware transcript, summary, and hashtag progress messaging consumes the API's actual provider fields.
+- ✓ Episode form field layout was reconciled: Title is in the identity row; Duration and Explicit are in the publish row; the label is Publish.
 
 ## Deferred Validation
 
@@ -89,6 +93,7 @@ The app is Angular 15 with TypeScript 4.8, Bootstrap 5.3.8, template-driven form
 | Use native authenticated Blob delivery | Avoid unnecessary client ZIP/file-saver dependencies | ✓ Good |
 | Preserve the existing Episodes-tab workflow | Add capability without disrupting episode editing | ✓ Good |
 | Fail closed when the live fixture identity is mismatched | Avoid mutating unrelated production-like data to force validation | ✓ Good |
+| Keep provider choice backend-owned and expose actual provider per step | Prevent misleading UI status when Gemini falls back to Groq | ✓ Good |
 
 ---
 *Last updated: 2026-07-31 after v1.1 milestone*

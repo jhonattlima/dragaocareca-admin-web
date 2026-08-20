@@ -1,5 +1,15 @@
 # Project Milestones: Dragao Careca Admin Web
 
+## v1.2 Trailer Video YouTube Publishing (Implementation complete; release closeout pending)
+
+**Phases:** 7-9 implemented and verified; Phases 10-11 remain roadmap placeholders because the existing workflow already contains the integration and artifact capability.
+
+**Delivered:** Final trailer-video upload/replacement UI, private-first YouTube job lifecycle, title/hashtag authoring, debounced approximate hashtag lookup, Save-time metadata orchestration, provider-aware transcript/summary/hashtag progress messages, and the adjusted episode-form field layout.
+
+**Verification:** Complete ChromeHeadless suite passed 70/70, focused suites passed 61/61, frontend build passed, and the sibling API hashtag-authoring verifier passed. Live OAuth/channel publication and external provider quota remain operational follow-up.
+
+**Provider contract:** The UI displays the provider reported by the API for each step. It does not infer or hard-code Gemini/Groq; summary and hashtag fallback decisions remain backend-owned.
+
 ## v1.1 Episode Artifact Downloads (Shipped: 2026-07-31)
 
 **Phases completed:** 3 phases, 11 plans, 25 tasks

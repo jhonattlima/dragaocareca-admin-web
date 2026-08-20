@@ -8,7 +8,7 @@ v1.2 extends the existing episode workflow from finalized local trailer video th
 
 - ✅ **v1.0 Transcript Summary Integration** — Phases 1-3, shipped 2026-07-29
 - ✅ **v1.1 Episode Artifact Downloads** — Phases 4-6, shipped 2026-07-31
-- 📋 **v1.2 Trailer Video YouTube Publishing** — Phases 7-11, planned
+- 🚧 **v1.2 Trailer Video YouTube Publishing** — Phases 7-11, implementation complete through Phase 9; final release/UAT closeout remains
 
 ## Phases
 
@@ -34,9 +34,9 @@ v1.2 extends the existing episode workflow from finalized local trailer video th
 
 **Milestone Goal:** Let operators safely upload a trailer video, start its private YouTube transfer immediately, populate the private link, and publish it with saved episode metadata while cleaning up replaced or deleted provider videos.
 
-- [ ] **Phase 7: Final Trailer Video Upload** - Select, upload, cancel, retry, and safely replace a final MP4 through the existing trailer-video API route.
-- [ ] **Phase 8: YouTube Job Lifecycle** - Persist and execute resumable server-side YouTube uploads through private readiness with safe retry and cancellation boundaries.
-- [ ] **Phase 9: Title & Hashtag Authoring** - Finalize the operator-facing trailer title and hashtag lookup/counting before the existing Phase 8 Save publication boundary.
+- [x] **Phase 7: Final Trailer Video Upload** - Select, upload, cancel, retry, and safely replace a final MP4 through the existing trailer-video API route. (implemented)
+- [x] **Phase 8: YouTube Job Lifecycle** - Persist and execute resumable server-side YouTube uploads through private readiness with safe retry and cancellation boundaries. (implemented)
+- [x] **Phase 9: Title & Hashtag Authoring** - Finalize the operator-facing trailer title and hashtag lookup/counting before the existing Phase 8 Save publication boundary. (verified 2026-08-14; amended 2026-08-20)
 - [ ] **Phase 10: Operator Workflow Integration** - Connect the API contracts to the sectioned Angular workflow with thin orchestration and stale-state protection.
 - [ ] **Phase 11: Trailer Artifact & Compatibility Release** - Make only finalized trailer videos downloadable and preserve existing application behavior and release gates.
 
@@ -158,8 +158,8 @@ Plans:
 | 4 | v1.1 Episode Artifact Downloads | 3/3 | Complete | 2026-07-31 |
 | 5 | v1.1 Episode Artifact Downloads | 4/4 | Complete | 2026-07-31 |
 | 6 | v1.1 Episode Artifact Downloads | 4/4 | Complete | 2026-07-31 |
-| 7. Final Trailer Video Upload | v1.2 | 3/3 | In Progress|  |
-| 8. YouTube Job Lifecycle | v1.2 | 5/5 | In Progress|  |
-| 9. Title, Hashtags & Publishing | v1.2 | 3/3 | In Progress|  |
-| 10. Operator Workflow Integration | v1.2 | 0/TBD | Not started | - |
-| 11. Trailer Artifact & Compatibility Release | v1.2 | 0/TBD | Not started | - |
+| 7. Final Trailer Video Upload | v1.2 | 3/3 | Complete |  |
+| 8. YouTube Job Lifecycle | v1.2 | 5/5 | Complete |  |
+| 9. Title, Hashtags & Publishing | v1.2 | 3/3 | Complete | 2026-08-14 |
+| 10. Operator Workflow Integration | v1.2 | 0/TBD | Deferred; implemented in existing workflow | - |
+| 11. Trailer Artifact & Compatibility Release | v1.2 | 0/TBD | Deferred; covered by API artifact workflow | - |

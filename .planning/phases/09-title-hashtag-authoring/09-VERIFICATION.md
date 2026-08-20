@@ -74,6 +74,16 @@ human_verification: []
 
 The lifecycle API run also emitted an `ENOENT` rename warning from the asynchronous hashtag authoring worker while processing episode 1805, but the verifier completed with exit 0 and reported its lifecycle checks verified. This is recorded for follow-up observation, not promoted to a blocker because the independent assertions passed.
 
+## Post-Verification Amendment: Provider-Aware Status and Form Layout
+
+**Updated:** 2026-08-20
+
+The verified Phase 09 UI now consumes provider metadata from the existing API status DTOs and reports the actual provider in the existing transcript, summary, and hashtag status messages. It does not use static provider labels: the backend-reported provider is formatted for display, including fallback cases. A completed summary message therefore identifies the provider that actually generated it, while an unavailable hashtag message identifies the provider used for the failed/fallback attempt.
+
+The episode form was also aligned with the final operator layout: `Title` moved to the first row beside episode identity fields; `Duration` and `Explicit` moved to the publish row; and the label is now `Publish` rather than `Publish DateTime`.
+
+Post-amendment validation: `npm run build` passed. Existing selector-parser and bundle/style budget warnings remain non-blocking. No new UI trigger, provider credential, or client-side business rule was introduced.
+
 ## Probe Execution
 
 | Probe | Command | Result | Status |

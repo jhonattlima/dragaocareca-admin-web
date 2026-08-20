@@ -5,10 +5,10 @@ milestone_name: Trailer Video YouTube Publishing
 current_phase: 09
 current_phase_name: title-hashtag-authoring
 status: verifying
-stopped_at: Phase 9 implementation complete; browser verification pending ChromeHeadless
-last_updated: "2026-08-14T13:59:37.186Z"
-last_activity: 2026-08-14
-last_activity_desc: Phase 09 execution started
+stopped_at: Phase 9 browser verification complete; provider-aware status and episode-form layout amendments integrated
+last_updated: "2026-08-20T19:30:00.000Z"
+last_activity: 2026-08-20
+last_activity_desc: Reconciled API provider fallback/status contract and final form layout
 progress:
   total_phases: 6
   completed_phases: 4
@@ -28,10 +28,10 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-Phase: 09 (title-hashtag-authoring) — EXECUTING
+Phase: 09 (title-hashtag-authoring) — VERIFIED
 Plan: 3 of 3
-Status: Phase complete — ready for verification
-Last activity: 2026-08-14 — Phase 09 execution started
+Status: Phase complete — ChromeHeadless verification passed; post-verification amendments build-verified
+Last activity: 2026-08-20 — provider-aware messages and layout adjustment reconciled
 
 Progress: ░░░░░░░░░░ [██████████] 100%
 
@@ -100,7 +100,7 @@ Progress: ░░░░░░░░░░ [██████████] 100%
 
 ### Pending Todos
 
-- Confirm exact sibling API route/DTO names, OAuth channel and scopes, local MP4 limits, Unicode counting policy, and provider cleanup semantics during Phase 7/8 planning.
+- Run a final cross-repository browser smoke test against the deployed API after OAuth/channel enablement; the local Phase 09 suite and API verifier are already green.
 
 ### Blockers/Concerns
 
@@ -119,6 +119,6 @@ Progress: ░░░░░░░░░░ [██████████] 100%
 
 ## Session Continuity
 
-Last session: 2026-08-14T13:59:37.179Z
-Stopped at: Phase 9 implementation complete; browser verification pending ChromeHeadless
+Last session: 2026-08-20T19:30:00.000Z
+Stopped at: Phase 9 verification complete; final live cross-repository smoke test remains
 Resume file: .planning/phases/09-title-hashtag-authoring/09-VERIFICATION.md
