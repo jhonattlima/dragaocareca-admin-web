@@ -28,6 +28,8 @@ describe('ManageComponent summary flow', () => {
       'uploadEpisodeAudio',
       'uploadEpisodeTrailer',
       'createEpisode',
+      'updateEpisode',
+      'commitYoutubeTrailerJob',
       'lookupHashtag',
     ]);
     apiService.listEpisodes.and.returnValue(of([]));
@@ -109,6 +111,72 @@ describe('ManageComponent summary flow', () => {
     component.onSummaryChange(editor);
 
     expect(editor.formModel.summaryManuallyEdited).toBeTrue();
+  });
+
+  it('keeps authored hashtag lookup and editor context through a deferred YouTube commit failure', fakeAsync(() => {
+    const editor = component.addEditorState;
+    editor.formModel.episodeId = 42;
+    editor.formModel.title = 'Saved title';
+    editor.formModel.pubDate = '2026-08-20T10:00';
+    editor.formModel.hashtags = '#rpg';
+    editor.formModel.musicCredits[0] = {
+      name: 'Artist', links: [{ label: 'Bandcamp', url: 'https://example.test/music' }],
+      draftLabel: '', draftUrl: '', suggestions: [], suggestionsOpen: false,
+    };
+    editor.trailerVideoDraftId = 'draft-42';
+    const lookupResponse: HashtagLookupResponse = {
+      displayTag: '#rpg', normalizedTag: '#rpg', approximateCount: 12, retrievedAt: null,
+      cacheStatus: 'miss', regionCode: 'BR', relevanceLanguage: 'pt', source: 'provider',
+      state: 'available', errorCategory: null, retryAt: null,
+    };
+    apiService.lookupHashtag.and.returnValue(of(lookupResponse));
+    const createResponse = new Subject<Episode>();
+    const commitResponse = new Subject<YoutubeTrailerJobSnapshot>();
+    apiService.createEpisode.and.returnValue(createResponse);
+    apiService.commitYoutubeTrailerJob.and.returnValue(commitResponse);
+    (component as any).youtubeTrailerJobStates.set(editor, {
+      snapshot: { jobId: 'job-42', episodeId: 42, status: 'ready', progress: { confirmedBytes: 1, totalBytes: 1, processingPartsProcessed: null, processingPartsTotal: null, processingTimeLeftMs: null }, cancellation: { requestedAt: null, cancelledAt: null, boundary: null }, error: { category: null, occurredAt: null }, retry: { count: 0, nextAttemptAt: null }, createdAt: '', updatedAt: '', completedAt: '', privateWatchUrl: 'https://youtu.be/private', publicationStatus: 'not_started' },
+      episodeId: 42, jobId: 'job-42', sourceGeneration: 0, sourceFileName: 'draft:draft-42', pollingTimer: null, pollingSubscription: null, startInFlight: null, error: '',
+    });
+
+    component.onHashtagInput(editor);
+    tick(1000);
+    expect(component.getHashtagLookup(editor)?.normalizedTag).toBe('#rpg');
+    component.saveEpisode(editor);
+    createResponse.next({ episodeId: 42 } as Episode);
+    expect(apiService.commitYoutubeTrailerJob).toHaveBeenCalledWith(42, 'job-42', 'Trailer - Saved title', ['#rpg']);
+    expect(component.getSaveTransaction(editor)?.phase).toBe('committing');
+    expect(component.getHashtagLookup(editor)?.normalizedTag).toBe('#rpg');
+
+    commitResponse.error({ error: { category: 'quota' } });
+
+    expect(editor.formModel.title).toBe('Saved title');
+    expect(editor.formModel.hashtags).toBe('#rpg');
+    expect(editor.formModel.youtube).toBe('https://youtu.be/private');
+    expect(component.getHashtagLookup(editor)?.normalizedTag).toBe('#rpg');
+    expect(component.getSaveTransaction(editor)?.phase).toBe('error');
+    expect(component.errorMessage).toContain('YouTube commit failed (quota)');
+  }));
+
+  it('ignores a save response after the editor is explicitly reset', () => {
+    const editor = component.addEditorState;
+    editor.formModel.episodeId = 42;
+    editor.formModel.title = 'Stale save';
+    editor.formModel.pubDate = '2026-08-20T10:00';
+    editor.formModel.musicCredits[0] = {
+      name: 'Artist', links: [{ label: 'Bandcamp', url: 'https://example.test/music' }],
+      draftLabel: '', draftUrl: '', suggestions: [], suggestionsOpen: false,
+    };
+    const createResponse = new Subject<Episode>();
+    apiService.createEpisode.and.returnValue(createResponse);
+
+    component.saveEpisode(editor);
+    component.resetEditor(editor);
+    createResponse.next({ episodeId: 42 } as Episode);
+
+    expect(apiService.commitYoutubeTrailerJob).not.toHaveBeenCalled();
+    expect(editor.formModel.title).toBe('');
+    expect(component.getSaveTransaction(editor)).toBeNull();
   });
 
   it('polls summary status after transcript completion and autofills the generated text', () => {

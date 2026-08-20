@@ -76,6 +76,18 @@ interface YoutubeTrailerJobState {
   error: string;
 }
 
+type SaveTransactionPhase = 'saving' | 'committing' | 'success' | 'error';
+
+interface SaveTransactionState {
+  phase: SaveTransactionPhase;
+  episodeId: number;
+  jobId: string | null;
+  sourceGeneration: number;
+  title: string;
+  hashtags: string[];
+  message: string;
+}
+
 interface HashtagLookupState {
   timer: number | null;
   subscription: Subscription | null;
@@ -215,6 +227,7 @@ export class ManageComponent implements OnInit, OnDestroy {
   private readonly retryableUploadFiles = new WeakMap<EpisodeEditorState, Partial<Record<UploadKind, File>>>();
   private readonly trailerVideoReservations = new WeakMap<EpisodeEditorState, Subscription>();
   private readonly youtubeTrailerJobStates = new WeakMap<EpisodeEditorState, YoutubeTrailerJobState>();
+  private readonly saveTransactionStates = new WeakMap<EpisodeEditorState, SaveTransactionState>();
   private readonly hashtagLookupStates = new WeakMap<EpisodeEditorState, HashtagLookupState>();
   private readonly generationVersions = new WeakMap<EpisodeEditorState, number>();
   readonly youtubeTrailerJobSourceGeneration = new WeakMap<EpisodeEditorState, number>();
@@ -1077,6 +1090,18 @@ export class ManageComponent implements OnInit, OnDestroy {
 
     const payload = this.buildPayload(editor);
     const videoState = this.getTrailerVideoState(editor);
+    const currentYoutubeJob = this.getYoutubeTrailerJob(editor);
+    const youtubeState = this.getYoutubeTrailerJobState(editor);
+    const transaction: SaveTransactionState = {
+      phase: 'saving',
+      episodeId: editor.formModel.episodeId,
+      jobId: currentYoutubeJob?.jobId ?? null,
+      sourceGeneration: youtubeState.sourceGeneration,
+      title: this.getTrailerTitlePrefix(editor),
+      hashtags: this.serializeHashtags(editor.formModel.hashtags),
+      message: 'Saving the episode…',
+    };
+    this.saveTransactionStates.set(editor, transaction);
     if (!editor.editingEpisodeId && editor.trailerVideoDraftId && videoState.file) {
       videoState.status = 'promoting';
     }
@@ -1086,6 +1111,9 @@ export class ManageComponent implements OnInit, OnDestroy {
 
     request.subscribe({
       next: (episode) => {
+        if (this.saveTransactionStates.get(editor) !== transaction) {
+          return;
+        }
         const videoState = this.getTrailerVideoState(editor);
         if (videoState.file && editor.trailerVideoDraftId && videoState.episodeId === editor.formModel.episodeId) {
           videoState.status = episode.trailerVideoFileName ? 'finalized' : videoState.status;
@@ -1095,23 +1123,54 @@ export class ManageComponent implements OnInit, OnDestroy {
           }
           videoState.error = '';
         }
-        const currentYoutubeJob = this.getYoutubeTrailerJob(editor);
         if (episode.episodeId && currentYoutubeJob) {
+          if (transaction.episodeId !== editor.formModel.episodeId
+            || transaction.jobId !== currentYoutubeJob.jobId
+            || transaction.sourceGeneration !== this.getYoutubeTrailerJobState(editor).sourceGeneration) {
+            return;
+          }
+          transaction.phase = 'committing';
+          transaction.episodeId = episode.episodeId;
+          transaction.message = 'Episode saved. Committing the private YouTube trailer…';
           this.apiService.commitYoutubeTrailerJob(
             episode.episodeId,
             currentYoutubeJob.jobId,
-            this.getTrailerTitlePrefix(editor),
-            this.serializeHashtags(editor.formModel.hashtags),
+            transaction.title,
+            transaction.hashtags,
           ).subscribe({
             next: (snapshot) => {
+              if (this.saveTransactionStates.get(editor) !== transaction
+                || transaction.episodeId !== editor.formModel.episodeId
+                || transaction.jobId !== snapshot.jobId
+                || transaction.sourceGeneration !== this.getYoutubeTrailerJobState(editor).sourceGeneration) {
+                return;
+              }
+              this.storeYoutubeTrailerJob(editor, snapshot, this.getYoutubeTrailerJobState(editor).sourceFileName);
               if (snapshot.privateWatchUrl) editor.formModel.youtube = snapshot.privateWatchUrl;
+              transaction.phase = 'success';
+              transaction.message = snapshot.publicationStatus === 'public_confirmed'
+                ? 'Episode saved and trailer published publicly on YouTube.'
+                : 'Episode saved and YouTube commit completed.';
+              this.successMessage = transaction.message;
+              this.saveTransactionStates.delete(editor);
+              this.resetEditor(editor);
+              this.loadEpisodes();
             },
             error: (error) => {
-              this.errorMessage = error?.error?.message ?? 'Episode saved, but YouTube publication could not be queued.';
+              if (this.saveTransactionStates.get(editor) !== transaction) {
+                return;
+              }
+              transaction.phase = 'error';
+              transaction.message = this.getYoutubeCommitError(error);
+              this.errorMessage = transaction.message;
             },
           });
+          return;
         }
-        this.successMessage = editor.editingEpisodeId ? 'Episode updated.' : 'Episode saved.';
+        transaction.phase = 'success';
+        transaction.message = editor.editingEpisodeId ? 'Episode updated.' : 'Episode saved.';
+        this.successMessage = transaction.message;
+        this.saveTransactionStates.delete(editor);
         if (editor === this.addEditorState) {
           this.resetEditor(this.addEditorState);
         } else {
@@ -1120,6 +1179,10 @@ export class ManageComponent implements OnInit, OnDestroy {
         this.loadEpisodes();
       },
       error: (error) => {
+        if (this.saveTransactionStates.get(editor) !== transaction) {
+          return;
+        }
+        this.saveTransactionStates.delete(editor);
         if (!editor.editingEpisodeId && videoState.file && editor.trailerVideoDraftId) {
           videoState.status = 'staged';
           videoState.error = error?.error?.message ?? 'Could not finalize the trailer video.';
@@ -1127,6 +1190,12 @@ export class ManageComponent implements OnInit, OnDestroy {
         this.errorMessage = error?.error?.message ?? 'Could not save episode.';
       },
     });
+  }
+
+  private getYoutubeCommitError(error: any): string {
+    const category = error?.error?.category ?? error?.error?.publicationErrorCategory;
+    const detail = typeof category === 'string' ? ` (${category})` : '';
+    return `Episode saved, but the YouTube commit failed${detail}. Review the private trailer and retry Save.`;
   }
 
   toggleMember(editor: EpisodeEditorState, member: MemberOption): void {
@@ -1420,10 +1489,24 @@ export class ManageComponent implements OnInit, OnDestroy {
   }
 
   isEpisodeSaveDisabled(editor: EpisodeEditorState): boolean {
-    return editor.formModel.transcriptStatus === 'pending'
+    return this.isSaveTransactionInFlight(editor)
+      || editor.formModel.transcriptStatus === 'pending'
       || editor.formModel.transcriptStatus === 'processing'
       || Boolean(this.getTrailerTitleValidationError(editor))
       || !this.hasCompleteMusicCredit(editor);
+  }
+
+  getSaveTransaction(editor: EpisodeEditorState): SaveTransactionState | null {
+    return this.saveTransactionStates.get(editor) ?? null;
+  }
+
+  isSaveTransactionInFlight(editor: EpisodeEditorState): boolean {
+    const phase = this.getSaveTransaction(editor)?.phase;
+    return phase === 'saving' || phase === 'committing';
+  }
+
+  getSaveTransactionMessage(editor: EpisodeEditorState): string {
+    return this.getSaveTransaction(editor)?.message ?? '';
   }
 
   isCompleteMusicCredit(entry: Pick<StructuredEntry, 'name' | 'links'>): boolean {
@@ -1983,6 +2066,7 @@ export class ManageComponent implements OnInit, OnDestroy {
   }
 
   resetEditor(editor: EpisodeEditorState): void {
+    this.saveTransactionStates.delete(editor);
     this.cancelTrailerVideoWork(editor, 'canceled');
     this.clearYoutubeTrailerJobPolling(editor);
     this.clearHashtagLookup(editor);
