@@ -275,6 +275,109 @@ describe('ManageComponent summary flow', () => {
     expect(editor.formModel.summaryStatus).toBe('done');
     expect((component as unknown as { summaryStatusPollTimer: number | null }).summaryStatusPollTimer).toBeNull();
   });
+
+  it('restores transcript polling before summary polling for pending edited episodes', () => {
+    const episode = (episodeId: number, overrides: Partial<Episode> = {}): Episode => ({
+      episodeId,
+      title: `Episode ${episodeId}`,
+      summary: 'Existing summary',
+      pubDate: '2026-07-24T00:00:00.000Z',
+      explicit: 'no',
+      transcriptStatus: 'pending',
+      summaryStatus: 'pending',
+      ...overrides,
+    });
+    apiService.getEpisodeTranscriptionStatus.and.returnValue(of({
+      status: 'pending', transcriptFileName: null, transcriptUpdatedAt: null,
+      transcriptStartedAt: null, progress: 20, transcriptError: null, provider: null,
+    }));
+    apiService.getEpisodeGeneratedSummaryStatus.and.returnValue(of({
+      status: 'pending', summaryFileName: null, summaryUpdatedAt: null,
+      summaryStartedAt: null, progress: 10, error: null, version: 1,
+      promptVersion: 'summary-v1', provider: null, summaryText: null,
+    }));
+
+    component.startEdit(episode(42));
+
+    expect(apiService.getEpisodeTranscriptionStatus).toHaveBeenCalledOnceWith(42);
+    expect(apiService.getEpisodeGeneratedSummaryStatus).not.toHaveBeenCalled();
+    expect((component as unknown as { summaryStatusPollTimer: number | null }).summaryStatusPollTimer).toBeNull();
+    expect((component as unknown as { transcriptionStatusPollTimer: number | null }).transcriptionStatusPollTimer).not.toBeNull();
+
+    component.startEdit(episode(43, { transcriptStatus: 'done', summaryStatus: 'processing' }));
+
+    expect(apiService.getEpisodeTranscriptionStatus).toHaveBeenCalledOnceWith(42);
+    expect(apiService.getEpisodeGeneratedSummaryStatus).toHaveBeenCalledOnceWith(43);
+    expect((component as unknown as { transcriptionStatusPollTimer: number | null }).transcriptionStatusPollTimer).toBeNull();
+    expect((component as unknown as { summaryStatusPollTimer: number | null }).summaryStatusPollTimer).not.toBeNull();
+    (component as unknown as { clearEpisodeGenerationPolling: () => void }).clearEpisodeGenerationPolling();
+  });
+
+  it('restores suggested-tag polling without polling terminal generation states', () => {
+    const episode: Episode = {
+      episodeId: 42,
+      title: 'Episode 42',
+      summary: 'Existing summary',
+      pubDate: '2026-07-24T00:00:00.000Z',
+      explicit: 'no',
+      transcriptStatus: 'done',
+      summaryStatus: 'done',
+    };
+    apiService.getEpisodeGeneratedSummaryStatus.and.returnValue(of({
+      status: 'processing', summaryFileName: null, summaryUpdatedAt: null,
+      summaryStartedAt: null, progress: 50, error: null, version: 1,
+      promptVersion: 'summary-v1', provider: null, summaryText: null,
+    }));
+
+    component.startEdit({ ...episode, summaryStatus: 'idle' });
+    expect(apiService.getEpisodeGeneratedSummaryStatus).not.toHaveBeenCalled();
+
+    component.startEdit({
+      ...episode,
+      summaryStatus: 'done',
+      suggestedTags: {
+        status: 'processing', version: 1, updatedAt: '', startedAt: null,
+        finishedAt: null, retryAt: null, errorCategory: null,
+        promptVersion: null, provider: null, suggestions: [],
+      },
+    } as Episode & { suggestedTags?: SuggestedTagsSnapshot });
+    expect(apiService.getEpisodeGeneratedSummaryStatus).toHaveBeenCalledOnceWith(42);
+    (component as unknown as { clearEpisodeGenerationPolling: () => void }).clearEpisodeGenerationPolling();
+
+    component.startEdit({ ...episode, summaryStatus: 'error' });
+    expect(apiService.getEpisodeGeneratedSummaryStatus).toHaveBeenCalledOnceWith(42);
+  });
+
+  it('ignores a late response from an older restored summary poll after re-editing', () => {
+    const oldResponse = new Subject<EpisodeGeneratedSummaryStatus>();
+    const currentResponse = new Subject<EpisodeGeneratedSummaryStatus>();
+    apiService.getEpisodeGeneratedSummaryStatus.and.returnValues(oldResponse.asObservable(), currentResponse.asObservable());
+    const episode: Episode = {
+      episodeId: 42,
+      title: 'Episode 42',
+      summary: 'Existing summary',
+      pubDate: '2026-07-24T00:00:00.000Z',
+      explicit: 'no',
+      transcriptStatus: 'done',
+      summaryStatus: 'pending',
+    };
+
+    component.startEdit(episode);
+    component.startEdit(episode);
+    oldResponse.next({
+      status: 'done', summaryFileName: null, summaryUpdatedAt: null,
+      summaryStartedAt: null, progress: 100, error: null, version: 1,
+      promptVersion: null, provider: null, summaryText: 'Stale summary',
+    });
+    expect(component.episodesEditorState.formModel.summary).toBe('Existing summary');
+    currentResponse.next({
+      status: 'done', summaryFileName: null, summaryUpdatedAt: null,
+      summaryStartedAt: null, progress: 100, error: null, version: 2,
+      promptVersion: null, provider: null, summaryText: 'Current summary',
+    });
+    expect(component.episodesEditorState.formModel.summary).toBe('Current summary');
+    (component as unknown as { clearEpisodeGenerationPolling: () => void }).clearEpisodeGenerationPolling();
+  });
 });
 
 describe('ManageComponent artifact download modal', () => {

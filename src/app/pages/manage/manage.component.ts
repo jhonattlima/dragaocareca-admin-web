@@ -674,6 +674,7 @@ export class ManageComponent implements OnInit, OnDestroy {
       summaryStartedAt: episode.summaryStartedAt ?? null,
       summaryError: episode.summaryError ?? '',
       summaryProgress: episode.summaryProgress ?? null,
+      suggestedTags: (episode as Episode & { suggestedTags?: SuggestedTagsSnapshot }).suggestedTags,
       summaryManuallyEdited: false,
     };
     editor.selectedMembers = [...(episode.authors ?? [])];
@@ -683,7 +684,27 @@ export class ManageComponent implements OnInit, OnDestroy {
       status: episode.trailerVideoFileName ? 'finalized' : 'selected',
       episodeId: episode.episodeId,
     });
+    this.restoreEpisodeGenerationPolling(episode.episodeId, editor);
     this.restoreCurrentYoutubeTrailerJob(editor);
+  }
+
+  private restoreEpisodeGenerationPolling(episodeId: number, editor: EpisodeEditorState): void {
+    this.clearEpisodeGenerationPolling();
+
+    const transcriptPending = editor.formModel.transcriptStatus === 'pending'
+      || editor.formModel.transcriptStatus === 'processing';
+    if (transcriptPending) {
+      this.syncTranscriptionStatusPolling(episodeId, editor);
+      return;
+    }
+
+    const summaryPending = editor.formModel.summaryStatus === 'pending'
+      || editor.formModel.summaryStatus === 'processing';
+    const suggestedTagsPending = editor.formModel.suggestedTags?.status === 'pending'
+      || editor.formModel.suggestedTags?.status === 'processing';
+    if (summaryPending || suggestedTagsPending) {
+      this.syncSummaryStatusPolling(episodeId, editor);
+    }
   }
 
   getYoutubeTrailerJob(editor: EpisodeEditorState): YoutubeTrailerJobSnapshot | null {
