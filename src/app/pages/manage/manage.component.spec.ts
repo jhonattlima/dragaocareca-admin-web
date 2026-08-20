@@ -378,6 +378,33 @@ describe('ManageComponent summary flow', () => {
     expect(component.episodesEditorState.formModel.summary).toBe('Current summary');
     (component as unknown as { clearEpisodeGenerationPolling: () => void }).clearEpisodeGenerationPolling();
   });
+
+  it('preserves an operator summary edit when restored polling completes', () => {
+    const response = new Subject<EpisodeGeneratedSummaryStatus>();
+    apiService.getEpisodeGeneratedSummaryStatus.and.returnValue(response.asObservable());
+    const episode: Episode = {
+      episodeId: 42,
+      title: 'Episode 42',
+      summary: 'Persisted summary',
+      pubDate: '2026-07-24T00:00:00.000Z',
+      explicit: 'no',
+      transcriptStatus: 'done',
+      summaryStatus: 'pending',
+    };
+
+    component.startEdit(episode);
+    component.episodesEditorState.formModel.summary = 'Operator summary';
+    component.onSummaryChange(component.episodesEditorState);
+    response.next({
+      status: 'done', summaryFileName: null, summaryUpdatedAt: null,
+      summaryStartedAt: null, progress: 100, error: null, version: 1,
+      promptVersion: null, provider: null, summaryText: 'Generated replacement',
+    });
+
+    expect(component.episodesEditorState.formModel.summary).toBe('Operator summary');
+    expect(component.episodesEditorState.formModel.summaryManuallyEdited).toBeTrue();
+    (component as unknown as { clearEpisodeGenerationPolling: () => void }).clearEpisodeGenerationPolling();
+  });
 });
 
 describe('ManageComponent artifact download modal', () => {
