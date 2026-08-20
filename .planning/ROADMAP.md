@@ -131,10 +131,10 @@ Plans:
   3. Existing authentication and `authBypass` modes continue to protect or enable the workflow appropriately, while episode editing and generated-summary behavior remain usable.
   4. The sectioned, legacy-inspired layout presents separate local and YouTube stages, actionable errors, cancellation boundaries, and replacement warnings instead of a misleading single progress state.
 
-**Plans**: 1/3 plans executed
+**Plans**: 2/3 plans executed
 
 - [x] 10-01-PLAN.md
-- [ ] 10-02-PLAN.md
+- [x] 10-02-PLAN.md
 - [ ] 10-03-PLAN.md
 
 **UI hint**: yes
@@ -166,5 +166,5 @@ Plans:
 | 7. Final Trailer Video Upload | v1.2 | 3/3 | Complete |  |
 | 8. YouTube Job Lifecycle | v1.2 | 5/5 | Complete |  |
 | 9. Title, Hashtags & Publishing | v1.2 | 3/3 | Complete | 2026-08-14 |
-| 10. Operator Workflow Integration | v1.2 | 1/3 | In Progress|  |
+| 10. Operator Workflow Integration | v1.2 | 2/3 | In Progress|  |
 | 11. Trailer Artifact & Compatibility Release | v1.2 | 0/TBD | Deferred; covered by API artifact workflow | - |

@@ -5,15 +5,15 @@ milestone_name: Trailer Video YouTube Publishing
 current_phase: 09
 current_phase_name: title-hashtag-authoring
 status: verifying
-stopped_at: Completed 10-01-PLAN.md
-last_updated: "2026-08-20T21:51:40.281Z"
+stopped_at: Completed 10-02-PLAN.md
+last_updated: "2026-08-20T22:00:51.873Z"
 last_activity: 2026-08-20
 last_activity_desc: provider-aware messages and layout adjustment reconciled
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 20
-  completed_plans: 18
+  completed_plans: 19
   percent: 67
 ---
 
@@ -33,7 +33,7 @@ Plan: 3 of 3
 Status: Phase complete — ready for verification
 Last activity: 2026-08-20 — provider-aware messages and layout adjustment reconciled
 
-Progress: ░░░░░░░░░░ [█████████░] 90%
+Progress: ░░░░░░░░░░ [██████████] 95%
 
 ## Performance Metrics
 
@@ -59,6 +59,7 @@ Progress: ░░░░░░░░░░ [█████████░] 90%
 | Phase 09 P02 | 27 | 2 tasks | 4 files |
 | Phase 09 P03 | 8 | 2 tasks | 2 files |
 | Phase 10 P1 | 45 | 2 tasks | 2 files |
+| Phase 10 P02 | 18 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -99,6 +100,8 @@ Progress: ░░░░░░░░░░ [█████████░] 90%
 - [Phase ?]: Keep all authoring and lookup behavior in ManageComponent while the episode-form template provides accessible presentation bindings.
 - [Phase ?]: Use editor-derived IDs and keyboard-focusable hashtag tokens for accessible add/edit form feedback.
 - [Phase ?]: Restore persisted transcript-first or summary-stage polling from startEdit after clearing both shared pollers; preserve manual summaries and editor generation guards.
+- [Phase ?]: Save persists before the existing YouTube /commit call, and commit failure retains the active editor for recovery.
+- [Phase ?]: Episode/job/source-generation identity guards invalidate deferred callbacks after reset or replacement.
 
 ### Pending Todos
 
@@ -121,6 +124,6 @@ Progress: ░░░░░░░░░░ [█████████░] 90%
 
 ## Session Continuity
 
-Last session: 2026-08-20T21:51:40.271Z
-Stopped at: Completed 10-01-PLAN.md
-Resume file: .planning/phases/10-operator-workflow-integration/10-01-SUMMARY.md
+Last session: 2026-08-20T22:00:51.867Z
+Stopped at: Completed 10-02-PLAN.md
+Resume file: None
