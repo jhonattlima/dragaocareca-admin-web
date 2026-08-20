@@ -1114,6 +1114,12 @@ export class ManageComponent implements OnInit, OnDestroy {
         if (this.saveTransactionStates.get(editor) !== transaction) {
           return;
         }
+        const callbackYoutubeJob = this.getYoutubeTrailerJob(editor);
+        if (transaction.episodeId !== editor.formModel.episodeId
+          || transaction.jobId !== (callbackYoutubeJob?.jobId ?? null)
+          || transaction.sourceGeneration !== this.getYoutubeTrailerJobState(editor).sourceGeneration) {
+          return;
+        }
         const videoState = this.getTrailerVideoState(editor);
         if (videoState.file && editor.trailerVideoDraftId && videoState.episodeId === editor.formModel.episodeId) {
           videoState.status = episode.trailerVideoFileName ? 'finalized' : videoState.status;
