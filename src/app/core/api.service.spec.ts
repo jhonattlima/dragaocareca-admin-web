@@ -39,6 +39,7 @@ describe('ApiService title and hashtag authoring contract', () => {
       retryAt: '2026-08-14T01:00:00.000Z',
       errorCategory: 'rate_limited',
       promptVersion: 'hashtags-v1',
+      provider: 'groq',
       suggestions: [],
     };
     let response: EpisodeGeneratedSummaryStatus | undefined;
