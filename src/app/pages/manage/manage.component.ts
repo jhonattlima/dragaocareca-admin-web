@@ -694,6 +694,7 @@ export class ManageComponent implements OnInit, OnDestroy {
     const transcriptPending = editor.formModel.transcriptStatus === 'pending'
       || editor.formModel.transcriptStatus === 'processing';
     if (transcriptPending) {
+      this.transcriptionTerminalFailures.delete(episodeId);
       this.syncTranscriptionStatusPolling(episodeId, editor);
       return;
     }
