@@ -5,6 +5,15 @@
 .episode-form.compact .episode-form-header {
   margin-bottom: 0;
 }
+
+.save-transaction-status {
+  border-left: 4px solid #0d6efd;
+}
+
+.save-transaction-status.save-transaction-error {
+  border-left-color: #b02a37;
+}
+
 .readonly-field {
   background-color: #f1f3f5;
   color: #6c757d;

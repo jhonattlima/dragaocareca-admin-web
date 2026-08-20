@@ -22,7 +22,7 @@
           <button
             class="btn btn-sm btn-outline-primary mt-2"
             type="button"
-            [disabled]="upload.kind === 'trailerVideo' ? controller.isTrailerVideoBusy(editor) : controller.isUploadBusy(upload.kind)"
+            [disabled]="controller.isSaveTransactionInFlight(editor) || (upload.kind === 'trailerVideo' ? controller.isTrailerVideoBusy(editor) : controller.isUploadBusy(upload.kind))"
             (click)="fileInput.click()">
             {{ upload.kind === 'trailerVideo' ? (controller.isTrailerVideoBusy(editor) ? 'Uploading...' : 'Choose or replace MP4') : (controller.isUploadBusy(upload.kind) ? 'Uploading...' : 'Choose or drop file') }}
           </button>
@@ -30,7 +30,7 @@
             class="btn btn-sm btn-outline-danger mt-2 ms-2"
             type="button"
             *ngIf="controller.canDeleteUpload(editor, upload.kind)"
-            [disabled]="controller.isUploadBusy(upload.kind)"
+            [disabled]="controller.isSaveTransactionInFlight(editor) || controller.isUploadBusy(upload.kind)"
             (click)="controller.deleteUpload(editor, upload.kind)">
             {{ controller.uploadStates[upload.kind].deleting ? 'Deleting...' : 'Delete file' }}
           </button>
@@ -143,6 +143,13 @@
         </div>
       </div>
     </div>
+  </div>
+
+  <div class="section-block save-transaction-status" *ngIf="controller.getSaveTransaction(editor) as transaction" [class.save-transaction-error]="transaction.phase === 'error'" aria-live="polite">
+    <h2 class="manage-section-title">Save and YouTube commit</h2>
+    <p class="mb-1">{{ controller.getSaveTransactionMessage(editor) }}</p>
+    <p class="section-hint mb-0" *ngIf="transaction.phase === 'committing'">The episode is saved locally. Keep this editor open until the private YouTube commit finishes.</p>
+    <p class="section-hint mb-0" *ngIf="transaction.phase === 'error'">The editor, authored title, hashtags, summary, private link, and recovery controls remain available. Retry Save when ready.</p>
   </div>
 
   <div class="section-block">
@@ -469,7 +476,7 @@
       type="button"
       [disabled]="controller.isEpisodeSaveDisabled(editor)"
       (click)="controller.saveEpisode(editor)">
-      {{ editor.editingEpisodeId ? 'Update Episode' : 'Save Episode' }}
+      {{ controller.isSaveTransactionInFlight(editor) ? 'Saving...' : (editor.editingEpisodeId ? 'Update Episode' : 'Save Episode') }}
     </button>
     <button class="btn btn-secondary" type="button" (click)="controller.requestResetEditor(editor)">Reset</button>
   </div>
