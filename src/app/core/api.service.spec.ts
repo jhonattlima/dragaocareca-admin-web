@@ -101,8 +101,8 @@ describe('ApiService artifact jobs', () => {
     httpTestingController.verify();
   });
 
-  it('starts an artifact job with canonical selectors in the requested order', () => {
-    const artifacts: EpisodeArtifactSelector[] = ['episode', 'trailer', 'image', 'image-low', 'transcript'];
+  it('starts an artifact job with the exact trailer-video selector in the canonical request body', () => {
+    const artifacts: EpisodeArtifactSelector[] = ['episode', 'trailer', 'trailer-video', 'image', 'image-low', 'transcript'];
     const snapshot = createSnapshot({ requested: artifacts });
     let response: EpisodeArtifactJobSnapshot | undefined;
 
@@ -116,6 +116,15 @@ describe('ApiService artifact jobs', () => {
     request.flush(snapshot);
 
     expect(response).toEqual(snapshot);
+  });
+
+  it('posts trailer-video unchanged when it is the only requested artifact', () => {
+    apiService.startEpisodeArtifactJob(42, ['trailer-video']).subscribe();
+
+    const request = httpTestingController.expectOne(`${environment.apiBaseUrl}/episodes/42/artifacts/jobs`);
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({ artifacts: ['trailer-video'] });
+    request.flush(createSnapshot({ requested: ['trailer-video'], available: ['trailer-video'] }));
   });
 
   it('polls the job status route and exposes a completed download URL as data', () => {

@@ -561,6 +561,7 @@ describe('ManageComponent artifact download modal', () => {
     explicit: 'no',
     fileName: ' episode-42.mp3 ',
     trailerFileName: '',
+    trailerVideoFileName: 'episodes/42/trailer.mp4',
     coverFileName: 'cover-42.jpg',
     coverLowFileName: 'cover-42.webp',
     transcriptFileName: 'transcript-42.txt',
@@ -570,8 +571,8 @@ describe('ManageComponent artifact download modal', () => {
   const completedSnapshot = (overrides: Partial<EpisodeArtifactJobSnapshot> = {}): EpisodeArtifactJobSnapshot => ({
     jobId: 'job-42',
     episodeId: 42,
-    requested: ['episode', 'image', 'image-low', 'transcript'],
-    available: ['episode', 'image', 'image-low', 'transcript'],
+    requested: ['episode', 'trailer-video', 'image', 'image-low', 'transcript'],
+    available: ['episode', 'trailer-video', 'image', 'image-low', 'transcript'],
     missing: [],
     state: 'completed',
     progress: 100,
@@ -637,7 +638,7 @@ describe('ManageComponent artifact download modal', () => {
     expect(document.activeElement?.id).toBe('artifactModalTitle');
   }));
 
-  it('UI-03 and UI-04 render the five canonical options in order with trimmed availability defaults', () => {
+  it('UI-03 and UI-04 render the six canonical options in order with finalized trailer-video availability', () => {
     component.openArtifactModal(episode);
     fixture.detectChanges();
 
@@ -645,15 +646,34 @@ describe('ManageComponent artifact download modal', () => {
     expect(options.map((option) => option.querySelector('.artifact-option-label')?.textContent?.trim())).toEqual([
       'Episode audio .mp3',
       'Trailer .mp3',
+      'Trailer video .mp4',
       'Cover art .jpg/.jpeg',
       'Low cover art .webp',
       'Transcript .txt',
     ]);
     const checkboxes = Array.from(fixture.nativeElement.querySelectorAll('.artifact-option input')) as HTMLInputElement[];
-    expect(checkboxes.map((checkbox) => checkbox.checked)).toEqual([true, false, true, true, true]);
+    expect(checkboxes.map((checkbox) => checkbox.checked)).toEqual([true, false, true, true, true, true]);
     expect(checkboxes[1].disabled).toBeTrue();
     expect(checkboxes[1].parentElement?.textContent).toContain('Unavailable — file not uploaded.');
     expect(checkboxes[0].parentElement?.querySelector('.artifact-option-filename')?.getAttribute('title')).toBe('episode-42.mp3');
+    expect(checkboxes[2].disabled).toBeFalse();
+    expect(checkboxes[2].parentElement?.querySelector('.artifact-option-filename')?.getAttribute('title')).toBe('episodes/42/trailer.mp4');
+  });
+
+  it('leaves trailer-video unavailable and excludes it for absent, null, and staged-like DTO state', () => {
+    for (const candidate of [
+      { trailerVideoFileName: undefined },
+      { trailerVideoFileName: null },
+      { trailerVideoFileName: undefined, trailerVideoSyncStatus: 'unpublished' as const },
+    ]) {
+      component.openArtifactModal({ ...episode, ...candidate });
+      const trailerVideo = component.artifactOptions.find((option) => option.selector === 'trailer-video');
+      expect(trailerVideo?.available).toBeFalse();
+      expect(trailerVideo?.checked).toBeFalse();
+      expect(trailerVideo?.tooltip).toBe('Unavailable — file not uploaded.');
+      expect(component.artifactOptions.filter((option) => option.checked).map((option) => option.selector))
+        .not.toContain('trailer-video');
+    }
   });
 
   it('UI-05 validates an empty selection and submits only checked canonical selectors', () => {
@@ -665,10 +685,40 @@ describe('ManageComponent artifact download modal', () => {
     expect(component.artifactModalMessage).toContain('Select at least one');
 
     component.artifactOptions[0].checked = true;
-    component.artifactOptions[2].checked = true;
+    component.artifactOptions[3].checked = true;
     apiService.startEpisodeArtifactJob.and.returnValue(of(completedSnapshot({ state: 'pending', progress: 0 })));
     component.confirmArtifactJob();
     expect(apiService.startEpisodeArtifactJob).toHaveBeenCalledOnceWith(42, ['episode', 'image']);
+  });
+
+  it('submits the exact trailer-video selector and delivers a completed mixed artifact through the generic path', () => {
+    const snapshot = completedSnapshot({
+      requested: ['episode', 'trailer-video'],
+      available: ['episode', 'trailer-video'],
+    });
+    apiService.startEpisodeArtifactJob.and.returnValue(of(snapshot));
+
+    component.openArtifactModal(episode);
+    component.artifactOptions.forEach((option) => option.checked = option.selector === 'trailer-video');
+    component.confirmArtifactJob();
+
+    expect(apiService.startEpisodeArtifactJob).toHaveBeenCalledOnceWith(42, ['trailer-video']);
+    expect(apiService.downloadEpisodeArtifact).toHaveBeenCalledOnceWith(snapshot.downloadUrl as string);
+  });
+
+  it('marks finalized trailer-video unavailable after a backend no-final-file preflight rejection without inventing a URL', () => {
+    apiService.startEpisodeArtifactJob.and.returnValue(throwError(() => ({ status: 404 })));
+    component.openArtifactModal(episode);
+    component.artifactOptions.forEach((option) => option.checked = option.selector === 'trailer-video');
+
+    component.confirmArtifactJob();
+
+    const trailerVideo = component.artifactOptions.find((option) => option.selector === 'trailer-video');
+    expect(trailerVideo?.available).toBeFalse();
+    expect(trailerVideo?.checked).toBeFalse();
+    expect(component.artifactModalMessage).toContain('No selected files are currently available');
+    expect(component.artifactJob?.downloadUrl).not.toBeDefined();
+    expect(apiService.downloadEpisodeArtifact).not.toHaveBeenCalled();
   });
 
   it('UI-06 prevents duplicate starts while the first request is deferred and retains terminal partial results', () => {
