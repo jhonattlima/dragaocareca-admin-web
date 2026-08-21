@@ -304,6 +304,9 @@ export interface YoutubeTrailerJobSnapshot {
   updatedAt: string;
   completedAt: string | null;
   privateWatchUrl: string | null;
+  metadata?: {
+    hashtags?: string[];
+  } | null;
   publicationStatus?: 'not_started' | 'pending' | 'metadata_accepted' | 'playlist_confirmed' | 'public_confirmed' | 'failed';
   publicationErrorCategory?: string | null;
 }

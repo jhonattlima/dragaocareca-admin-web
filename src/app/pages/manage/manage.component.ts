@@ -202,6 +202,7 @@ export class ManageComponent implements OnInit, OnDestroy {
   private transcriptionStatusPollTimer: number | null = null;
   private transcriptionStatusPollEpisodeId: number | null = null;
   private readonly transcriptionTerminalFailures = new Set<number>();
+  private readonly youtubeTrailerHashtagsByEpisode = new Map<number, string[]>();
   private summaryStatusPollTimer: number | null = null;
   private summaryStatusPollEpisodeId: number | null = null;
   private artifactJobPollTimer: number | null = null;
@@ -656,7 +657,7 @@ export class ManageComponent implements OnInit, OnDestroy {
     editor.formModel = {
       episodeId: episode.episodeId,
       title: episode.title,
-      hashtags: '',
+      hashtags: this.getPersistedYoutubeHashtags(episode).join(' '),
       summary: episode.summary,
       pubDate: this.toDateTimeLocalValue(episode.pubDate),
       duration: episode.duration,
@@ -986,6 +987,11 @@ export class ManageComponent implements OnInit, OnDestroy {
     state.jobId = snapshot.jobId;
     state.sourceFileName = sourceFileName;
     state.error = '';
+    const persistedHashtags = this.serializeHashtags(snapshot.metadata?.hashtags?.join(' '));
+    if (persistedHashtags.length > 0) {
+      editor.formModel.hashtags = persistedHashtags.join(' ');
+      this.rememberYoutubeTrailerHashtags(snapshot.episodeId, persistedHashtags);
+    }
     if (snapshot.privateWatchUrl) {
       editor.formModel.youtube = snapshot.privateWatchUrl;
     }
@@ -1052,6 +1058,26 @@ export class ManageComponent implements OnInit, OnDestroy {
   private getYoutubeTrailerJobError(error: any, fallback: string): string {
     const category = error?.error?.category;
     return typeof category === 'string' ? `YouTube transfer error: ${category}.` : fallback;
+  }
+
+  private getPersistedYoutubeHashtags(episode: Episode): string[] {
+    const episodeData = episode as Episode & {
+      youtubeHashtags?: string[];
+      youtubeJob?: { metadata?: { hashtags?: string[] } | null; hashtags?: string[] } | null;
+    };
+    const fromEpisode = episodeData.youtubeHashtags
+      ?? episodeData.youtubeJob?.metadata?.hashtags
+      ?? episodeData.youtubeJob?.hashtags
+      ?? [];
+    const remembered = this.youtubeTrailerHashtagsByEpisode.get(episode.episodeId) ?? [];
+    return this.serializeHashtags([...fromEpisode, ...remembered].join(' '));
+  }
+
+  private rememberYoutubeTrailerHashtags(episodeId: number, hashtags: string[] | string): void {
+    const normalized = this.serializeHashtags(Array.isArray(hashtags) ? hashtags.join(' ') : hashtags);
+    if (normalized.length > 0) {
+      this.youtubeTrailerHashtagsByEpisode.set(episodeId, normalized);
+    }
   }
 
   resetForm(): void {
@@ -1153,6 +1179,7 @@ export class ManageComponent implements OnInit, OnDestroy {
                 return;
               }
               this.storeYoutubeTrailerJob(editor, snapshot, this.getYoutubeTrailerJobState(editor).sourceFileName);
+              this.rememberYoutubeTrailerHashtags(transaction.episodeId, transaction.hashtags);
               if (snapshot.privateWatchUrl) editor.formModel.youtube = snapshot.privateWatchUrl;
               transaction.phase = 'success';
               transaction.message = snapshot.publicationStatus === 'public_confirmed'

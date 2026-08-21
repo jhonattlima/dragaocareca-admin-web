@@ -160,6 +160,23 @@ describe('ManageComponent summary flow', () => {
     expect(component.errorMessage).toContain('YouTube commit failed (quota)');
   }));
 
+  it('restores persisted YouTube hashtags when an existing episode is reopened', () => {
+    const episode = {
+      episodeId: 42,
+      title: 'Episode 42',
+      summary: 'Existing summary',
+      pubDate: '2026-08-20T10:00:00.000Z',
+      explicit: 'no' as const,
+      trailerVideoFileName: 'episodes/42/trailer.mp4',
+      youtubeJob: { metadata: { hashtags: ['#Manual', '#RPG'] } },
+    } as Episode & { youtubeJob: { metadata: { hashtags: string[] } } };
+
+    component.startEdit(episode);
+
+    expect(component.episodesEditorState.formModel.hashtags).toBe('#manual #rpg');
+    expect(component.serializeHashtags(component.episodesEditorState.formModel.hashtags)).toEqual(['#manual', '#rpg']);
+  });
+
   it('keeps a successful hashtag lookup actionable through the save and commit boundaries', fakeAsync(() => {
     const editor = component.addEditorState;
     editor.formModel.episodeId = 42;
