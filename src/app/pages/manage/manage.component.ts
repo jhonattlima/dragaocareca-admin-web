@@ -119,7 +119,7 @@ interface ArtifactDefinition {
   selector: EpisodeArtifactSelector;
   label: string;
   formatHint: string;
-  fileField: 'fileName' | 'trailerFileName' | 'coverFileName' | 'coverLowFileName' | 'transcriptFileName';
+  fileField: 'fileName' | 'trailerFileName' | 'trailerVideoFileName' | 'coverFileName' | 'coverLowFileName' | 'transcriptFileName';
 }
 
 interface EpisodeFormState extends Omit<EpisodeWriteInput, 'guests' | 'musicCredits' | 'citations'> {
@@ -234,6 +234,7 @@ export class ManageComponent implements OnInit, OnDestroy {
   readonly artifactDefinitions: ArtifactDefinition[] = [
     { selector: 'episode', label: 'Episode audio', formatHint: '.mp3', fileField: 'fileName' },
     { selector: 'trailer', label: 'Trailer', formatHint: '.mp3', fileField: 'trailerFileName' },
+    { selector: 'trailer-video', label: 'Trailer video', formatHint: '.mp4', fileField: 'trailerVideoFileName' },
     { selector: 'image', label: 'Cover art', formatHint: '.jpg/.jpeg', fileField: 'coverFileName' },
     { selector: 'image-low', label: 'Low cover art', formatHint: '.webp', fileField: 'coverLowFileName' },
     { selector: 'transcript', label: 'Transcript', formatHint: '.txt', fileField: 'transcriptFileName' },
