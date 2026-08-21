@@ -24,7 +24,7 @@ current_phase_name: trailer-artifact-compatibility-release
 See: .planning/PROJECT.md
 
 **Core value:** Keep the admin workflow reliable, legible, and backend-driven so operators can manage episodes and inspect system state without fighting the UI.
-**Current focus:** Phase 11 — trailer-artifact-compatibility-release
+**Current focus:** Planning next milestone
 
 ## Current Position
 
@@ -104,12 +104,14 @@ Last activity: 2026-08-21 — Milestone v1.2 completed and archived
 
 ### Pending Todos
 
-- Run a final cross-repository browser smoke test against the deployed API after OAuth/channel enablement; the local Phase 09 suite and API verifier are already green.
+- Install/configure ChromeHeadless and rerun the focused/complete Angular browser suites.
+- Reconcile three stale verifier expectations in the sibling API repository.
+- Run the carried-forward v1.1 UI-08 and VAL-02 recovery checks when a matching fixture is available.
 
 ### Blockers/Concerns
 
-- v1.2 implementation depends on coordinating the new YouTube job and publication contracts with the sibling API repository.
-- Provider quota, resumable-session recovery, and live cancellation/reconciliation require explicit verification before release.
+- v1.2 is shipped; remaining concerns are verification debt rather than identified frontend integration defects.
+- Provider quota, resumable-session recovery, and live cancellation/reconciliation should be exercised in a Chrome-capable deployment environment.
 
 ### Roadmap Evolution
 
@@ -123,10 +125,10 @@ Last activity: 2026-08-21 — Milestone v1.2 completed and archived
 
 ## Session Continuity
 
-Last session: 2026-08-21T02:35:12.521Z
-Stopped at: Completed 11-02-PLAN.md after accepted human UAT
+Last session: 2026-08-21T11:35:00-03:00
+Stopped at: v1.2 milestone archived
 Resume file: None
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Start the next milestone with `$gsd-new-milestone`.
