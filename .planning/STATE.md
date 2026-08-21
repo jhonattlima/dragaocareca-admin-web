@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Trailer Video YouTube Publishing
-current_phase: 10
-current_phase_name: operator-workflow-integration
-status: complete
-stopped_at: Completed 10-03-PLAN.md after human UAT pass
-last_updated: "2026-08-20T23:52:13Z"
-last_activity: 2026-08-20
-last_activity_desc: provider-aware messages and layout adjustment reconciled
+current_phase: 11
+current_phase_name: trailer-artifact-compatibility-release
+status: in_progress
+stopped_at: Completed 11-01-PLAN.md; 11-02 remains
+last_updated: "2026-08-21T02:22:00Z"
+last_activity: 2026-08-21
+last_activity_desc: finalized trailer-video artifact selector and catalog integration
 progress:
   total_phases: 6
   completed_phases: 4
@@ -24,14 +24,14 @@ progress:
 See: .planning/PROJECT.md
 
 **Core value:** Keep the admin workflow reliable, legible, and backend-driven so operators can manage episodes and inspect system state without fighting the UI.
-**Current focus:** Phase 10 — operator-workflow-integration (complete)
+**Current focus:** Phase 11 — trailer-artifact-compatibility-release
 
 ## Current Position
 
-Phase: 10 (operator-workflow-integration) — COMPLETE
-Plan: 3 of 3
-Status: Plan complete; Task 2 human paired-auth and live lifecycle verification passed
-Last activity: 2026-08-20 — human UAT pass recorded for paired auth and live lifecycle
+Phase: 11 (trailer-artifact-compatibility-release)
+Plan: 1 of 2
+Status: Plan 11-01 complete; Plan 11-02 remains
+Last activity: 2026-08-21 — finalized trailer-video artifact selector and catalog integration
 
 Progress: ░░░░░░░░░░ [██████████] 95%
 
