@@ -150,7 +150,10 @@ Plans:
   2. A completed ZIP contains the canonical `trailer.mp4` entry sourced from the finalized local file, while unavailable, staged, failed, or stale replacements are excluded.
   3. Existing artifact progress, authenticated native download, retry/reset behavior, frontend tests, and `npm run build` remain green after the integration.
 
-**Plans**: TBD
+**Plans**: 2/2 plans created
+
+- [ ] 11-01-PLAN.md — Wire finalized trailer-video into the existing artifact catalog and request flow
+- [ ] 11-02-PLAN.md — Verify trailer ZIP compatibility and preserve existing artifact gates
 **UI hint**: yes
 
 ## Progress
@@ -167,4 +170,4 @@ Plans:
 | 8. YouTube Job Lifecycle | v1.2 | 5/5 | Complete |  |
 | 9. Title, Hashtags & Publishing | v1.2 | 3/3 | Complete | 2026-08-14 |
 | 10. Operator Workflow Integration | v1.2 | 3/3 | Complete | 2026-08-20 |
-| 11. Trailer Artifact & Compatibility Release | v1.2 | 0/TBD | Deferred; covered by API artifact workflow | - |
+| 11. Trailer Artifact & Compatibility Release | v1.2 | 0/2 | Planned | - |
