@@ -10,7 +10,19 @@ The frontend stays thin: it orchestrates API calls and presents state, while the
 
 Keep the admin workflow reliable, legible, and backend-driven so operators can manage episodes and inspect system state without fighting the UI.
 
-## Current Milestone: v1.2 Trailer Video YouTube Publishing — Shipped 2026-08-21
+## Current State
+
+**Shipped:** v1.3 Publication UX Fixes on 2026-08-21.
+
+The admin workflow now presents immediate-versus-scheduled publication feedback, resets File Management and trailer state after successful Save, previews the complete numbered trailer title, and preserves the sectioned responsive form layout with a wider Title field.
+
+**Next:** Start the next cycle with `$gsd-new-milestone`.
+
+## Previous Milestone: v1.3 Publication UX Fixes — Shipped 2026-08-21
+
+See `.planning/milestones/v1.3-ROADMAP.md` for the archived scope and verification.
+
+## Earlier Milestone: v1.2 Trailer Video YouTube Publishing — Shipped 2026-08-21
 
 **Delivered:** Operators can upload a final trailer video from New Episode, monitor and cancel transfers, stage it privately on YouTube, review the returned link, publish it publicly, and download it later from Episodes.
 
@@ -22,12 +34,6 @@ Keep the admin workflow reliable, legible, and backend-driven so operators can m
 - include the final trailer video in the Episodes artifact-download modal
 
 **Cross-repository provider contract:** The API owns Gemini-first/Groq-fallback selection for transcript-adjacent summary and hashtag authoring. The UI consumes the provider reported in each existing status DTO and displays it in the existing workflow messages; it never infers provider identity or calls Gemini/Groq directly.
-
-## Current State
-
-**Shipped:** v1.2 Trailer Video YouTube Publishing (2026-08-21)
-
-**Next:** Define the next milestone.
 
 Operators can select episode artifacts from the Episodes list, monitor backend ZIP preparation, and receive an authenticated native browser download. The release includes the SQLite-backed API job lifecycle, canonical selector validation, accessible modal, progress polling, server-authoritative filenames, retry/reset behavior, CORS header exposure, DC334 full-selection evidence, and green frontend build/test gates.
 
@@ -67,13 +73,8 @@ v1.2 extends the existing final trailer-video API upload contract with private-f
 - UI-08: complete live partial/failure/authentication/retry/reset/reopen/repeated-completion recovery matrix.
 - VAL-02: complete manual validation of visible progress and ZIP contents for a correctly matched live fixture.
 
-## Active Requirements
-
-No next-milestone requirements are defined. Use `$gsd-new-milestone` to start the next requirements cycle.
-
 ## Known Technical Debt
 
-- ChromeHeadless is unavailable in the local validation environment, so browser assertions remain environment-limited.
 - Three stale verifier expectations remain in the sibling API repository and should be reconciled before the next provider-contract change.
 - The v1.1 UI-08 and VAL-02 live recovery checks remain carried-forward validation debt.
 
@@ -107,4 +108,4 @@ The app is Angular 15 with TypeScript 4.8, Bootstrap 5.3.8, template-driven form
 | Keep provider choice backend-owned and expose actual provider per step | Prevent misleading UI status when Gemini falls back to Groq | ✓ Good |
 
 ---
-*Last updated: 2026-08-21 after v1.2 milestone*
+*Last updated: 2026-08-21 after v1.3 milestone archival*

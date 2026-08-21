@@ -185,6 +185,8 @@ export class ManageComponent implements OnInit, OnDestroy {
   episodes: Episode[] = [];
   errorMessage = '';
   successMessage = '';
+  successPopupOpen = false;
+  successPopupMessage = '';
   duplicateEpisodeIdModalOpen = false;
   duplicateEpisodeIdModalMessage = '';
   duplicateEpisodeNumberModalOpen = false;
@@ -1096,6 +1098,7 @@ export class ManageComponent implements OnInit, OnDestroy {
   saveEpisode(editor: EpisodeEditorState): void {
     this.errorMessage = '';
     this.successMessage = '';
+    this.dismissSuccessPopup();
 
     if (!editor.formModel.episodeId || !editor.formModel.title || !editor.formModel.pubDate) {
       this.errorMessage = 'Episode ID, title and pubDate are required.';
@@ -1121,6 +1124,9 @@ export class ManageComponent implements OnInit, OnDestroy {
     const payload = this.buildPayload(editor);
     const videoState = this.getTrailerVideoState(editor);
     const currentYoutubeJob = this.getYoutubeTrailerJob(editor);
+    if (!editor.formModel.youtube && currentYoutubeJob?.privateWatchUrl) {
+      editor.formModel.youtube = currentYoutubeJob.privateWatchUrl;
+    }
     const youtubeState = this.getYoutubeTrailerJobState(editor);
     const transaction: SaveTransactionState = {
       phase: 'saving',
@@ -1185,12 +1191,14 @@ export class ManageComponent implements OnInit, OnDestroy {
               this.rememberYoutubeTrailerHashtags(transaction.episodeId, transaction.hashtags);
               if (snapshot.privateWatchUrl) editor.formModel.youtube = snapshot.privateWatchUrl;
               transaction.phase = 'success';
-              transaction.message = snapshot.publicationStatus === 'public_confirmed'
-                ? 'Episode saved and trailer published publicly on YouTube.'
-                : 'Episode saved and YouTube commit completed.';
+              transaction.message = this.getPublicationOutcomeMessage(
+                episode,
+                snapshot.publicationStatus === 'public_confirmed',
+              );
               this.successMessage = transaction.message;
+              this.showSuccessPopup(transaction.message);
               this.saveTransactionStates.delete(editor);
-              this.resetEditor(editor);
+              this.resetEditor(editor, true);
               this.loadEpisodes();
             },
             error: (error) => {
@@ -1205,13 +1213,14 @@ export class ManageComponent implements OnInit, OnDestroy {
           return;
         }
         transaction.phase = 'success';
-        transaction.message = editor.editingEpisodeId ? 'Episode updated.' : 'Episode saved.';
+        transaction.message = this.getPublicationOutcomeMessage(episode, false);
         this.successMessage = transaction.message;
+        this.showSuccessPopup(transaction.message);
         this.saveTransactionStates.delete(editor);
         if (editor === this.addEditorState) {
-          this.resetEditor(this.addEditorState);
+          this.resetEditor(this.addEditorState, true);
         } else {
-          this.resetEditor(this.episodesEditorState);
+          this.resetEditor(this.episodesEditorState, true);
         }
         this.loadEpisodes();
       },
@@ -1233,6 +1242,32 @@ export class ManageComponent implements OnInit, OnDestroy {
     const category = error?.error?.category ?? error?.error?.publicationErrorCategory;
     const detail = typeof category === 'string' ? ` (${category})` : '';
     return `Episode saved, but the YouTube commit failed${detail}. Review the private trailer and retry Save.`;
+  }
+
+  private getPublicationOutcomeMessage(episode: Episode, youtubePublished: boolean): string {
+    const publicationDate = new Date(episode.pubDate);
+    const hasValidDate = !Number.isNaN(publicationDate.getTime());
+    const isScheduled = hasValidDate && publicationDate.getTime() > Date.now();
+    const dateLabel = hasValidDate
+      ? publicationDate.toLocaleString()
+      : 'the configured publication date';
+    const youtubeNote = youtubePublished ? ' The trailer was published publicly on YouTube.' : '';
+
+    if (isScheduled) {
+      return `Episode saved and scheduled to launch on ${dateLabel}.${youtubeNote}`;
+    }
+
+    return `Episode saved and launched successfully.${youtubeNote}`;
+  }
+
+  showSuccessPopup(message: string): void {
+    this.successPopupMessage = message;
+    this.successPopupOpen = true;
+  }
+
+  dismissSuccessPopup(): void {
+    this.successPopupOpen = false;
+    this.successPopupMessage = '';
   }
 
   toggleMember(editor: EpisodeEditorState, member: MemberOption): void {
@@ -1582,7 +1617,7 @@ export class ManageComponent implements OnInit, OnDestroy {
   }
 
   getTrailerTitlePrefix(editor: EpisodeEditorState): string {
-    return `Trailer - ${(editor.formModel.title ?? '').trim()}`;
+    return `Trailer - DC ${editor.formModel.episodeNumber} - ${(editor.formModel.title ?? '').trim()}`;
   }
 
   getTrailerTitleCodePointLength(editor: EpisodeEditorState): number {
@@ -2166,11 +2201,27 @@ export class ManageComponent implements OnInit, OnDestroy {
     };
   }
 
-  resetEditor(editor: EpisodeEditorState): void {
+  resetEditor(editor: EpisodeEditorState, afterSuccessfulSave = false): void {
     this.saveTransactionStates.delete(editor);
-    this.cancelTrailerVideoWork(editor, 'canceled');
+    this.cancelTrailerVideoWork(editor, afterSuccessfulSave ? 'selected' : 'canceled');
     this.clearYoutubeTrailerJobPolling(editor);
     this.clearHashtagLookup(editor);
+    if (afterSuccessfulSave) {
+      this.trailerVideoReservations.get(editor)?.unsubscribe();
+      this.trailerVideoReservations.delete(editor);
+      this.retryableUploadFiles.delete(editor);
+      this.youtubeTrailerJobStates.delete(editor);
+      this.setTrailerVideoState(editor, {
+        file: null,
+        status: 'selected',
+        progress: 0,
+        error: '',
+        episodeId: null,
+        draftId: null,
+        priorFinalFileName: '',
+      });
+      this.resetUploadStates();
+    }
     this.generationVersions.set(editor, (this.generationVersions.get(editor) ?? 0) + 1);
     editor.trailerVideoDraftId = null;
     if (editor === this.addEditorState) {
@@ -2183,6 +2234,16 @@ export class ManageComponent implements OnInit, OnDestroy {
     if (editor === this.addEditorState) {
       this.scheduleAddEditorDefaults();
     }
+  }
+
+  private resetUploadStates(): void {
+    this.uploadStates = {
+      audio: { busy: false, deleting: false, dragOver: false, progress: 0 },
+      trailer: { busy: false, deleting: false, dragOver: false, progress: 0 },
+      trailerVideo: { busy: false, deleting: false, dragOver: false, progress: 0 },
+      cover: { busy: false, deleting: false, dragOver: false, progress: 0 },
+      coverLow: { busy: false, deleting: false, dragOver: false, progress: 0 },
+    };
   }
 
   requestResetEditor(editor: EpisodeEditorState): void {

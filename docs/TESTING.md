@@ -14,6 +14,13 @@
 npm test
 npm test -- --watch
 npm test -- --watch=false --browsers=ChromeHeadless
+
+The test wrapper automatically uses the Playwright Chromium binary when
+`CHROME_BIN` is not already configured. Install it once with:
+
+```bash
+npx playwright install chromium
+```
 npm run build
 
 # Run from /home/jhonatt/repos/jhonatt_projects/dragaocareca-admin-api

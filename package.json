@@ -6,7 +6,7 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test",
+    "test": "node scripts/run-karma-tests.js",
     "screenshot:metrics": "node scripts/capture-metrics-screenshot.js"
   },
   "private": true,

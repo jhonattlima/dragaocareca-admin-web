@@ -1,5 +1,19 @@
 # Project Milestones: Dragao Careca Admin Web
 
+## v1.3 Publication UX Fixes (Shipped: 2026-08-21)
+
+**Phases completed:** 1 phase, 2 plans
+
+**Key accomplishments:**
+
+- Added immediate-versus-scheduled Save success popup feedback.
+- Cleared File Management and trailer state after successful Save without false cancellation messaging.
+- Corrected numbered trailer title preview and YouTube commit composition.
+- Rebalanced the episode identity row to give Title more width.
+- Formally verified 13/13 requirements, 5/5 UAT scenarios, 95/95 ChromeHeadless specs, build, and TypeScript checks.
+
+**Deferred:** v1.1 artifact recovery validation debt and v1.2 sibling API verifier/operational follow-up remain documented.
+
 ## v1.2 Trailer Video YouTube Publishing (Shipped: 2026-08-21)
 
 **Phases completed:** 6 phases, 22 plans, 41 tasks

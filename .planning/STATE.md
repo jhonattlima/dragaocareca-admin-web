@@ -1,20 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.2
-milestone_name: Trailer Video YouTube Publishing
-status: Awaiting next milestone
-stopped_at: Completed 11-02-PLAN.md after accepted human UAT
-last_updated: "2026-08-21T11:35:32.326Z"
+milestone: v1.3
+milestone_name: Publication UX Fixes
+status: complete
+last_updated: "2026-08-21T15:37:14.228Z"
 last_activity: 2026-08-21
-last_activity_desc: Milestone v1.2 completed and archived
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 22
-  completed_plans: 22
+  total_phases: 1
+  completed_phases: 1
+  total_plans: 2
+  completed_plans: 2
   percent: 100
-current_phase: 11
-current_phase_name: trailer-artifact-compatibility-release
 ---
 
 # Project State
@@ -24,20 +20,20 @@ current_phase_name: trailer-artifact-compatibility-release
 See: .planning/PROJECT.md
 
 **Core value:** Keep the admin workflow reliable, legible, and backend-driven so operators can manage episodes and inspect system state without fighting the UI.
-**Current focus:** Planning next milestone
+**Current focus:** None — v1.3 Publication UX Fixes shipped
 
 ## Current Position
 
-Phase: Milestone v1.2 complete
-Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-08-21 — Milestone v1.2 completed and archived
+Phase: 12 — Publication UX Fixes
+Plan: 12-01 and 12-02 executed
+Status: Milestone archived — 13/13 requirements verified; 95/95 ChromeHeadless specs passed
+Last activity: 2026-08-21 — Phase 12 UAT completed
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 0 in v1.2
+- Total plans completed: 2 in v1.3
 - Average duration: n/a
 - Total execution time: 0.0 hours
 
@@ -131,4 +127,4 @@ Resume file: None
 
 ## Operator Next Steps
 
-- Start the next milestone with `$gsd-new-milestone`.
+- Start the next cycle with `$gsd-new-milestone`.

@@ -102,6 +102,16 @@
   </ng-container>
 </div>
 
+<div class="delete-modal-backdrop" *ngIf="successPopupOpen">
+  <div class="delete-modal success-popup" role="dialog" aria-modal="true" aria-labelledby="saveSuccessTitle">
+    <h3 id="saveSuccessTitle">Episode saved successfully</h3>
+    <p class="mb-3">{{ successPopupMessage }}</p>
+    <div class="d-flex justify-content-end">
+      <button class="btn btn-primary" type="button" (click)="dismissSuccessPopup()">OK</button>
+    </div>
+  </div>
+</div>
+
 <div class="delete-modal-backdrop artifact-modal-backdrop" *ngIf="artifactModalOpen">
   <div
     class="delete-modal artifact-modal"

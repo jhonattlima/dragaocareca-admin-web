@@ -169,6 +169,8 @@ Keep the legacy-inspired sectioned layout:
 
 Do not regress to a minimal single-panel layout.
 
+After a successful Save, the episode form resets all File Management progress and trailer lifecycle state. The UI shows an accessible success popup that distinguishes an episode launched immediately from one scheduled for its future `pubDate`. The read-only trailer title preview and Save-time YouTube title use `Trailer - DC <episode number> - <episode name> <hashtags>`.
+
 ## Local Runbook
 
 ```bash

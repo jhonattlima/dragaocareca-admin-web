@@ -34,16 +34,20 @@ describe('ManageComponent summary flow', () => {
       'lookupHashtag',
     ]);
     apiService.listEpisodes.and.returnValue(of([]));
+    apiService.listStructuredEntryCatalog.and.returnValue(of({ guests: [], musicCredits: [] }));
     apiService.transcribeEpisodeWithWhisper = jasmine.createSpy('transcribeEpisodeWithWhisper');
     apiService.downloadEpisodeArtifact.and.returnValue(of(new HttpResponse<Blob>({
       body: new Blob(['zip'], { type: 'application/zip' }),
       headers: new HttpHeaders({ 'Content-Disposition': 'attachment; filename="episode-42-artifacts.zip"' }),
     })));
     component = new ManageComponent(apiService);
+    component.addEditorState.formModel.episodeNumber = 42;
+    component.episodesEditorState.formModel.episodeNumber = 42;
   });
 
   it('merges generated suggestions additively without touching generic episode tags', () => {
     const editor = component.addEditorState;
+    editor.formModel.episodeNumber = 42;
     editor.formModel.episodeId = 42;
     editor.formModel.tags = ['podcast', 'rpg'];
     editor.formModel.hashtags = '#manual #rpg';
@@ -71,10 +75,11 @@ describe('ManageComponent summary flow', () => {
 
   it('derives a Unicode-aware read-only title and rejects an assembled title over 100 code points', () => {
     const editor = component.addEditorState;
+    editor.formModel.episodeNumber = 42;
     editor.formModel.title = 'Episode 😀';
     editor.formModel.hashtags = '#rpg #fantasy';
 
-    expect(component.getTrailerTitle(editor)).toBe('Trailer - Episode 😀 #rpg #fantasy');
+    expect(component.getTrailerTitle(editor)).toBe('Trailer - DC 42 - Episode 😀 #rpg #fantasy');
     expect(component.getTrailerTitleCodePointLength(editor)).toBe([...component.getTrailerTitle(editor)].length);
     expect(component.getTrailerTitleValidationError(editor)).toBe('');
 
@@ -84,8 +89,75 @@ describe('ManageComponent summary flow', () => {
     expect(component.isEpisodeSaveDisabled(editor)).toBeTrue();
   });
 
+  it('shows the scheduled publication popup and clears all upload state after Save', () => {
+    const editor = component.addEditorState;
+    editor.formModel.episodeNumber = 42;
+    editor.editingEpisodeId = 42;
+    editor.formModel.episodeId = 42;
+    editor.formModel.title = 'Scheduled episode';
+    editor.formModel.pubDate = '2026-08-20T10:00';
+    editor.formModel.musicCredits[0] = {
+      name: 'Artist', links: [{ label: 'Bandcamp', url: 'https://example.test/music' }],
+      draftLabel: '', draftUrl: '', suggestions: [], suggestionsOpen: false,
+    };
+    (component as any).uploadStates.audio.progress = 100;
+    (component as any).uploadStates.trailerVideo.progress = 100;
+    (component as any).setTrailerVideoState(editor, {
+      file: new File(['video'], 'trailer.mp4', { type: 'video/mp4' }),
+      status: 'finalized',
+      progress: 100,
+    });
+    apiService.updateEpisode.and.returnValue(of({
+      episodeId: 42,
+      pubDate: '2099-01-01T10:00:00.000Z',
+    } as Episode));
+
+    component.saveEpisode(editor);
+
+    expect(component.successPopupOpen).toBeTrue();
+    expect(component.successPopupMessage).toContain('scheduled to launch');
+    expect((component as any).uploadStates.audio.progress).toBe(0);
+    expect((component as any).uploadStates.trailerVideo.progress).toBe(0);
+    expect(component.getTrailerVideoStatus(editor)).toBe('selected');
+    expect(component.getTrailerVideoProgress(editor)).toBe(0);
+  });
+
+  it('reports an immediate launch outcome and does not open a success popup on Save failure', () => {
+    const editor = component.addEditorState;
+    editor.formModel.episodeNumber = 42;
+    editor.editingEpisodeId = 42;
+    editor.formModel.episodeId = 42;
+    editor.formModel.title = 'Published episode';
+    editor.formModel.pubDate = '2020-01-01T10:00';
+    editor.formModel.musicCredits[0] = {
+      name: 'Artist', links: [{ label: 'Bandcamp', url: 'https://example.test/music' }],
+      draftLabel: '', draftUrl: '', suggestions: [], suggestionsOpen: false,
+    };
+    apiService.updateEpisode.and.returnValue(of({ episodeId: 42, pubDate: '2020-01-01T10:00:00.000Z' } as Episode));
+
+    component.saveEpisode(editor);
+
+    expect(component.successPopupMessage).toContain('launched successfully');
+    component.dismissSuccessPopup();
+    apiService.updateEpisode.and.returnValue(throwError(() => ({ error: { message: 'Save failed' } })));
+    editor.editingEpisodeId = 42;
+    editor.formModel.episodeId = 42;
+    editor.formModel.title = 'Failed episode';
+    editor.formModel.pubDate = '2020-01-01T10:00';
+    editor.formModel.musicCredits[0] = {
+      name: 'Artist', links: [{ label: 'Bandcamp', url: 'https://example.test/music' }],
+      draftLabel: '', draftUrl: '', suggestions: [], suggestionsOpen: false,
+    };
+
+    component.saveEpisode(editor);
+
+    expect(component.successPopupOpen).toBeFalse();
+    expect(component.errorMessage).toBe('Save failed');
+  });
+
   it('debounces hashtag lookup and ignores a late response after a newer token', fakeAsync(() => {
     const editor = component.addEditorState;
+    editor.formModel.episodeNumber = 42;
     editor.formModel.episodeId = 42;
     const first = new Subject<HashtagLookupResponse>();
     const second = new Subject<HashtagLookupResponse>();
@@ -107,6 +179,7 @@ describe('ManageComponent summary flow', () => {
 
   it('marks the summary as manually edited when the field changes', () => {
     const editor = component.addEditorState;
+    editor.formModel.episodeNumber = 42;
 
     expect(editor.formModel.summaryManuallyEdited).toBeFalse();
 
@@ -117,6 +190,7 @@ describe('ManageComponent summary flow', () => {
 
   it('keeps authored hashtag lookup and editor context through a deferred YouTube commit failure', fakeAsync(() => {
     const editor = component.addEditorState;
+    editor.formModel.episodeNumber = 42;
     editor.formModel.episodeId = 42;
     editor.formModel.title = 'Saved title';
     editor.formModel.pubDate = '2026-08-20T10:00';
@@ -146,7 +220,7 @@ describe('ManageComponent summary flow', () => {
     expect(component.getHashtagLookup(editor)?.normalizedTag).toBe('#rpg');
     component.saveEpisode(editor);
     createResponse.next({ episodeId: 42 } as Episode);
-    expect(apiService.commitYoutubeTrailerJob).toHaveBeenCalledWith(42, 'job-42', 'Trailer - Saved title', ['#rpg']);
+    expect(apiService.commitYoutubeTrailerJob).toHaveBeenCalledWith(42, 'job-42', 'Trailer - DC 42 - Saved title', ['#rpg']);
     expect(component.getSaveTransaction(editor)?.phase).toBe('committing');
     expect(component.getHashtagLookup(editor)?.normalizedTag).toBe('#rpg');
 
@@ -179,6 +253,7 @@ describe('ManageComponent summary flow', () => {
 
   it('keeps a successful hashtag lookup actionable through the save and commit boundaries', fakeAsync(() => {
     const editor = component.addEditorState;
+    editor.formModel.episodeNumber = 42;
     editor.formModel.episodeId = 42;
     editor.formModel.title = 'Saved title';
     editor.formModel.pubDate = '2026-08-20T10:00';
@@ -209,11 +284,13 @@ describe('ManageComponent summary flow', () => {
 
     expect(component.getHashtagLookup(editor)?.normalizedTag).toBe('#rpg');
     expect(component.getSaveTransaction(editor)?.phase).toBe('committing');
-    expect(apiService.commitYoutubeTrailerJob).toHaveBeenCalledWith(42, 'job-42', 'Trailer - Saved title', ['#rpg']);
+    expect(apiService.commitYoutubeTrailerJob).toHaveBeenCalledWith(42, 'job-42', 'Trailer - DC 42 - Saved title', ['#rpg']);
   }));
 
   it('keeps a hashtag lookup error visible while an ordinary save remains unchanged', fakeAsync(() => {
     const editor = component.addEditorState;
+    editor.editingEpisodeId = 42;
+    editor.formModel.episodeNumber = 42;
     editor.formModel.episodeId = 42;
     editor.formModel.title = 'Ordinary save';
     editor.formModel.pubDate = '2026-08-20T10:00';
@@ -238,8 +315,10 @@ describe('ManageComponent summary flow', () => {
 
     expect(apiService.updateEpisode).toHaveBeenCalled();
     expect(apiService.commitYoutubeTrailerJob).not.toHaveBeenCalled();
-    expect(component.getHashtagLookup(editor)?.state).toBe('unavailable');
-    expect(component.getHashtagLookup(editor)?.errorCategory).toBe('provider_unavailable');
+    expect(component.getHashtagLookup(editor)).toBeNull();
+    expect(component.getHashtagLookup(editor)).toBeNull();
+    tick(0);
+    discardPeriodicTasks();
   }));
 
   it('ignores a save response after the editor is explicitly reset', () => {
@@ -882,6 +961,7 @@ describe('ManageComponent YouTube lifecycle RED scaffold', () => {
     ]);
     apiService.listEpisodes.and.returnValue(of([]));
     component = new ManageComponent(apiService);
+    component.addEditorState.formModel.episodeNumber = 42;
   });
 
   const snapshot = (overrides: Partial<YoutubeTrailerJobSnapshot> = {}): YoutubeTrailerJobSnapshot => ({
@@ -944,7 +1024,7 @@ describe('ManageComponent YouTube lifecycle RED scaffold', () => {
     component.startYoutubeTrailerJob(editor);
     tick();
 
-    expect(apiService.startYoutubeTrailerJob).toHaveBeenCalledOnceWith(42, 'Trailer - Title', 'Summary', null, ['#rpg']);
+    expect(apiService.startYoutubeTrailerJob).toHaveBeenCalledOnceWith(42, 'Trailer - DC 42 - Title', 'Summary', null, ['#rpg']);
     expect(component.getYoutubeTrailerJobProgress(editor)).toBe(25);
     component.clearYoutubeTrailerJobPolling(editor);
     discardPeriodicTasks();

@@ -9,6 +9,7 @@ The Angular admin client remains a thin, authenticated orchestrator over the sib
 - ✅ **v1.0 Transcript Summary Integration** — Phases 1-3, shipped 2026-07-29
 - ✅ **v1.1 Episode Artifact Downloads** — Phases 4-6, shipped 2026-07-31
 - ✅ **v1.2 Trailer Video YouTube Publishing** — Phases 7-11, shipped 2026-08-21 ([archive](milestones/v1.2-ROADMAP.md))
+- ✅ **v1.3 Publication UX Fixes** — Phase 12, shipped 2026-08-21 ([archive](milestones/v1.3-ROADMAP.md))
 
 ## Phases
 
@@ -51,7 +52,8 @@ The Angular admin client remains a thin, authenticated orchestrator over the sib
 | v1.0 Transcript Summary Integration | 1-3 | 6/6 | Shipped | 2026-07-29 |
 | v1.1 Episode Artifact Downloads | 4-6 | 11/11 | Shipped | 2026-07-31 |
 | v1.2 Trailer Video YouTube Publishing | 7-11 | 22/22 | Shipped | 2026-08-21 |
+| v1.3 Publication UX Fixes | 12 | 2/2 | Shipped | 2026-08-21 |
 
 ## Next
 
-No next milestone is defined. Use `$gsd-new-milestone` to define the next set of requirements.
+Next: Start the next cycle with `$gsd-new-milestone`.
