@@ -8,7 +8,7 @@ v1.2 extends the existing episode workflow from finalized local trailer video th
 
 - ✅ **v1.0 Transcript Summary Integration** — Phases 1-3, shipped 2026-07-29
 - ✅ **v1.1 Episode Artifact Downloads** — Phases 4-6, shipped 2026-07-31
-- 🚧 **v1.2 Trailer Video YouTube Publishing** — Phases 7-11, implementation complete through Phase 9; final release/UAT closeout remains
+- ✅ **v1.2 Trailer Video YouTube Publishing** — Phases 7-11, completed 2026-08-21; ChromeHeadless limitation recorded
 
 ## Phases
 
@@ -30,14 +30,14 @@ v1.2 extends the existing episode workflow from finalized local trailer video th
 
 </details>
 
-### 📋 v1.2 Trailer Video YouTube Publishing (Planned)
+### ✅ v1.2 Trailer Video YouTube Publishing (Completed)
 
 **Milestone Goal:** Let operators safely upload a trailer video, start its private YouTube transfer immediately, populate the private link, and publish it with saved episode metadata while cleaning up replaced or deleted provider videos.
 
 - [x] **Phase 7: Final Trailer Video Upload** - Select, upload, cancel, retry, and safely replace a final MP4 through the existing trailer-video API route. (implemented)
 - [x] **Phase 8: YouTube Job Lifecycle** - Persist and execute resumable server-side YouTube uploads through private readiness with safe retry and cancellation boundaries. (implemented)
 - [x] **Phase 9: Title & Hashtag Authoring** - Finalize the operator-facing trailer title and hashtag lookup/counting before the existing Phase 8 Save publication boundary. (verified 2026-08-14; amended 2026-08-20)
-- [ ] **Phase 10: Operator Workflow Integration** - Connect the API contracts to the sectioned Angular workflow with thin orchestration and stale-state protection.
+- [x] **Phase 10: Operator Workflow Integration** - Connect the API contracts to the sectioned Angular workflow with thin orchestration and stale-state protection. (completed 2026-08-20)
 - [x] **Phase 11: Trailer Artifact & Compatibility Release** - Make only finalized trailer videos downloadable and preserve existing application behavior and release gates. (completed 2026-08-21; ChromeHeadless limitation recorded)
 
 ## Phase Details
