@@ -1,8 +1,8 @@
 ---
-status: diagnosed
+status: resolved
 trigger: "Diagnose UAT gap G-08.1-4 only; do not implement fixes. Investigate why Duration and Bytes are not visibly read-only despite the intended styling, and verify the requirement scope excludes Spotify ID. Read the UAT, phase context/research/summaries, episode form template/SCSS, browser/CSS conventions, and relevant generated/compiled styling behavior. Create a debug session under .planning/debug/ with evidence and return ## ROOT CAUSE FOUND (or ## INVESTIGATION INCONCLUSIVE), files involved, and a precise fix direction. Preserve unrelated changes."
 created: 2026-08-14T00:00:00-03:00
-updated: 2026-08-14T11:52:47-03:00
+updated: 2026-08-21T11:35:00-03:00
 ---
 
 ## Current Focus
@@ -67,4 +67,8 @@ started: Reported as UAT gap G-08.1-4.
 root_cause: "The Duration and Bytes controls are wired as native readonly and the `.readonly-field` rule is present in the compiled Angular bundle, but the visual implementation only changes background to #f1f3f5 and text to #6c757d. Bootstrap continues to supply the normal form-control border/focus affordance, and the background tint has only 1.112:1 contrast against white. Native readonly has no browser-default disabled appearance, so the fields remain visually indistinguishable enough from editable controls to fail G-08.1-4's human visual check."
 fix: "Strengthen the readonly presentation at the EpisodeForm field boundary: target the readonly controls explicitly (for example `.form-control.readonly-field[readonly]` or an equivalent `:read-only` selector) and define a clearly perceptible readonly treatment that preserves accessibility, including a stronger background/border/text distinction and suppressing editable-only focus/cursor affordances as appropriate. Do not change metadata binding or API behavior."
 verification:
-files_changed: []
+  status: resolved_by_phase_uat
+  evidence: "08.1-UAT.md retest 5 passed; production build passed; current readonly template and styling remain present."
+files_changed:
+  - src/app/pages/manage/episode-form.component.html
+  - src/app/pages/manage/episode-form.component.scss

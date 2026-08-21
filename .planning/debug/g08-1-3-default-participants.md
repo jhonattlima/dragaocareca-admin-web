@@ -1,8 +1,8 @@
 ---
-status: diagnosed
+status: resolved
 trigger: "Diagnose UAT gap G-08.1-3 only; do not implement fixes. Investigate why only Jhonatt Lima is selected when the expected configured defaults are Jhonatt Lima, Diego Broniszak, Eric Farias, and Gabriel Moraes. Read the UAT, phase context/research/summaries, environment files, participant catalog loading, and ManageComponent initialization/selection code. Create a debug session under .planning/debug/ with evidence and return ## ROOT CAUSE FOUND (or ## INVESTIGATION INCONCLUSIVE), files involved, and a precise fix direction. Preserve unrelated changes."
 created: 2026-08-14T00:00:00-03:00
-updated: 2026-08-14T00:40:00-03:00
+updated: 2026-08-21T11:35:00-03:00
 ---
 
 ## Current Focus
@@ -54,5 +54,8 @@ started: Reported as UAT gap G-08.1-3; exact introduction time not provided.
 root_cause: All three frontend environment files configure defaultParticipants as ['Jhonatt Lima']. ManageComponent copies that one-name array and intersects it with the available memberOptions, which does contain Diego Broniszak, Eric Farias, and Gabriel Moraes; therefore only Jhonatt Lima can be selected. The participant catalog is a hardcoded ManageComponent list, not an asynchronous API-loaded catalog, and initialization/reset correctly invokes the filtering function for new episodes.
 fix: Set defaultParticipants in every environment used by the target deployment (development, staging, and production as applicable) to the four exact catalog names in the required order: Jhonatt Lima, Diego Broniszak, Eric Farias, Gabriel Moraes. Keep applyConfiguredParticipantDefaults unchanged; do not alter edit-flow preservation or catalog filtering. Update the focused test/configuration assertion to cover the shipped four-name values so this mismatch cannot recur.
 verification:
-verification: Root cause confirmed by direct source/config comparison, Angular file-replacement inspection, git history, focused selection spec semantics, and a successful npm run build. No application fix was implemented.
-files_changed: [.planning/debug/g08-1-3-default-participants.md]
+verification: "08.1-UAT.md retest 3 passed; all configured environment values and the participant-selection path were rechecked."
+files_changed:
+  - src/environments/environment.ts
+  - src/environments/environment.staging.ts
+  - src/environments/environment.prod.ts

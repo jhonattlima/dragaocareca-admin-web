@@ -10,11 +10,11 @@ The frontend stays thin: it orchestrates API calls and presents state, while the
 
 Keep the admin workflow reliable, legible, and backend-driven so operators can manage episodes and inspect system state without fighting the UI.
 
-## Current Milestone: v1.2 Trailer Video YouTube Publishing
+## Current Milestone: v1.2 Trailer Video YouTube Publishing — Shipped 2026-08-21
 
-**Goal:** Let operators upload a final trailer video from New Episode, monitor and cancel transfers, stage it privately on YouTube, review the returned link, publish it publicly, and download it later from Episodes.
+**Delivered:** Operators can upload a final trailer video from New Episode, monitor and cancel transfers, stage it privately on YouTube, review the returned link, publish it publicly, and download it later from Episodes.
 
-**Target features:**
+**Delivered features:**
 - add a trailer-video upload box to New Episode File Management with upload progress, cancel, retry, and replacement behavior
 - add API-owned YouTube upload/publish jobs with progress polling and safe cancellation boundaries
 - fill the existing YouTube link field after the non-public YouTube upload and provide an explicit Publish button
@@ -25,15 +25,15 @@ Keep the admin workflow reliable, legible, and backend-driven so operators can m
 
 ## Current State
 
-**Shipped:** v1.1 Episode Artifact Downloads (2026-07-31)
+**Shipped:** v1.2 Trailer Video YouTube Publishing (2026-08-21)
 
-**Next:** v1.2 Trailer Video YouTube Publishing
+**Next:** Define the next milestone.
 
 Operators can select episode artifacts from the Episodes list, monitor backend ZIP preparation, and receive an authenticated native browser download. The release includes the SQLite-backed API job lifecycle, canonical selector validation, accessible modal, progress polling, server-authoritative filenames, retry/reset behavior, CORS header exposure, DC334 full-selection evidence, and green frontend build/test gates.
 
 The happy path was accepted as the release scope. The broader live recovery matrix was intentionally not performed; UI-08 and VAL-02 remain documented validation debt.
 
-The next milestone extends the existing final trailer-video API upload contract and artifact selector. YouTube upload, public publishing, hashtag search counts, and their progress/cancellation contracts are new API capabilities.
+v1.2 extends the existing final trailer-video API upload contract with private-first YouTube jobs, Save-time publication metadata, editable hashtag/title authoring, robust episode-form defaults, operator recovery states, and finalized trailer artifact downloads. The UI remains backend-driven and preserves the existing sectioned workflow.
 
 ## Validated Requirements
 
@@ -53,18 +53,29 @@ The next milestone extends the existing final trailer-video API upload contract 
 - ✓ Provider-aware transcript, summary, and hashtag progress messaging consumes the API's actual provider fields.
 - ✓ Episode form field layout was reconciled: Title is in the identity row; Duration and Explicit are in the publish row; the label is Publish.
 
+### v1.2 Trailer Video YouTube Publishing
+
+- ✓ TRAILER-01–TRAILER-05: MP4 staging, progress, cancellation, retry, replacement, and Save-time promotion.
+- ✓ YOUTUBE-01–YOUTUBE-07: private-first transfer, durable recovery, safe link population, metadata commit, publication, and cleanup boundaries.
+- ✓ TITLE-01–TITLE-04: editable hashtags, approximate lookup feedback, Unicode-safe title preview, and cached/rate-limited lookup.
+- ✓ ARTIFACT-01–ARTIFACT-02: finalized trailer selection and canonical `trailer.mp4` ZIP inclusion.
+- ✓ OPS-01–OPS-05: API-owned provider/auth behavior, stale protection, recovery, and existing workflow compatibility.
+- ✓ FORM-01–FORM-05: publication defaults, backend-confirmed audio metadata, participant defaults, music-credit validation, and read-only field styling.
+
 ## Deferred Validation
 
 - UI-08: complete live partial/failure/authentication/retry/reset/reopen/repeated-completion recovery matrix.
 - VAL-02: complete manual validation of visible progress and ZIP contents for a correctly matched live fixture.
 
-## Active v1.2 Requirements
+## Active Requirements
 
-- Upload and replace final MP4 trailer videos from New Episode with visible progress, cancellation, retry, and replacement controls.
-- Upload the staged trailer to YouTube as non-public, return its link, and allow explicit public publishing.
-- Display YouTube transfer progress and recoverable failure states without duplicating jobs.
-- Search public YouTube hashtag results and use the count in the editable trailer-title workflow.
-- Include the final trailer video in episode artifact downloads.
+No next-milestone requirements are defined. Use `$gsd-new-milestone` to start the next requirements cycle.
+
+## Known Technical Debt
+
+- ChromeHeadless is unavailable in the local validation environment, so browser assertions remain environment-limited.
+- Three stale verifier expectations remain in the sibling API repository and should be reconciled before the next provider-contract change.
+- The v1.1 UI-08 and VAL-02 live recovery checks remain carried-forward validation debt.
 
 ## Out of Scope
 
@@ -96,4 +107,4 @@ The app is Angular 15 with TypeScript 4.8, Bootstrap 5.3.8, template-driven form
 | Keep provider choice backend-owned and expose actual provider per step | Prevent misleading UI status when Gemini falls back to Groq | ✓ Good |
 
 ---
-*Last updated: 2026-07-31 after v1.1 milestone*
+*Last updated: 2026-08-21 after v1.2 milestone*

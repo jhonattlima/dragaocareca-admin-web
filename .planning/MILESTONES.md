@@ -1,5 +1,34 @@
 # Project Milestones: Dragao Careca Admin Web
 
+## v1.2 Trailer Video YouTube Publishing (Shipped: 2026-08-21)
+
+**Phases completed:** 6 phases, 22 plans, 41 tasks
+
+**Key accomplishments:**
+
+- Authenticated draft reservations now gate immediate MP4 staging, save-time promotion, and rollback-safe final trailer replacement in the sibling API.
+- Angular now stages trailer MP4s immediately against server-issued draft reservations, exposes byte progress and recoverable lifecycle states, and promotes the staged video only through successful Save/create.
+- Canonical Angular/API trailer-video docs and a requirement-complete validation matrix now reflect draft staging, Save-time promotion, rollback ownership, and the explicit no-YouTube Phase 7 boundary.
+- Executable failing acceptance coverage now defines the Phase 8 YouTube metadata, private-first lifecycle, recovery, cancellation, safe DTO, and Angular boundary contracts.
+- Durable authenticated YouTube trailer jobs now accept persisted title/summary metadata, recover the current source safely, reuse provider work on retry, and expose only an operator-safe private watch URL.
+- The sibling API lifecycle verifier now proves the private YouTube job contract and the phase coverage boundary explicitly, including metadata input, recovery, cancellation reconciliation, idempotent publication seams, and sensitive-data exclusion.
+- 1. [Rule 3 - Blocking issue] Converted the existing RED scaffold to the exported service contract
+- Manage now owns a recoverable, private-first YouTube trailer lifecycle with guarded polling and a sectioned operator card.
+- Executable RED contracts for FORM-01 through FORM-05, including backend-confirmed audio metadata and fixed two-decimal decimal-MB presentation.
+- 1. [Rule 1 - Bug] Corrected byte-validation error wording used by the verifier
+- 1. [Rule 1 - Bug] Cleared stale upload success on incomplete audio metadata
+- Canonical episode-form contract documentation, FORM traceability, and independent frontend/API gates recorded with an explicit ChromeHeadless limitation.
+- Four ordered participant defaults are now shipped across all Angular environments, with focused coverage protecting catalog intersection and edit preservation.
+- Duration and Bytes now use a clearly perceptible, scoped readonly treatment while preserving native bindings and excluding Spotify ID from the gap fix.
+- API-owned Save/start/commit metadata persistence with shared Unicode title validation and one-hour normalized hashtag lookup caching
+- Angular summary-driven hashtag authoring with additive suggestions, Unicode title validation, cancellable lookup feedback, and canonical YouTube metadata payloads
+- Sectioned Angular episode form with editable hashtag authoring, read-only Unicode-validated trailer title preview, and accessible lookup feedback.
+- Manage edit restoration now resumes the persisted transcript-to-summary stage with one guarded poller and preserves operator-authored summaries.
+- Save-time episode persistence and YouTube commit now report honest, stale-safe outcomes while retaining recoverable editor and private-link context.
+- Focused auth and Manage compatibility regressions are committed, final compilation/build gates are recorded, and the required paired-auth/provider lifecycle checkpoint passed.
+
+---
+
 ## v1.2 Trailer Video YouTube Publishing (Implementation complete; release closeout pending)
 
 **Phases:** 7-9 implemented and verified; Phases 10-11 remain roadmap placeholders because the existing workflow already contains the integration and artifact capability.
