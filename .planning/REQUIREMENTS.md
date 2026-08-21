@@ -33,8 +33,8 @@
 
 ### Artifact Integration
 
-- [ ] **ARTIFACT-01**: The Episodes artifact-download modal offers the finalized `trailer-video` artifact when it is available.
-- [ ] **ARTIFACT-02**: A requested finalized trailer video is included in the backend-generated ZIP under its canonical `trailer.mp4` entry and unavailable/staged files are not downloaded as if finalized.
+- [x] **ARTIFACT-01**: The Episodes artifact-download modal offers the finalized `trailer-video` artifact when it is available.
+- [x] **ARTIFACT-02**: A requested finalized trailer video is included in the backend-generated ZIP under its canonical `trailer.mp4` entry and unavailable/staged files are not downloaded as if finalized.
 
 ### Operational Safety
 
@@ -94,8 +94,8 @@ Traceability records the approved v1.2 requirements and the implemented Phase 8.
 | TITLE-02 | Phase 9 | Complete |
 | TITLE-03 | Phase 9 | Complete |
 | TITLE-04 | Phase 9 | Complete |
-| ARTIFACT-01 | Phase 11 | Pending |
-| ARTIFACT-02 | Phase 11 | Pending |
+| ARTIFACT-01 | Phase 11 | Complete |
+| ARTIFACT-02 | Phase 11 | Complete |
 | OPS-01 | Phase 8 | Complete |
 | OPS-02 | Phase 8 | Complete |
 | OPS-03 | Phase 8 | Complete |

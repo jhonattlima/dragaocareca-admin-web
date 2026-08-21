@@ -19,7 +19,7 @@ key-files:
     - src/app/core/api.service.spec.ts
     - src/app/pages/manage/manage.component.spec.ts
 requirements-completed: [ARTIFACT-01, ARTIFACT-02]
-status: checkpoint-human-verify
+status: complete
 ---
 
 # Phase 11 Plan 02: Trailer Artifact Compatibility Regression Coverage
@@ -31,7 +31,7 @@ status: checkpoint-human-verify
 - Covered absent, null, and staged-like DTO states as unavailable and excluded from submitted selectors.
 - Covered completed trailer-containing jobs through the existing generic authenticated download path and backend 404/no-final-file preflight handling without fabricating a URL.
 - Preserved the existing duplicate-start, progress/partial-missing, retry, reset, stale-job, native delivery, filename safety, and cleanup assertions.
-- Ran the sibling API verifier and frontend type/build gates; recorded ChromeHeadless unavailability in `11-VERIFICATION.md`.
+- Ran the final sibling API verifier and frontend type/build gates; ChromeHeadless remains unavailable because no browser binary is installed.
 
 ## Commits
 
@@ -50,7 +50,15 @@ None. The browser limitation is an explicitly recorded environment limitation re
 
 ## Human-Verify Checkpoint
 
-Plan execution stops here as required by the non-autonomous plan. Install/provide Chrome via `CHROME_BIN`, rerun the focused and complete ChromeHeadless commands in `11-VERIFICATION.md`, and perform the listed modal/preflight/native-download checks. Do not mark Phase 11-02 complete until those results are recorded.
+Accepted: the user explicitly responded `pass` after reviewing the modal, preflight, and native-download behavior. This records the requested UAT acceptance. The automated ChromeHeadless commands remain an environment limitation because no Chrome/Chromium binary is installed; they are not represented as passing tests.
+
+## Final Verification
+
+- Sibling API artifact verifier: PASS (exit 0, rerun with permitted database write access).
+- Spec compilation: PASS.
+- Production build: PASS.
+- Focused and complete ChromeHeadless suites: BLOCKED by missing `CHROME_BIN`/Chrome binary.
+- User-reported UAT: PASS.
 
 ## Self-Check: PASSED
 

@@ -16,7 +16,18 @@ The build retained known non-blocking warnings: selector-parser warnings for `le
 
 ## Human verification checkpoint
 
-Before release sign-off, provide a Chrome/ChromeHeadless binary through `CHROME_BIN` (or run on a host with Chrome installed), then rerun both blocked Angular commands above and require zero test failures. In the artifact modal, confirm a finalized episode shows and can select `Trailer video .mp4`, while an absent/null/staged-only episode disables and excludes it; confirm a completed mixed selection downloads through the authenticated native path and that a backend 404/no-final-file response leaves no fabricated download URL. Record the browser results here before marking the plan complete.
+**Result: PASS (user-reported UAT).** The user explicitly responded `pass` after the requested artifact-modal, finalized/absent/staged availability, backend preflight rejection, and authenticated native-download checks. This closes the human checkpoint and accepts the plan.
+
+The focused and complete ChromeHeadless commands remain **BLOCKED**, not passed, because this environment has no Chrome/Chromium binary (`No binary for ChromeHeadless browser on your platform`; `CHROME_BIN` is unset). The final focused rerun successfully bound Karma's port but stopped at browser launch for that reason.
+
+## Final rerun evidence
+
+| Gate | Result | Notes |
+| --- | --- | --- |
+| Sibling API artifact verifier | PASS (exit 0) | Reran with permitted access to its temporary SQLite database; finalized `trailer-video`, canonical `trailer.mp4`, stale/unavailable exclusion, safe failures, auth, ZIP security, and OpenAPI parity verified. |
+| Spec compilation | PASS (exit 0) | `./node_modules/.bin/tsc -p tsconfig.spec.json --noEmit` |
+| Production build | PASS (exit 0) | Known selector-parser and Angular budget warnings retained. |
+| Focused ChromeHeadless suite | BLOCKED | No Chrome binary; no test result claimed. |
 
 ## Scope checks
 
@@ -24,3 +35,4 @@ Before release sign-off, provide a Chrome/ChromeHeadless binary through `CHROME_
 - No sibling API files were modified.
 - No package or lockfile changes were made.
 - Existing unrelated dirty application changes were preserved.
+- User-reported UAT acceptance was recorded without changing application code.
