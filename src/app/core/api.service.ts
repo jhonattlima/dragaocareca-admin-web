@@ -234,7 +234,7 @@ export interface HashtagLookupResponse extends SuggestedTagRetrieval {
   retryAt: string | null;
 }
 
-export type EpisodeArtifactSelector = 'episode' | 'trailer' | 'image' | 'image-low' | 'transcript';
+export type EpisodeArtifactSelector = 'episode' | 'trailer' | 'image' | 'image-low' | 'transcript' | 'trailer-video';
 
 export interface EpisodeArtifactJobSnapshot {
   jobId: string;
