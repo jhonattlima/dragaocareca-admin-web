@@ -7,8 +7,8 @@
 
   <div class="section-block">
     <h2 class="manage-section-title">File Management</h2>
-    <div class="row g-3 align-items-stretch mb-3">
-      <div class="col-md-3" *ngFor="let upload of controller.uploadDefinitions">
+    <div class="upload-grid mb-3">
+      <div class="upload-grid-item" *ngFor="let upload of controller.uploadDefinitions">
         <div
           class="file-card upload-card"
           [class.dragover]="controller.isUploadDragOver(upload.kind)"
@@ -123,6 +123,13 @@
             (click)="controller.retryUpload(editor, 'audio')">
             Try again
           </button>
+          <button
+            class="btn btn-sm btn-outline-primary mt-2 ms-2"
+            type="button"
+            *ngIf="upload.kind === 'audio' && controller.canTranscribeWithWhisper(editor)"
+            (click)="controller.transcribeWithWhisper(editor)">
+            Transcript with Whisper
+          </button>
           <div class="progress upload-progress mt-2" *ngIf="upload.kind === 'audio' && controller.hasGenerationProgress(editor)">
             <div
               class="progress-bar"
@@ -168,6 +175,21 @@
           <option *ngFor="let opt of controller.episodeTypes" [value]="opt">{{ opt }}</option>
         </select>
       </div>
+      <div class="form-group col-md-6 mb-3">
+        <label>Title</label>
+        <input class="form-control" type="text" [(ngModel)]="editor.formModel.title">
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="form-group col-md-3 mb-3">
+        <label>Publish</label>
+        <input class="form-control" type="datetime-local" [(ngModel)]="editor.formModel.pubDate">
+      </div>
+      <div class="form-group col-md-3 mb-3">
+        <label>Bytes</label>
+        <input class="form-control readonly-field readonly-metadata-field" type="text" [value]="editor.formModel.bytes == null ? '' : controller.formatBytesAsMegabytes(editor.formModel.bytes)" readonly>
+      </div>
       <div class="form-group col-md-3 mb-3">
         <label>Duration</label>
         <input class="form-control readonly-field readonly-metadata-field" type="text" [(ngModel)]="editor.formModel.duration" readonly>
@@ -181,28 +203,14 @@
       </div>
     </div>
 
-    <div class="row">
-      <div class="form-group col-md-6 mb-3">
-        <label>Title</label>
-        <input class="form-control" type="text" [(ngModel)]="editor.formModel.title">
-      </div>
-      <div class="form-group col-md-3 mb-3">
-        <label>Publish DateTime</label>
-        <input class="form-control" type="datetime-local" [(ngModel)]="editor.formModel.pubDate">
-      </div>
-      <div class="form-group col-md-3 mb-3">
-        <label>Bytes</label>
-        <input class="form-control readonly-field readonly-metadata-field" type="text" [value]="editor.formModel.bytes == null ? '' : controller.formatBytesAsMegabytes(editor.formModel.bytes)" readonly>
-      </div>
-    </div>
-
     <div class="form-group mb-3">
       <label>Summary</label>
       <textarea
-        class="form-control"
+        class="form-control auto-grow-textarea"
         rows="5"
         [(ngModel)]="editor.formModel.summary"
         (ngModelChange)="controller.onSummaryChange(editor)"
+        (input)="controller.autoResizeTextarea($event)"
         placeholder="Episode summary / description"></textarea>
     </div>
 
@@ -232,10 +240,10 @@
           (blur)="controller.onHashtagBlur(editor)">
         <div class="hashtag-authoring-status" [attr.id]="'episode-hashtag-status-' + (editor.editingEpisodeId || 'new')" aria-live="polite">
           <span *ngIf="editor.formModel.suggestedTags?.status === 'pending' || editor.formModel.suggestedTags?.status === 'processing'">
-            Automatic hashtag research in progress; editing is temporarily disabled.
+            Automatic hashtag research using {{ controller.formatProvider(editor.formModel.suggestedTags?.provider) }}. Editing is temporarily disabled.
           </span>
           <span *ngIf="editor.formModel.suggestedTags?.status === 'unavailable'">
-            Automatic hashtag research is unavailable. You can continue with manual hashtags.
+            Automatic hashtag research using {{ controller.formatProvider(editor.formModel.suggestedTags?.provider) }} is unavailable. You can continue with manual hashtags.
           </span>
         </div>
         <div class="hashtag-token-list" *ngIf="controller.serializeHashtags(editor.formModel.hashtags).length > 0" aria-label="Authored hashtags">
@@ -269,7 +277,7 @@
       <label [attr.for]="'trailer-title-preview-' + (editor.editingEpisodeId || 'new')">Trailer title preview</label>
       <input
         [attr.id]="'trailer-title-preview-' + (editor.editingEpisodeId || 'new')"
-        class="form-control readonly-field"
+        class="form-control readonly-field readonly-metadata-field trailer-title-preview-field"
         type="text"
         [value]="controller.getTrailerTitle(editor)"
         readonly

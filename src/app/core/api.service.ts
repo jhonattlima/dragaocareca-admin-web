@@ -34,11 +34,13 @@ export interface Episode {
   transcriptStartedAt?: string | null;
   transcriptError?: string;
   transcriptProgress?: number | null;
+  transcriptProvider?: string | null;
   summaryStatus?: 'idle' | 'pending' | 'processing' | 'done' | 'error';
   summaryUpdatedAt?: string | null;
   summaryStartedAt?: string | null;
   summaryError?: string | null;
   summaryProgress?: number | null;
+  summaryProvider?: string | null;
 }
 
 export interface EpisodeWriteInput {
@@ -179,6 +181,17 @@ export interface EpisodeTranscriptionStatus {
   transcriptStartedAt: string | null;
   progress: number | null;
   transcriptError: string | null;
+  provider: string | null;
+}
+
+export interface EpisodeTranscriptionQueueResponse {
+  episodeId: number;
+  queued: boolean;
+  version: number;
+  status: EpisodeTranscriptionStatus['status'];
+  progress: number | null;
+  transcriptError: string | null;
+  message: string;
 }
 
 export interface EpisodeGeneratedSummaryStatus {
@@ -190,6 +203,7 @@ export interface EpisodeGeneratedSummaryStatus {
   error: string | null;
   version: number | null;
   promptVersion: string | null;
+  provider: string | null;
   summaryText?: string | null;
   suggestedTags?: SuggestedTagsSnapshot;
 }
@@ -224,6 +238,7 @@ export interface SuggestedTagsSnapshot {
   retryAt: string | null;
   errorCategory: SuggestedTagsErrorCategory | null;
   promptVersion: string | null;
+  provider: string | null;
   suggestions: SuggestedTagRetrieval[];
 }
 
@@ -458,6 +473,13 @@ export class ApiService {
 
   getEpisodeTranscriptionStatus(episodeId: number): Observable<EpisodeTranscriptionStatus> {
     return this.http.get<EpisodeTranscriptionStatus>(`${environment.apiBaseUrl}/episodes/${episodeId}/transcription`);
+  }
+
+  transcribeEpisodeWithWhisper(episodeId: number): Observable<EpisodeTranscriptionQueueResponse> {
+    return this.http.post<EpisodeTranscriptionQueueResponse>(
+      `${environment.apiBaseUrl}/episodes/${episodeId}/transcription/whisper`,
+      {},
+    );
   }
 
   getEpisodeGeneratedSummaryStatus(episodeId: number): Observable<EpisodeGeneratedSummaryStatus> {

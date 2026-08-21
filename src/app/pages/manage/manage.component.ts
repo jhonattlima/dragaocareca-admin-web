@@ -132,11 +132,13 @@ interface EpisodeFormState extends Omit<EpisodeWriteInput, 'guests' | 'musicCred
   transcriptStartedAt?: string | null;
   transcriptError?: string;
   transcriptProgress?: number | null;
+  transcriptProvider?: string | null;
   summaryStatus?: 'idle' | 'pending' | 'processing' | 'done' | 'error';
   summaryUpdatedAt?: string | null;
   summaryStartedAt?: string | null;
   summaryError?: string | null;
   summaryProgress?: number | null;
+  summaryProvider?: string | null;
   summaryManuallyEdited?: boolean;
   hashtags: string;
   suggestedTags?: SuggestedTagsSnapshot;
@@ -202,6 +204,7 @@ export class ManageComponent implements OnInit, OnDestroy {
   private transcriptionStatusPollTimer: number | null = null;
   private transcriptionStatusPollEpisodeId: number | null = null;
   private readonly transcriptionTerminalFailures = new Set<number>();
+  private readonly whisperTranscriptionInFlight = new Set<number>();
   private readonly youtubeTrailerHashtagsByEpisode = new Map<number, string[]>();
   private summaryStatusPollTimer: number | null = null;
   private summaryStatusPollEpisodeId: number | null = null;
@@ -1710,11 +1713,11 @@ export class ManageComponent implements OnInit, OnDestroy {
 
     switch (status) {
       case 'pending':
-        return 'Transcription queued in the background.';
+        return `Transcription queued in the background using ${this.formatProvider(editor.formModel.transcriptProvider)}.`;
       case 'processing':
-        return `Transcribing the episode audio... ${this.getTranscriptionProgress(editor)}%${this.getTranscriptionTimingSuffix(editor)}`;
+        return `Transcribing the episode audio using ${this.formatProvider(editor.formModel.transcriptProvider)}... ${this.getTranscriptionProgress(editor)}%${this.getTranscriptionTimingSuffix(editor)}`;
       case 'done':
-        return 'Transcript saved and ready.';
+        return `Transcript saved and ready. Generated using ${this.formatProvider(editor.formModel.transcriptProvider)}.`;
       case 'error':
         return editor.formModel.transcriptError
           ? `Transcription failed: ${editor.formModel.transcriptError}`
@@ -1728,17 +1731,17 @@ export class ManageComponent implements OnInit, OnDestroy {
     const status = editor.formModel.summaryStatus;
     if (!status || status === 'idle') {
       return editor.formModel.transcriptStatus === 'done'
-        ? `Generating the episode summary... ${this.getSummaryProgress(editor)}%`
+        ? `Generating the episode summary using ${this.formatProvider(editor.formModel.summaryProvider)}... ${this.getSummaryProgress(editor)}%`
         : '';
     }
 
     switch (status) {
       case 'pending':
-        return 'Summary generation queued in the background.';
+        return `Summary generation queued in the background using ${this.formatProvider(editor.formModel.summaryProvider)}.`;
       case 'processing':
-        return `Generating the episode summary... ${this.getSummaryProgress(editor)}%`;
+        return `Generating the episode summary using ${this.formatProvider(editor.formModel.summaryProvider)}... ${this.getSummaryProgress(editor)}%`;
       case 'done':
-        return 'Summary saved and ready.';
+        return `Summary saved and ready. Generated using ${this.formatProvider(editor.formModel.summaryProvider)}.`;
       case 'error':
         return editor.formModel.summaryError
           ? `Summary generation failed: ${editor.formModel.summaryError}`
@@ -1746,6 +1749,11 @@ export class ManageComponent implements OnInit, OnDestroy {
       default:
         return '';
     }
+  }
+
+  formatProvider(provider: string | null | undefined): string {
+    if (!provider) return 'the configured provider';
+    return provider === 'faster-whisper' ? 'Faster-Whisper' : `${provider.charAt(0).toUpperCase()}${provider.slice(1)}`;
   }
 
   getSummaryProgress(editor: EpisodeEditorState): number {
@@ -1764,6 +1772,13 @@ export class ManageComponent implements OnInit, OnDestroy {
 
   onSummaryChange(editor: EpisodeEditorState): void {
     editor.formModel.summaryManuallyEdited = true;
+  }
+
+  autoResizeTextarea(event: Event): void {
+    const textarea = event.target as HTMLTextAreaElement | null;
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${textarea.scrollHeight}px`;
   }
 
   hasSummaryProgress(editor: EpisodeEditorState): boolean {
@@ -1932,6 +1947,58 @@ export class ManageComponent implements OnInit, OnDestroy {
     if (file && this.canRetryUpload(editor, kind)) {
       this.uploadMedia(editor, kind, file);
     }
+  }
+
+  canTranscribeWithWhisper(editor: EpisodeEditorState): boolean {
+    const episodeId = editor.formModel.episodeId;
+    return editor.formModel.transcriptStatus === 'error'
+      && episodeId > 0
+      && !this.whisperTranscriptionInFlight.has(episodeId)
+      && !this.isUploadBusy('audio');
+  }
+
+  isWhisperTranscriptionInFlight(editor: EpisodeEditorState): boolean {
+    return this.whisperTranscriptionInFlight.has(editor.formModel.episodeId);
+  }
+
+  transcribeWithWhisper(editor: EpisodeEditorState): void {
+    const episodeId = editor.formModel.episodeId;
+    if (!this.canTranscribeWithWhisper(editor)) {
+      return;
+    }
+
+    this.whisperTranscriptionInFlight.add(episodeId);
+    this.transcriptionTerminalFailures.delete(episodeId);
+    editor.formModel.transcriptStatus = 'pending';
+    editor.formModel.transcriptError = '';
+    editor.formModel.transcriptProgress = 0;
+
+    this.apiService.transcribeEpisodeWithWhisper(episodeId).subscribe({
+      next: (response) => {
+        if (editor.formModel.episodeId !== episodeId) {
+          return;
+        }
+        editor.formModel.transcriptStatus = response.status;
+        editor.formModel.transcriptError = response.transcriptError ?? '';
+        editor.formModel.transcriptProgress = response.progress ?? (response.status === 'done' ? 100 : 0);
+        if (response.status === 'error') {
+          this.transcriptionTerminalFailures.add(episodeId);
+          this.clearTranscriptionStatusPolling();
+          return;
+        }
+        this.syncTranscriptionStatusPolling(episodeId, editor);
+      },
+      error: (error) => {
+        if (editor.formModel.episodeId === episodeId) {
+          editor.formModel.transcriptStatus = 'error';
+          editor.formModel.transcriptError = error?.error?.message ?? error?.message ?? 'Could not start Whisper transcription.';
+          editor.formModel.transcriptProgress = null;
+          this.transcriptionTerminalFailures.add(episodeId);
+          this.clearTranscriptionStatusPolling();
+        }
+      },
+      complete: () => this.whisperTranscriptionInFlight.delete(episodeId),
+    });
   }
 
   getTrailerVideoStatus(editor: EpisodeEditorState): TrailerVideoLifecycle {
@@ -2374,6 +2441,7 @@ export class ManageComponent implements OnInit, OnDestroy {
           editor.formModel.transcriptStartedAt = status.transcriptStartedAt ?? editor.formModel.transcriptStartedAt ?? null;
           editor.formModel.transcriptError = status.transcriptError ?? '';
           editor.formModel.transcriptProgress = status.progress ?? (status.status === 'done' ? 100 : null);
+          editor.formModel.transcriptProvider = status.provider;
 
           if (status.status === 'error') {
             this.transcriptionTerminalFailures.add(episodeId);
@@ -2435,6 +2503,7 @@ export class ManageComponent implements OnInit, OnDestroy {
           editor.formModel.summaryStartedAt = status.summaryStartedAt ?? editor.formModel.summaryStartedAt ?? null;
           editor.formModel.summaryError = status.error ?? '';
           editor.formModel.summaryProgress = status.progress ?? (status.status === 'done' ? 100 : null);
+          editor.formModel.summaryProvider = status.provider;
           editor.formModel.suggestedTags = status.suggestedTags;
           this.mergeSuggestedTags(editor, status.suggestedTags);
 

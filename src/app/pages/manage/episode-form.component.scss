@@ -14,6 +14,19 @@
   border-left-color: #b02a37;
 }
 
+.upload-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.auto-grow-textarea {
+  field-sizing: content;
+  max-height: 35rem;
+  min-height: 8rem;
+  overflow-y: auto;
+  resize: vertical;
+}
 .readonly-field {
   background-color: #f1f3f5;
   color: #6c757d;
@@ -104,8 +117,21 @@
 }
 
 .trailer-title-preview .form-control[readonly] {
-  background-color: #f1f3f5;
+  background-color: #dee2e6 !important;
+  background-image: none !important;
+  border-color: #adb5bd;
   color: #495057;
+  cursor: default;
+  box-shadow: none;
+}
+
+.trailer-title-preview-field[readonly]:focus,
+.trailer-title-preview-field[readonly]:focus-visible {
+  background-color: #dee2e6 !important;
+  background-image: none !important;
+  border-color: #6c757d;
+  color: #495057;
+  box-shadow: none;
 }
 
 .trailer-title-preview .error {
@@ -115,8 +141,24 @@
 }
 
 @media (max-width: 767.98px) {
+  .upload-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .hashtag-token-popup {
     left: auto;
     right: 0;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1199.98px) {
+  .upload-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1200px) {
+  .upload-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
