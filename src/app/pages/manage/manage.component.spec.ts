@@ -1523,4 +1523,16 @@ describe('Phase 8.1 RED form contracts FORM-01 through FORM-05', () => {
     expect(format(1234567)).toBe('1.23 MB');
     expect(format(1235000)).toBe('1.24 MB');
   });
+
+  it('normalizes ordered caption mentions and hashtags and renders truthful preview text', () => {
+    const editor = component.addEditorState;
+    editor.formModel.title = 'Episode';
+    editor.formModel.summary = 'Summary';
+    editor.formModel.instagramCaptionMentions = [' @Host ', '@host', 'invalid handle'];
+    editor.formModel.instagramHashtags = [' #Tema ', '#tema', '#RPG'];
+    expect(component.buildPayload(editor).instagramCaptionMentions).toEqual(['@host']);
+    expect(component.buildPayload(editor).instagramHashtags).toEqual(['#tema', '#rpg']);
+    expect(component.getInstagramCaptionPreview(editor)).toContain('@host');
+    expect(component.getInstagramCaptionPreview(editor)).toContain('#tema');
+  });
 });
