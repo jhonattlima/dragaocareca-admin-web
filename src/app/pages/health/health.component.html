@@ -41,6 +41,17 @@
             </td>
           </tr>
         </ng-container>
+        <tr class="health-section-row" [attr.data-tone]="metaStatus ? 'good' : 'muted'">
+          <th scope="row">Meta connection</th>
+          <td>{{ metaStatus?.diagnostic || 'unavailable' }}</td>
+          <td colspan="2">Authenticated API projection; no provider credentials or calls in browser</td>
+        </tr>
+        <tr *ngFor="let row of metaGateRows" [attr.data-tone]="row.tone" class="health-subrow">
+          <th scope="row">{{ row.label }}</th>
+          <td>{{ row.value }}</td>
+          <td>{{ row.note }}</td>
+          <td class="text-end"><span class="health-pill" [attr.data-tone]="row.tone">{{ row.tone }}</span></td>
+        </tr>
       </tbody>
     </table>
   </div>

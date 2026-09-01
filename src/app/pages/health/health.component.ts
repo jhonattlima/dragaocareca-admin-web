@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { ApiService, HealthStatus } from '../../core/api.service';
+import { ApiService, HealthStatus, MetaConnectionStatus } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 
 @Component({
@@ -9,6 +9,7 @@ import { AuthService } from '../../core/auth.service';
 })
 export class HealthComponent implements OnInit {
   healthStatus?: HealthStatus;
+  metaStatus?: MetaConnectionStatus;
   authBypassEnabled = false;
   botExpanded = true;
 
@@ -27,6 +28,25 @@ export class HealthComponent implements OnInit {
         this.healthStatus = undefined;
       },
     });
+    this.apiService.getMetaConnectionStatus().subscribe({
+      next: (status) => this.metaStatus = status,
+      error: () => this.metaStatus = undefined,
+    });
+  }
+
+  get metaTaggingLabel(): string {
+    return this.metaStatus?.accountTagging ?? 'unavailable';
+  }
+
+  get metaGateRows(): Array<{ label: string; value: string; note: string; tone: string; level: number }> {
+    const status = this.metaStatus;
+    return [
+      { label: 'Instagram Reel gate', value: status?.gates.instagram.status ?? 'unavailable', note: status?.gates.instagram.reasons.join(' ') || 'API-owned gate', tone: status?.gates.instagram.status === 'ready' ? 'good' : status ? 'warn' : 'muted', level: 0 },
+      { label: 'Facebook Reel gate', value: status?.gates.facebookReel.status ?? 'unavailable', note: status?.gates.facebookReel.reasons.join(' ') || 'API-owned gate', tone: status?.gates.facebookReel.status === 'ready' ? 'good' : status ? 'warn' : 'muted', level: 0 },
+      { label: 'Graph version', value: status?.graphApiVersion ?? 'unavailable', note: 'Pinned API contract', tone: status?.checks.version ? 'good' : 'warn', level: 0 },
+      { label: 'Token lifecycle', value: status?.token.status ?? 'unavailable', note: 'Category only; credentials remain API-only', tone: status?.token.status === 'valid' ? 'good' : 'warn', level: 0 },
+      { label: 'Account tagging', value: this.metaTaggingLabel, note: 'Caption @handles are mentions, not verified tags', tone: status?.accountTagging === 'proven' ? 'good' : 'warn', level: 0 },
+    ];
   }
 
   get botEnabledLabel(): string {

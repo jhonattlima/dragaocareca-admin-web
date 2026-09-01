@@ -83,6 +83,36 @@ describe('ApiService title and hashtag authoring contract', () => {
   });
 });
 
+describe('ApiService Meta connection boundary', () => {
+  let apiService: ApiService;
+  let httpTestingController: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ imports: [HttpClientTestingModule], providers: [ApiService] });
+    apiService = TestBed.inject(ApiService);
+    httpTestingController = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => httpTestingController.verify());
+
+  it('gets only the redacted authenticated API projection', () => {
+    let response: unknown;
+    apiService.getMetaConnectionStatus().subscribe(value => response = value);
+    const request = httpTestingController.expectOne(`${environment.apiBaseUrl}/meta-connection/status`);
+    expect(request.request.method).toBe('GET');
+    expect(request.request.url).not.toContain('graph.facebook.com');
+    request.flush({
+      contractVersion: 'meta-connection.v1', graphApiVersion: 'v25.0', configured: false,
+      page: { id: null, linkedInstagramAccountId: null }, token: { status: 'unknown', expiresAt: null },
+      checks: { identity: false, linkage: false, permissions: false, version: true }, permissions: [], tasks: [],
+      gates: { instagram: { enabled: false, canPublish: false, status: 'disabled', reasons: ['disabled'] }, facebookReel: { enabled: false, canPublish: false, status: 'disabled', reasons: ['disabled'] } },
+      accountTagging: 'not_proven', checkedAt: null, requestId: null, diagnostic: 'not_configured',
+    });
+    expect((response as { token: { status: string } }).token.status).toBe('unknown');
+    expect(JSON.stringify(response)).not.toContain('access_token');
+  });
+});
+
 describe('ApiService artifact jobs', () => {
   let apiService: ApiService;
   let httpTestingController: HttpTestingController;

@@ -365,6 +365,29 @@ export interface HealthStatus {
   };
 }
 
+export interface MetaGateStatus {
+  enabled: boolean;
+  canPublish: boolean;
+  status: 'disabled' | 'blocked' | 'ready';
+  reasons: string[];
+}
+
+export interface MetaConnectionStatus {
+  contractVersion: 'meta-connection.v1';
+  graphApiVersion: 'v25.0';
+  configured: boolean;
+  page: { id: string | null; linkedInstagramAccountId: string | null };
+  token: { status: 'valid' | 'expiring' | 'invalid' | 'unknown'; expiresAt: string | null };
+  checks: { identity: boolean; linkage: boolean; permissions: boolean; version: boolean };
+  permissions: string[];
+  tasks: string[];
+  gates: { instagram: MetaGateStatus; facebookReel: MetaGateStatus };
+  accountTagging: 'not_checked' | 'proven' | 'not_proven' | 'unsupported';
+  checkedAt: string | null;
+  requestId: string | null;
+  diagnostic: 'not_configured' | 'disabled' | 'validated' | 'validation_failed' | 'provider_unavailable';
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -578,5 +601,9 @@ export class ApiService {
   getHealth(): Observable<HealthStatus> {
     const healthUrl = environment.apiBaseUrl.replace(/\/v1$/, '/health');
     return this.http.get<HealthStatus>(healthUrl);
+  }
+
+  getMetaConnectionStatus(): Observable<MetaConnectionStatus> {
+    return this.http.get<MetaConnectionStatus>(`${environment.apiBaseUrl}/meta-connection/status`);
   }
 }
