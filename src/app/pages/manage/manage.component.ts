@@ -141,6 +141,8 @@ interface EpisodeFormState extends Omit<EpisodeWriteInput, 'guests' | 'musicCred
   summaryProvider?: string | null;
   summaryManuallyEdited?: boolean;
   hashtags: string;
+  instagramCaptionMentions: string[];
+  instagramHashtags: string[];
   suggestedTags?: SuggestedTagsSnapshot;
 }
 
@@ -663,6 +665,8 @@ export class ManageComponent implements OnInit, OnDestroy {
       episodeId: episode.episodeId,
       title: episode.title,
       hashtags: this.getPersistedYoutubeHashtags(episode).join(' '),
+      instagramCaptionMentions: [...(episode.instagramCaptionMentions ?? [])],
+      instagramHashtags: [...(episode.instagramHashtags ?? [])],
       summary: episode.summary,
       pubDate: this.toDateTimeLocalValue(episode.pubDate),
       duration: episode.duration,
@@ -2272,6 +2276,8 @@ export class ManageComponent implements OnInit, OnDestroy {
       episodeId: this.suggestedNextEpisodeId,
       title: '',
       hashtags: '',
+      instagramCaptionMentions: [],
+      instagramHashtags: [],
       summary: '',
       pubDate: this.suggestedNextPubDate,
       explicit: 'no',
@@ -2390,7 +2396,34 @@ export class ManageComponent implements OnInit, OnDestroy {
         editor.formModel.musicCredits.filter((entry) => this.isCompleteMusicCredit(entry))
       ),
       coverCredits: editor.formModel.coverCredits ?? [],
+      instagramCaptionMentions: this.normalizeInstagramMentions(editor.formModel.instagramCaptionMentions),
+      instagramHashtags: this.normalizeInstagramHashtags(editor.formModel.instagramHashtags),
     };
+  }
+
+  normalizeInstagramMentions(values: string[]): string[] {
+    return [...new Set(values.map((value) => value.trim().replace(/^@+/, '').toLowerCase()).filter((value) => /^[a-z0-9._]{1,30}$/i.test(value)).map((value) => `@${value}`))];
+  }
+
+  normalizeInstagramHashtags(values: string[]): string[] {
+    return [...new Set(values.map((value) => value.trim().replace(/^#+/, '').toLowerCase()).filter((value) => /^[\p{L}\p{N}_-]{1,100}$/u.test(value)).map((value) => `#${value}`))];
+  }
+
+  addInstagramMention(editor: EpisodeEditorState): void { editor.formModel.instagramCaptionMentions.push('@'); }
+  removeInstagramMention(editor: EpisodeEditorState, index: number): void { editor.formModel.instagramCaptionMentions.splice(index, 1); }
+  addInstagramHashtag(editor: EpisodeEditorState): void { editor.formModel.instagramHashtags.push('#'); }
+  removeInstagramHashtag(editor: EpisodeEditorState, index: number): void { editor.formModel.instagramHashtags.splice(index, 1); }
+  moveInstagramHashtag(editor: EpisodeEditorState, index: number, delta: number): void {
+    const target = index + delta;
+    if (target < 0 || target >= editor.formModel.instagramHashtags.length) return;
+    const values = editor.formModel.instagramHashtags;
+    [values[index], values[target]] = [values[target], values[index]];
+  }
+
+  getInstagramCaptionPreview(editor: EpisodeEditorState): string {
+    const mentions = this.normalizeInstagramMentions(editor.formModel.instagramCaptionMentions).join(' ');
+    const hashtags = this.normalizeInstagramHashtags(editor.formModel.instagramHashtags).join(' ');
+    return [editor.formModel.title.trim(), editor.formModel.summary.trim(), mentions, hashtags].filter(Boolean).join('\n\n').slice(0, 2200);
   }
 
   onEpisodeIdChange(editor: EpisodeEditorState, value: number | string): void {

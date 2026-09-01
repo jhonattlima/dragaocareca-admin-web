@@ -214,6 +214,34 @@
         placeholder="Episode summary / description"></textarea>
     </div>
 
+    <div class="section-block social-posting-section" aria-labelledby="social-posting-title">
+      <h2 id="social-posting-title" class="manage-section-title">Instagram social posting</h2>
+      <p class="section-hint">Caption mentions and hashtags are saved as ordered text. A caption mention is not a verified account tag.</p>
+      <div class="form-group mb-3">
+        <label>Caption mentions</label>
+        <div class="input-group mb-2" *ngFor="let mention of editor.formModel.instagramCaptionMentions; let i = index">
+          <input class="form-control" [(ngModel)]="editor.formModel.instagramCaptionMentions[i]" [attr.aria-label]="'Caption mention ' + (i + 1)" placeholder="@handle">
+          <button class="btn btn-outline-danger" type="button" (click)="controller.removeInstagramMention(editor, i)" aria-label="Remove caption mention">Remove</button>
+        </div>
+        <button class="btn btn-sm btn-outline-primary" type="button" (click)="controller.addInstagramMention(editor)">Add caption mention</button>
+      </div>
+      <div class="form-group mb-3">
+        <label>Instagram hashtags</label>
+        <div class="input-group mb-2" *ngFor="let hashtag of editor.formModel.instagramHashtags; let i = index">
+          <input class="form-control" [(ngModel)]="editor.formModel.instagramHashtags[i]" [attr.aria-label]="'Instagram hashtag ' + (i + 1)" placeholder="#hashtag">
+          <button class="btn btn-outline-secondary" type="button" (click)="controller.moveInstagramHashtag(editor, i, -1)" [disabled]="i === 0">Up</button>
+          <button class="btn btn-outline-secondary" type="button" (click)="controller.moveInstagramHashtag(editor, i, 1)" [disabled]="i === editor.formModel.instagramHashtags.length - 1">Down</button>
+          <button class="btn btn-outline-danger" type="button" (click)="controller.removeInstagramHashtag(editor, i)" aria-label="Remove Instagram hashtag">Remove</button>
+        </div>
+        <button class="btn btn-sm btn-outline-primary" type="button" (click)="controller.addInstagramHashtag(editor)">Add Instagram hashtag</button>
+      </div>
+      <div class="caption-preview" aria-live="polite">
+        <strong>Caption preview</strong>
+        <pre class="mb-1">{{ controller.getInstagramCaptionPreview(editor) }}</pre>
+        <small>Handles above are caption mentions only; they do not prove verified account tagging or notification.</small>
+      </div>
+    </div>
+
     <div class="row">
       <div class="form-group col-md-4 mb-3">
         <label>YouTube Link</label>

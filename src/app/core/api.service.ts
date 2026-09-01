@@ -41,6 +41,8 @@ export interface Episode {
   summaryError?: string | null;
   summaryProgress?: number | null;
   summaryProvider?: string | null;
+  instagramCaptionMentions?: string[];
+  instagramHashtags?: string[];
 }
 
 export interface EpisodeWriteInput {
@@ -66,6 +68,8 @@ export interface EpisodeWriteInput {
   spotifyId?: string;
   musicCredits?: string[];
   coverCredits?: string[];
+  instagramCaptionMentions?: string[];
+  instagramHashtags?: string[];
 }
 
 export interface StructuredEntrySuggestionItem {
