@@ -392,6 +392,20 @@ export interface MetaConnectionStatus {
   diagnostic: 'not_configured' | 'disabled' | 'validated' | 'validation_failed' | 'provider_unavailable';
 }
 
+export interface PublicationEffectStatus {
+  destination: 'telegram' | 'instagram_reel' | 'facebook_native_video';
+  lifecycle: 'pending' | 'eligible' | 'delivering' | 'processing' | 'published' | 'failed' | 'blocked' | 'uncertain';
+  checkpoint?: { stage: string; providerId: string | null; permalink: string | null; updatedAt: string };
+  attempt?: { count: number; lastAttemptAt: string | null };
+  diagnostic?: string | null;
+}
+
+export interface EpisodePublicationStatus {
+  contractVersion: 'episode-publication.v1';
+  episodeId: number;
+  effects: PublicationEffectStatus[];
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -609,5 +623,9 @@ export class ApiService {
 
   getMetaConnectionStatus(): Observable<MetaConnectionStatus> {
     return this.http.get<MetaConnectionStatus>(`${environment.apiBaseUrl}/meta-connection/status`);
+  }
+
+  getEpisodePublicationStatus(episodeId: number): Observable<EpisodePublicationStatus> {
+    return this.http.get<EpisodePublicationStatus>(`${environment.apiBaseUrl}/internal/publication/episodes/${episodeId}`);
   }
 }

@@ -113,6 +113,38 @@ describe('ApiService Meta connection boundary', () => {
   });
 });
 
+describe('ApiService publication status boundary', () => {
+  let apiService: ApiService;
+  let httpTestingController: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ imports: [HttpClientTestingModule], providers: [ApiService] });
+    apiService = TestBed.inject(ApiService);
+    httpTestingController = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => httpTestingController.verify());
+
+  it('consumes only the authenticated redacted publication projection', () => {
+    let response: unknown;
+    apiService.getEpisodePublicationStatus(42).subscribe(value => response = value);
+    const request = httpTestingController.expectOne(`${environment.apiBaseUrl}/internal/publication/episodes/42`);
+    expect(request.request.method).toBe('GET');
+    expect(request.request.url).not.toContain('graph.facebook.com');
+    request.flush({
+      contractVersion: 'episode-publication.v1',
+      episodeId: 42,
+      effects: [{
+        destination: 'instagram_reel', lifecycle: 'published',
+        checkpoint: { stage: 'remote_identity', providerId: 'opaque-id', permalink: 'https://instagram.com/reel/opaque-id', updatedAt: '2026-09-03T00:00:00.000Z' },
+        attempt: { count: 1, lastAttemptAt: '2026-09-03T00:00:00.000Z' }, diagnostic: null,
+      }],
+    });
+    expect((response as { effects: Array<{ lifecycle: string }> }).effects[0].lifecycle).toBe('published');
+    expect(JSON.stringify(response)).not.toMatch(/access_token|secret|rawResponse/i);
+  });
+});
+
 describe('ApiService artifact jobs', () => {
   let apiService: ApiService;
   let httpTestingController: HttpTestingController;
