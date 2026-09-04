@@ -216,7 +216,7 @@
 
     <div class="section-block social-posting-section" aria-labelledby="social-posting-title">
       <h2 id="social-posting-title" class="manage-section-title">Instagram social posting</h2>
-      <p class="section-hint">Caption mentions and hashtags are saved as ordered text. A caption mention is not a verified account tag.</p>
+      <p class="section-hint">Caption mentions and up to 50 hashtags are saved as ordered text. Hashtags are filled from the relevance research and remain editable. A caption mention is not a verified account tag.</p>
       <div class="form-group mb-3">
         <label>Caption mentions</label>
         <div class="input-group mb-2" *ngFor="let mention of editor.formModel.instagramCaptionMentions; let i = index">
@@ -228,12 +228,12 @@
       <div class="form-group mb-3">
         <label>Instagram hashtags</label>
         <div class="input-group mb-2" *ngFor="let hashtag of editor.formModel.instagramHashtags; let i = index">
-          <input class="form-control" [(ngModel)]="editor.formModel.instagramHashtags[i]" [attr.aria-label]="'Instagram hashtag ' + (i + 1)" placeholder="#hashtag">
+          <input class="form-control" [(ngModel)]="editor.formModel.instagramHashtags[i]" (ngModelChange)="controller.onInstagramHashtagsChange(editor)" [attr.aria-label]="'Instagram hashtag ' + (i + 1)" placeholder="#hashtag">
           <button class="btn btn-outline-secondary" type="button" (click)="controller.moveInstagramHashtag(editor, i, -1)" [disabled]="i === 0">Up</button>
           <button class="btn btn-outline-secondary" type="button" (click)="controller.moveInstagramHashtag(editor, i, 1)" [disabled]="i === editor.formModel.instagramHashtags.length - 1">Down</button>
           <button class="btn btn-outline-danger" type="button" (click)="controller.removeInstagramHashtag(editor, i)" aria-label="Remove Instagram hashtag">Remove</button>
         </div>
-        <button class="btn btn-sm btn-outline-primary" type="button" (click)="controller.addInstagramHashtag(editor)">Add Instagram hashtag</button>
+        <button class="btn btn-sm btn-outline-primary" type="button" (click)="controller.addInstagramHashtag(editor)" [disabled]="editor.formModel.instagramHashtags.length >= 50">Add Instagram hashtag</button>
       </div>
       <div class="caption-preview" aria-live="polite">
         <strong>Caption preview</strong>

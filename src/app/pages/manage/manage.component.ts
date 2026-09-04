@@ -152,6 +152,7 @@ export interface EpisodeEditorState {
   listDrafts: Record<EpisodeListField, string>;
   editingEpisodeId: number | null;
   trailerVideoDraftId?: string | null;
+  instagramHashtagsManuallyEdited?: boolean;
 }
 
 @Component({
@@ -163,7 +164,7 @@ export class ManageComponent implements OnInit, OnDestroy {
   readonly self = this;
   activeTab: ManageTab = 'add';
   readonly episodeTypes = [
-    'Leitura de Pergaminhos',
+    'Leitura de pergaminhos',
     'Rapidinhas do Careca',
     'Terras Distantes',
     'Especial',
@@ -701,6 +702,13 @@ export class ManageComponent implements OnInit, OnDestroy {
       suggestedTags: (episode as Episode & { suggestedTags?: SuggestedTagsSnapshot }).suggestedTags,
       summaryManuallyEdited: false,
     };
+    editor.instagramHashtagsManuallyEdited = (episode.instagramHashtags ?? []).length > 0;
+    if (editor.formModel.suggestedTags?.status === 'done') {
+      this.seedInstagramHashtags(editor, [
+        ...(editor.formModel.suggestedTags.candidates ?? []).map((candidate) => candidate.displayTag),
+        ...editor.formModel.suggestedTags.suggestions.map((suggestion) => suggestion.displayTag),
+      ]);
+    }
     editor.selectedMembers = [...(episode.authors ?? [])];
     editor.formModel.episodeNumber = episode.episodeNumber ?? episode.episodeId;
     this.setTrailerVideoState(editor, {
@@ -1621,7 +1629,19 @@ export class ManageComponent implements OnInit, OnDestroy {
   }
 
   getTrailerTitlePrefix(editor: EpisodeEditorState): string {
-    return `Trailer - DC ${editor.formModel.episodeNumber} - ${(editor.formModel.title ?? '').trim()}`;
+    return `Trailer - DC ${editor.formModel.episodeNumber} - ${this.getTrailerTitleSource(editor)}`;
+  }
+
+  private getTrailerTitleSource(editor: EpisodeEditorState): string {
+    let title = (editor.formModel.title ?? '').trim().replace(/\s*\|\s*DC\s+\d+\s*$/iu, '');
+    const episodeType = (editor.formModel.episodeType ?? '').trim();
+    if (episodeType && episodeType.toLocaleLowerCase() !== 'nenhum') {
+      const prefix = `${episodeType} - `;
+      if (title.toLocaleLowerCase().startsWith(prefix.toLocaleLowerCase())) {
+        title = title.slice(prefix.length).trim();
+      }
+    }
+    return title;
   }
 
   getTrailerTitleCodePointLength(editor: EpisodeEditorState): number {
@@ -2411,11 +2431,18 @@ export class ManageComponent implements OnInit, OnDestroy {
 
   addInstagramMention(editor: EpisodeEditorState): void { editor.formModel.instagramCaptionMentions.push('@'); }
   removeInstagramMention(editor: EpisodeEditorState, index: number): void { editor.formModel.instagramCaptionMentions.splice(index, 1); }
-  addInstagramHashtag(editor: EpisodeEditorState): void { editor.formModel.instagramHashtags.push('#'); }
-  removeInstagramHashtag(editor: EpisodeEditorState, index: number): void { editor.formModel.instagramHashtags.splice(index, 1); }
+  addInstagramHashtag(editor: EpisodeEditorState): void {
+    editor.instagramHashtagsManuallyEdited = true;
+    editor.formModel.instagramHashtags.push('#');
+  }
+  removeInstagramHashtag(editor: EpisodeEditorState, index: number): void {
+    editor.instagramHashtagsManuallyEdited = true;
+    editor.formModel.instagramHashtags.splice(index, 1);
+  }
   moveInstagramHashtag(editor: EpisodeEditorState, index: number, delta: number): void {
     const target = index + delta;
     if (target < 0 || target >= editor.formModel.instagramHashtags.length) return;
+    editor.instagramHashtagsManuallyEdited = true;
     const values = editor.formModel.instagramHashtags;
     [values[index], values[target]] = [values[target], values[index]];
   }
@@ -2635,6 +2662,10 @@ export class ManageComponent implements OnInit, OnDestroy {
     if (!snapshot || snapshot.status !== 'done') {
       return;
     }
+    this.seedInstagramHashtags(editor, [
+      ...(snapshot.candidates ?? []).map((candidate) => candidate.displayTag),
+      ...snapshot.suggestions.map((suggestion) => suggestion.displayTag),
+    ]);
     const seen = new Set<string>();
     const merged: string[] = [];
     for (const token of String(editor.formModel.hashtags ?? '').trim().split(/\s+/u).filter(Boolean)) {
@@ -2662,6 +2693,20 @@ export class ManageComponent implements OnInit, OnDestroy {
       }
     }
     editor.formModel.hashtags = merged.join(' ');
+  }
+
+  private seedInstagramHashtags(editor: EpisodeEditorState, candidates: string[]): void {
+    if (editor.instagramHashtagsManuallyEdited) {
+      return;
+    }
+    const source = candidates.length > 0
+      ? candidates
+      : this.serializeHashtags(editor.formModel.hashtags);
+    editor.formModel.instagramHashtags = this.normalizeInstagramHashtags(source).slice(0, 50);
+  }
+
+  onInstagramHashtagsChange(editor: EpisodeEditorState): void {
+    editor.instagramHashtagsManuallyEdited = true;
   }
 
   private clearEpisodeGenerationPolling(): void {

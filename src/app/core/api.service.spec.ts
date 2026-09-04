@@ -40,6 +40,7 @@ describe('ApiService title and hashtag authoring contract', () => {
       errorCategory: 'rate_limited',
       promptVersion: 'hashtags-v1',
       provider: 'groq',
+      candidates: [],
       suggestions: [],
     };
     let response: EpisodeGeneratedSummaryStatus | undefined;

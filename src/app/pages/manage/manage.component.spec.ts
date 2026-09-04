@@ -59,6 +59,11 @@ describe('ManageComponent summary flow', () => {
         { displayTag: '#fantasy', normalizedTag: '#fantasy', approximateCount: 9, retrievedAt: null, cacheStatus: 'miss', regionCode: 'BR', relevanceLanguage: 'pt', relevanceScore: 80 },
         { displayTag: '#podcast', normalizedTag: '#podcast', approximateCount: 8, retrievedAt: null, cacheStatus: 'miss', regionCode: 'BR', relevanceLanguage: 'pt', relevanceScore: 70 },
       ],
+      candidates: [
+        { displayTag: '#rpg', normalizedTag: '#rpg', relevant: true, relevanceScore: 90 },
+        { displayTag: '#fantasy', normalizedTag: '#fantasy', relevant: true, relevanceScore: 80 },
+        { displayTag: '#podcast', normalizedTag: '#podcast', relevant: true, relevanceScore: 70 },
+      ],
     };
     apiService.getEpisodeGeneratedSummaryStatus.and.returnValue(of({
       status: 'done', summaryFileName: null, summaryUpdatedAt: null, summaryStartedAt: null,
@@ -71,6 +76,22 @@ describe('ManageComponent summary flow', () => {
     expect(editor.formModel.hashtags).toBe('#manual #rpg #fantasy');
     expect(editor.formModel.tags).toEqual(['podcast', 'rpg']);
     expect(editor.formModel.summary).toBe('Generated');
+    expect(editor.formModel.instagramHashtags).toEqual(['#rpg', '#fantasy', '#podcast']);
+  });
+
+  it('keeps manual Instagram hashtag edits when suggestion polling returns', () => {
+    const editor = component.addEditorState;
+    editor.formModel.instagramHashtags = ['#manual'];
+    component.onInstagramHashtagsChange(editor);
+    const snapshot: SuggestedTagsSnapshot = {
+      status: 'done', version: 1, updatedAt: '', startedAt: null, finishedAt: null, retryAt: null,
+      errorCategory: null, promptVersion: null, provider: null,
+      candidates: [{ displayTag: '#suggested', normalizedTag: '#suggested', relevant: true, relevanceScore: 90 }],
+      suggestions: [],
+    };
+    (component as unknown as { mergeSuggestedTags: (targetEditor: typeof editor, value: SuggestedTagsSnapshot) => void })
+      .mergeSuggestedTags(editor, snapshot);
+    expect(editor.formModel.instagramHashtags).toEqual(['#manual']);
   });
 
   it('derives a Unicode-aware read-only title and rejects an assembled title over 100 code points', () => {
@@ -575,7 +596,7 @@ describe('ManageComponent summary flow', () => {
       suggestedTags: {
         status: 'processing', version: 1, updatedAt: '', startedAt: null,
         finishedAt: null, retryAt: null, errorCategory: null,
-        promptVersion: null, provider: null, suggestions: [],
+        promptVersion: null, provider: null, candidates: [], suggestions: [],
       },
     } as Episode & { suggestedTags?: SuggestedTagsSnapshot });
     expect(apiService.getEpisodeGeneratedSummaryStatus).toHaveBeenCalledOnceWith(42);
@@ -1440,6 +1461,16 @@ describe('Phase 8.1 RED form contracts FORM-01 through FORM-05', () => {
     expect(whisperSpy).toHaveBeenCalledWith(42);
     expect(editor.formModel.transcriptStatus).toBe('processing');
     expect(component.canTranscribeWithWhisper(editor)).toBeFalse();
+  });
+
+  it('shows the active Groq provider during automatic transcription fallback', () => {
+    const editor = component.addEditorState;
+    editor.formModel.transcriptStatus = 'processing';
+    editor.formModel.transcriptProvider = 'groq';
+    editor.formModel.transcriptProgress = 42;
+
+    expect(component.getTranscriptionStatus(editor)).toContain('Groq');
+    expect(component.getTranscriptionStatus(editor)).toContain('42%');
   });
 
   it('FORM-02/D-04 keeps trailer-audio mapping filename-only', () => {

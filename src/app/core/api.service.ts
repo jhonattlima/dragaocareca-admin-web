@@ -243,6 +243,12 @@ export interface SuggestedTagsSnapshot {
   errorCategory: SuggestedTagsErrorCategory | null;
   promptVersion: string | null;
   provider: string | null;
+  candidates: Array<{
+    displayTag: string;
+    normalizedTag: string;
+    relevant: boolean;
+    relevanceScore: number;
+  }>;
   suggestions: SuggestedTagRetrieval[];
 }
 
