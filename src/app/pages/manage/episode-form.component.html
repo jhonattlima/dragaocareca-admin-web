@@ -219,11 +219,15 @@
       <p class="section-hint">The Instagram caption can include literal @handles and up to 50 hashtags. Hashtags are filled from the relevance research and remain editable. Literal @handles are not verified account tags.</p>
       <div class="form-group mb-3">
         <label>Caption mentions (@handles in caption text)</label>
-        <div class="input-group mb-2" *ngFor="let mention of editor.formModel.instagramCaptionMentions; let i = index">
-          <input class="form-control" [(ngModel)]="editor.formModel.instagramCaptionMentions[i]" [attr.aria-label]="'Caption mention ' + (i + 1)" placeholder="@handle">
-          <button class="btn btn-outline-danger" type="button" (click)="controller.removeInstagramMention(editor, i)" aria-label="Remove caption mention">Remove</button>
-        </div>
-        <button class="btn btn-sm btn-outline-primary" type="button" (click)="controller.addInstagramMention(editor)">Add caption mention</button>
+        <input
+          [attr.id]="'instagram-caption-mentions-' + (editor.editingEpisodeId || 'new')"
+          class="form-control"
+          type="text"
+          [ngModel]="editor.formModel.instagramCaptionMentions.join(' ')"
+          (ngModelChange)="controller.onInstagramCaptionMentionsTextChange(editor, $event)"
+          aria-label="Caption mentions"
+          placeholder="@handle1 @handle2">
+        <small class="form-text text-muted">Write the @handles separated by spaces. They are included literally in the caption.</small>
       </div>
       <div class="form-group mb-3">
         <label [attr.for]="'instagram-hashtags-' + (editor.editingEpisodeId || 'new')">Instagram Hashtags</label>
