@@ -2709,6 +2709,11 @@ export class ManageComponent implements OnInit, OnDestroy {
     editor.instagramHashtagsManuallyEdited = true;
   }
 
+  onInstagramHashtagsTextChange(editor: EpisodeEditorState, value: string): void {
+    editor.instagramHashtagsManuallyEdited = true;
+    editor.formModel.instagramHashtags = String(value ?? '').trim().split(/\s+/u).filter(Boolean);
+  }
+
   private clearEpisodeGenerationPolling(): void {
     this.clearTranscriptionStatusPolling();
     this.clearSummaryStatusPolling();

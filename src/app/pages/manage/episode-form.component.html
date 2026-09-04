@@ -216,9 +216,9 @@
 
     <div class="section-block social-posting-section" aria-labelledby="social-posting-title">
       <h2 id="social-posting-title" class="manage-section-title">Instagram social posting</h2>
-      <p class="section-hint">Caption mentions and up to 50 hashtags are saved as ordered text. Hashtags are filled from the relevance research and remain editable. A caption mention is not a verified account tag.</p>
+      <p class="section-hint">The Instagram caption can include literal @handles and up to 50 hashtags. Hashtags are filled from the relevance research and remain editable. Literal @handles are not verified account tags.</p>
       <div class="form-group mb-3">
-        <label>Caption mentions</label>
+        <label>Caption mentions (@handles in caption text)</label>
         <div class="input-group mb-2" *ngFor="let mention of editor.formModel.instagramCaptionMentions; let i = index">
           <input class="form-control" [(ngModel)]="editor.formModel.instagramCaptionMentions[i]" [attr.aria-label]="'Caption mention ' + (i + 1)" placeholder="@handle">
           <button class="btn btn-outline-danger" type="button" (click)="controller.removeInstagramMention(editor, i)" aria-label="Remove caption mention">Remove</button>
@@ -226,14 +226,16 @@
         <button class="btn btn-sm btn-outline-primary" type="button" (click)="controller.addInstagramMention(editor)">Add caption mention</button>
       </div>
       <div class="form-group mb-3">
-        <label>Instagram hashtags</label>
-        <div class="input-group mb-2" *ngFor="let hashtag of editor.formModel.instagramHashtags; let i = index">
-          <input class="form-control" [(ngModel)]="editor.formModel.instagramHashtags[i]" (ngModelChange)="controller.onInstagramHashtagsChange(editor)" [attr.aria-label]="'Instagram hashtag ' + (i + 1)" placeholder="#hashtag">
-          <button class="btn btn-outline-secondary" type="button" (click)="controller.moveInstagramHashtag(editor, i, -1)" [disabled]="i === 0">Up</button>
-          <button class="btn btn-outline-secondary" type="button" (click)="controller.moveInstagramHashtag(editor, i, 1)" [disabled]="i === editor.formModel.instagramHashtags.length - 1">Down</button>
-          <button class="btn btn-outline-danger" type="button" (click)="controller.removeInstagramHashtag(editor, i)" aria-label="Remove Instagram hashtag">Remove</button>
-        </div>
-        <button class="btn btn-sm btn-outline-primary" type="button" (click)="controller.addInstagramHashtag(editor)" [disabled]="editor.formModel.instagramHashtags.length >= 50">Add Instagram hashtag</button>
+        <label [attr.for]="'instagram-hashtags-' + (editor.editingEpisodeId || 'new')">Instagram Hashtags</label>
+        <input
+          [attr.id]="'instagram-hashtags-' + (editor.editingEpisodeId || 'new')"
+          class="form-control"
+          type="text"
+          [ngModel]="editor.formModel.instagramHashtags.join(' ')"
+          (ngModelChange)="controller.onInstagramHashtagsTextChange(editor, $event)"
+          aria-label="Instagram hashtags"
+          placeholder="#hashtag1 #hashtag2 #hashtag3">
+        <small class="form-text text-muted">Automatically filled with the relevance hashtags used by the YouTube field; edit the text before saving.</small>
       </div>
       <div class="caption-preview" aria-live="polite">
         <strong>Caption preview</strong>
