@@ -577,9 +577,17 @@ export class MetricsComponent implements OnInit {
   get siteUsageSeries(): SiteUsageDailyPoint[] {
     return (this.siteUsage?.series ?? []).map((point) => ({
       ...point,
-      label: new Date(`${point.date}T00:00:00`).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' }),
-      tooltipLabel: new Date(`${point.date}T00:00:00`).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' }),
+      label: this.formatSiteUsageDate(point.date, false),
+      tooltipLabel: this.formatSiteUsageDate(point.date, true),
     }));
+  }
+
+  private formatSiteUsageDate(value: string, withYear: boolean): string {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return value;
+    }
+    return parsed.toLocaleDateString('pt-BR', withYear ? { day: 'numeric', month: 'short', year: 'numeric' } : { day: 'numeric', month: 'short' });
   }
 
   get siteUsageChartLabel(): string {
