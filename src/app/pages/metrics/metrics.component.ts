@@ -575,11 +575,32 @@ export class MetricsComponent implements OnInit {
   }
 
   get siteUsageSeries(): SiteUsageDailyPoint[] {
-    return (this.siteUsage?.series ?? []).map((point) => ({
-      ...point,
-      label: this.formatSiteUsageDate(point.date, false),
-      tooltipLabel: this.formatSiteUsageDate(point.date, true),
-    }));
+    if (!this.siteUsage) return [];
+    const raw = new Map(this.siteUsage.series.map((point) => [this.siteUsageDateKey(point.date), point]));
+    const start = new Date(this.siteUsage.range.currentStart);
+    const end = new Date(this.siteUsage.range.currentEnd);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return this.siteUsage.series.map((point) => this.toSiteUsageDailyPoint(point.date, point.pageviews, point.sessions));
+    }
+    const series: SiteUsageDailyPoint[] = [];
+    const cursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
+    const lastDay = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()));
+    while (cursor <= lastDay && series.length <= 366) {
+      const date = cursor.toISOString().slice(0, 10);
+      const point = raw.get(date);
+      series.push(this.toSiteUsageDailyPoint(date, point?.pageviews ?? 0, point?.sessions ?? 0));
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+    return series;
+  }
+
+  private siteUsageDateKey(value: string): string {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? value.slice(0, 10) : parsed.toISOString().slice(0, 10);
+  }
+
+  private toSiteUsageDailyPoint(date: string, pageviews: number, sessions: number): SiteUsageDailyPoint {
+    return { date, pageviews, sessions, label: this.formatSiteUsageDate(date, false), tooltipLabel: this.formatSiteUsageDate(date, true) };
   }
 
   private formatSiteUsageDate(value: string, withYear: boolean): string {

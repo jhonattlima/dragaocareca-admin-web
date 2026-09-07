@@ -298,7 +298,7 @@
           <defs><linearGradient id="siteUsageChartFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#2f8f83" stop-opacity="0.3" /><stop offset="100%" stop-color="#2f8f83" stop-opacity="0.04" /></linearGradient></defs>
           <path [attr.d]="siteUsageChartAreaPath" class="metrics-chart-area" fill="url(#siteUsageChartFill)" vector-effect="non-scaling-stroke"></path>
           <path [attr.d]="siteUsageChartPath" class="metrics-chart-line" style="stroke:#2f8f83" vector-effect="non-scaling-stroke"></path>
-          <g *ngFor="let point of siteUsageChartPoints"><circle [attr.cx]="point.x" [attr.cy]="point.y" r="2.2" class="metrics-chart-node" [class.is-active]="point.date === hoveredSiteUsagePoint?.date" (mouseenter)="hoveredSiteUsagePoint = point" tabindex="0"></circle></g>
+          <g *ngFor="let point of siteUsageChartPoints"><circle [attr.cx]="point.x" [attr.cy]="point.y" r="2.8" class="metrics-chart-node" [class.is-active]="point.date === hoveredSiteUsagePoint?.date" [style.opacity]="siteUsageChartPoints.length === 1 ? 1 : null" [style.fill]="siteUsageChartPoints.length === 1 ? '#2f8f83' : null" (mouseenter)="hoveredSiteUsagePoint = point" tabindex="0"></circle></g>
         </svg>
         <div class="metrics-chart-axis"><span *ngFor="let label of siteUsageChartLabels" [style.left.%]="label.x">{{ label.label }}</span></div>
       </div>
