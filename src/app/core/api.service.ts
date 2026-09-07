@@ -178,6 +178,31 @@ export interface YouTubeMetricsSnapshot {
   debug?: Record<string, unknown>;
 }
 
+export interface SiteUsageMetricsErrorResponse {
+  source: 'umami';
+  fetchedAt: string;
+  ok: false;
+  code: 'disabled' | 'missing_credentials' | 'fetch_failed';
+  message: string;
+  details?: string;
+}
+
+export interface SiteUsageMetricsSnapshot {
+  source: 'umami';
+  fetchedAt: string;
+  ok: true;
+  range: { requestedDays: number; currentStart: string; currentEnd: string; previousStart: string; previousEnd: string; timeZone: string };
+  totals: { pageviews: number; visitors: number; sessions: number; bounces: number; totalTimeSeconds: number };
+  comparison: { pageviews: number; visitors: number; sessions: number; bounces: number; totalTimeSeconds: number };
+  series: Array<{ date: string; pageviews: number; sessions: number }>;
+  topPages: Array<{ label: string; value: number }>;
+  referrers: Array<{ label: string; value: number }>;
+  campaigns: Array<{ label: string; value: number }>;
+  browsers: Array<{ label: string; value: number }>;
+  operatingSystems: Array<{ label: string; value: number }>;
+  devices: Array<{ label: string; value: number }>;
+}
+
 export interface EpisodeTranscriptionStatus {
   status: 'idle' | 'pending' | 'processing' | 'done' | 'error';
   transcriptFileName: string | null;
@@ -620,6 +645,11 @@ export class ApiService {
     return this.http.get<YouTubeMetricsSnapshot | YouTubeMetricsErrorResponse>(`${environment.apiBaseUrl}/metrics/youtube`, {
       params,
     });
+  }
+
+  getSiteUsageMetrics(days = 30): Observable<SiteUsageMetricsSnapshot | SiteUsageMetricsErrorResponse> {
+    const params = new HttpParams().set('days', String(days));
+    return this.http.get<SiteUsageMetricsSnapshot | SiteUsageMetricsErrorResponse>(`${environment.apiBaseUrl}/metrics/site-usage`, { params });
   }
 
   getHealth(): Observable<HealthStatus> {

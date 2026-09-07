@@ -242,3 +242,29 @@
     </section>
   </section>
 </div>
+
+<div class="container section-box metrics-shell mb-3 site-usage-metrics">
+  <div class="metrics-header">
+    <div>
+      <p class="metrics-kicker">Demanda do site</p>
+      <h2 class="mt-0 mb-1">Uso do site</h2>
+      <p class="metrics-subtitle">Métricas agregadas e privadas, coletadas pelo domínio principal.</p>
+    </div>
+  </div>
+
+  <p class="section-hint mb-3" *ngIf="siteUsageLoading">Carregando métricas do site...</p>
+  <p class="error mb-3" *ngIf="siteUsageError">{{ siteUsageError.message }}</p>
+  <ng-container *ngIf="siteUsage as usage">
+    <div class="metrics-top-grid">
+      <div class="metrics-stat-card"><div class="metrics-stat-label">Visitantes estimados</div><div class="metrics-stat-value">{{ formatSiteMetric(usage.totals.visitors) }}</div><div class="metrics-stat-delta">{{ siteMetricChange(usage.totals.visitors, usage.comparison.visitors) }}</div></div>
+      <div class="metrics-stat-card"><div class="metrics-stat-label">Visualizações</div><div class="metrics-stat-value">{{ formatSiteMetric(usage.totals.pageviews) }}</div><div class="metrics-stat-delta">{{ siteMetricChange(usage.totals.pageviews, usage.comparison.pageviews) }}</div></div>
+      <div class="metrics-stat-card"><div class="metrics-stat-label">Sessões</div><div class="metrics-stat-value">{{ formatSiteMetric(usage.totals.sessions) }}</div><div class="metrics-stat-delta">{{ siteMetricChange(usage.totals.sessions, usage.comparison.sessions) }}</div></div>
+    </div>
+    <div class="metrics-top-grid" style="margin-top:1rem;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));">
+      <div><h3>Conteúdo mais acessado</h3><p *ngFor="let row of usage.topPages">{{ row.label }} <strong>({{ formatSiteMetric(row.value) }})</strong></p></div>
+      <div><h3>Origem dos acessos</h3><p *ngFor="let row of usage.referrers">{{ row.label }} <strong>({{ formatSiteMetric(row.value) }})</strong></p></div>
+      <div><h3>Dispositivos</h3><p *ngFor="let row of usage.devices">{{ row.label }} <strong>({{ formatSiteMetric(row.value) }})</strong></p></div>
+    </div>
+    <p class="section-hint">Visitantes são estimativas agregadas com foco em privacidade, não identificadores de pessoas. Período: últimos {{ usage.range.requestedDays }} dias.</p>
+  </ng-container>
+</div>

@@ -5,6 +5,8 @@ import {
   SpotifyMetricsSnapshot,
   YouTubeMetricsErrorResponse,
   YouTubeMetricsSnapshot,
+  SiteUsageMetricsErrorResponse,
+  SiteUsageMetricsSnapshot,
 } from '../../core/api.service';
 
 type MetricsSection = {
@@ -97,6 +99,9 @@ export class MetricsComponent implements OnInit {
   metricsError?: SpotifyMetricsErrorResponse;
   youtubeMetrics?: YouTubeMetricsSnapshot;
   youtubeMetricsError?: YouTubeMetricsErrorResponse;
+  siteUsage?: SiteUsageMetricsSnapshot;
+  siteUsageError?: SiteUsageMetricsErrorResponse;
+  siteUsageLoading = true;
   loading = true;
   youtubeLoading = true;
   sections: MetricsSection[] = [];
@@ -149,6 +154,38 @@ export class MetricsComponent implements OnInit {
   ngOnInit(): void {
     this.loadRangeSnapshots();
     this.loadYouTubeRangeSnapshots();
+    this.loadSiteUsageMetrics();
+  }
+
+  private loadSiteUsageMetrics(): void {
+    this.siteUsageLoading = true;
+    this.apiService.getSiteUsageMetrics(30).subscribe({
+      next: (response) => {
+        this.siteUsageLoading = false;
+        if ('ok' in response && response.ok === false) {
+          this.siteUsage = undefined;
+          this.siteUsageError = response;
+          return;
+        }
+        this.siteUsageError = undefined;
+        this.siteUsage = response;
+      },
+      error: () => {
+        this.siteUsageLoading = false;
+        this.siteUsage = undefined;
+        this.siteUsageError = { source: 'umami', fetchedAt: new Date().toISOString(), ok: false, code: 'fetch_failed', message: 'Não foi possível carregar as métricas do site.' };
+      },
+    });
+  }
+
+  formatSiteMetric(value: number | null | undefined): string {
+    return value === null || value === undefined ? '—' : new Intl.NumberFormat('pt-BR').format(value);
+  }
+
+  siteMetricChange(current: number, previous: number): string {
+    if (!previous) return 'Sem comparação anterior';
+    const delta = ((current - previous) / previous) * 100;
+    return `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}% vs. período anterior`;
   }
 
   @HostListener('document:click', ['$event'])
