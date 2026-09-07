@@ -77,6 +77,12 @@ type SiteUsageDailyPoint = {
   sessions: number;
 };
 
+type SiteUsageChartPoint = SiteUsageDailyPoint & {
+  x: number;
+  y: number;
+  index: number;
+};
+
 type PresetRangeKey = '90' | '30' | '7';
 type RangeKey = PresetRangeKey;
 
@@ -113,7 +119,12 @@ export class MetricsComponent implements OnInit {
   siteUsageRangeMenuOpen = false;
   siteUsageSelectedRangeKey: RangeKey = '30';
   selectedSiteUsageChartMetric: 'pageviews' | 'sessions' = 'pageviews';
-  hoveredSiteUsagePoint?: SiteUsageDailyPoint;
+  hoveredSiteUsagePoint?: SiteUsageChartPoint;
+  siteUsageSeries: SiteUsageDailyPoint[] = [];
+  siteUsageChartPoints: SiteUsageChartPoint[] = [];
+  siteUsageChartPath = '';
+  siteUsageChartAreaPath = '';
+  siteUsageChartLabels: Array<{ label: string; x: number }> = [];
   loading = true;
   youtubeLoading = true;
   sections: MetricsSection[] = [];
@@ -183,11 +194,13 @@ export class MetricsComponent implements OnInit {
         }
         this.siteUsageError = undefined;
         this.siteUsage = response;
+        this.rebuildSiteUsageChart();
       },
       error: () => {
         if (requestId !== this.siteUsageRequestSeq) return;
         this.siteUsageLoading = false;
         this.siteUsage = undefined;
+        this.resetSiteUsageChart();
         this.siteUsageError = { source: 'umami', fetchedAt: new Date().toISOString(), ok: false, code: 'fetch_failed', message: 'Não foi possível carregar as métricas do site.' };
       },
     });
@@ -365,6 +378,7 @@ export class MetricsComponent implements OnInit {
   selectSiteUsageChartMetric(metric: 'pageviews' | 'sessions'): void {
     this.selectedSiteUsageChartMetric = metric;
     this.hoveredSiteUsagePoint = undefined;
+    this.rebuildSiteUsageChart();
   }
 
   selectRange(key: RangeKey): void {
@@ -452,24 +466,30 @@ export class MetricsComponent implements OnInit {
 
   handleSiteUsageChartPointerMove(event: MouseEvent): void {
     const svg = event.currentTarget as SVGSVGElement | null;
-    if (!svg || !this.siteUsageChartPoints.length) return;
+    const points = this.siteUsageChartPoints;
+    if (!svg || !points.length) return;
     const bounds = svg.getBoundingClientRect();
     const offsetX = ((event.clientX - bounds.left) / bounds.width) * 100;
     const clampedX = Math.max(0, Math.min(100, offsetX));
-    let closest = this.siteUsageChartPoints[0];
+    let closest = points[0];
     let closestDistance = Math.abs(closest.x - clampedX);
-    for (const point of this.siteUsageChartPoints.slice(1)) {
+    for (let index = 1; index < points.length; index += 1) {
+      const point = points[index];
       const distance = Math.abs(point.x - clampedX);
       if (distance < closestDistance) {
         closest = point;
         closestDistance = distance;
       }
     }
-    this.hoveredSiteUsagePoint = this.siteUsageSeries[closest.index];
+    if (this.hoveredSiteUsagePoint?.date !== closest.date) {
+      this.hoveredSiteUsagePoint = closest;
+    }
   }
 
   clearSiteUsageHover(): void {
-    this.hoveredSiteUsagePoint = undefined;
+    if (this.hoveredSiteUsagePoint) {
+      this.hoveredSiteUsagePoint = undefined;
+    }
   }
 
   handleChartPointerMove(event: MouseEvent): void {
@@ -574,24 +594,64 @@ export class MetricsComponent implements OnInit {
     return this.rangeOptions.find((option) => option.key === this.siteUsageSelectedRangeKey)?.label ?? 'Últimos 30 dias';
   }
 
-  get siteUsageSeries(): SiteUsageDailyPoint[] {
-    if (!this.siteUsage) return [];
-    const raw = new Map(this.siteUsage.series.map((point) => [this.siteUsageDateKey(point.date), point]));
-    const start = new Date(this.siteUsage.range.currentStart);
-    const end = new Date(this.siteUsage.range.currentEnd);
+  private rebuildSiteUsageChart(): void {
+    const snapshot = this.siteUsage;
+    if (!snapshot) {
+      this.resetSiteUsageChart();
+      return;
+    }
+
+    const raw = new Map(snapshot.series.map((point) => [this.siteUsageDateKey(point.date), point]));
+    const start = new Date(snapshot.range.currentStart);
+    const end = new Date(snapshot.range.currentEnd);
+    let series: SiteUsageDailyPoint[];
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-      return this.siteUsage.series.map((point) => this.toSiteUsageDailyPoint(point.date, point.pageviews, point.sessions));
+      series = snapshot.series.map((point) => this.toSiteUsageDailyPoint(point.date, point.pageviews, point.sessions));
+    } else {
+      series = [];
+      const cursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
+      const lastDay = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()));
+      while (cursor <= lastDay && series.length <= 366) {
+        const date = cursor.toISOString().slice(0, 10);
+        const point = raw.get(date);
+        series.push(this.toSiteUsageDailyPoint(date, point?.pageviews ?? 0, point?.sessions ?? 0));
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
+      }
     }
-    const series: SiteUsageDailyPoint[] = [];
-    const cursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
-    const lastDay = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()));
-    while (cursor <= lastDay && series.length <= 366) {
-      const date = cursor.toISOString().slice(0, 10);
-      const point = raw.get(date);
-      series.push(this.toSiteUsageDailyPoint(date, point?.pageviews ?? 0, point?.sessions ?? 0));
-      cursor.setUTCDate(cursor.getUTCDate() + 1);
+
+    const values = series.map((point) => this.siteUsageChartValue(point));
+    const max = Math.max(...values, 1);
+    this.siteUsageSeries = series;
+    this.siteUsageChartPoints = series.map((point, index) => ({
+      ...point,
+      index,
+      x: series.length === 1 ? 50 : 6 + index * (88 / (series.length - 1)),
+      y: Math.max(14, 92 - Math.round((this.siteUsageChartValue(point) / max) * 72)),
+    }));
+    this.siteUsageChartPath = this.buildSiteUsageSeriesPath(this.siteUsageChartPoints);
+    this.siteUsageChartAreaPath = this.siteUsageChartPoints.length < 2 ? '' : `${this.siteUsageChartPath} L 94 110 L 6 110 Z`;
+    const interval = this.siteUsageChartPoints.length >= 30 ? 5 : 1;
+    this.siteUsageChartLabels = this.siteUsageChartPoints
+      .filter((point) => point.index === this.siteUsageChartPoints.length - 1 || point.index % interval === 0)
+      .map((point) => ({ label: point.label, x: point.x }));
+  }
+
+  private resetSiteUsageChart(): void {
+    this.hoveredSiteUsagePoint = undefined;
+    this.siteUsageSeries = [];
+    this.siteUsageChartPoints = [];
+    this.siteUsageChartPath = '';
+    this.siteUsageChartAreaPath = '';
+    this.siteUsageChartLabels = [];
+  }
+
+  private buildSiteUsageSeriesPath(points: SiteUsageChartPoint[]): string {
+    if (!points.length) {
+      return '';
     }
-    return series;
+
+    const [first, ...rest] = points;
+    return rest.reduce((path, point) => `${path} L ${point.x} ${point.y}`, `M ${first.x} ${first.y}`);
   }
 
   private siteUsageDateKey(value: string): string {
@@ -604,11 +664,14 @@ export class MetricsComponent implements OnInit {
   }
 
   private formatSiteUsageDate(value: string, withYear: boolean): string {
-    const parsed = new Date(value);
+    const day = value.slice(0, 10);
+    const parsed = new Date(`${day}T12:00:00Z`);
     if (Number.isNaN(parsed.getTime())) {
       return value;
     }
-    return parsed.toLocaleDateString('pt-BR', withYear ? { day: 'numeric', month: 'short', year: 'numeric' } : { day: 'numeric', month: 'short' });
+    return parsed.toLocaleDateString('pt-BR', withYear
+      ? { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }
+      : { day: 'numeric', month: 'short', timeZone: 'UTC' });
   }
 
   get siteUsageChartLabel(): string {
@@ -619,44 +682,20 @@ export class MetricsComponent implements OnInit {
     return this.selectedSiteUsageChartMetric === 'sessions' ? 'Sessões' : 'Visualizações';
   }
 
-  get siteUsageChartPoints(): Array<SiteUsageDailyPoint & { x: number; y: number; index: number }> {
-    const series = this.siteUsageSeries;
-    const values = series.map((point) => this.siteUsageChartValue(point));
-    const max = Math.max(...values, 1);
-    return series.map((point, index) => ({
-      ...point,
-      index,
-      x: series.length === 1 ? 50 : 6 + index * (88 / (series.length - 1)),
-      y: Math.max(14, 92 - Math.round((this.siteUsageChartValue(point) / max) * 72)),
-    }));
-  }
-
-  get siteUsageChartPath(): string {
-    return this.buildSeriesPath(this.siteUsageChartPoints.map((point) => ({ ...point, plays: this.siteUsageChartValue(point) })));
-  }
-
-  get siteUsageChartAreaPath(): string {
-    return this.siteUsageChartPoints.length < 2 ? '' : `${this.siteUsageChartPath} L 94 110 L 6 110 Z`;
-  }
-
   get siteUsageChartTooltipPosition(): { x: number; y: number } | null {
-    const point = this.siteUsageChartPoints.find((item) => item.date === this.hoveredSiteUsagePoint?.date);
-    return point ? { x: point.x, y: point.y } : null;
+    return this.hoveredSiteUsagePoint ? { x: this.hoveredSiteUsagePoint.x, y: this.hoveredSiteUsagePoint.y } : null;
   }
 
   get siteUsageChartTooltipValue(): number {
     return this.hoveredSiteUsagePoint ? this.siteUsageChartValue(this.hoveredSiteUsagePoint) : 0;
   }
 
-  get siteUsageChartLabels(): Array<{ label: string; x: number }> {
-    const points = this.siteUsageChartPoints;
-    if (!points.length) return [];
-    const interval = points.length >= 30 ? 5 : 1;
-    return points.filter((point) => point.index === points.length - 1 || point.index % interval === 0).map((point) => ({ label: point.label, x: point.x }));
-  }
-
   private siteUsageChartValue(point: SiteUsageDailyPoint): number {
     return this.selectedSiteUsageChartMetric === 'sessions' ? point.sessions : point.pageviews;
+  }
+
+  trackBySiteUsageKey(_: number, item: { date?: string; label?: string }): string {
+    return item.date ?? item.label ?? '';
   }
 
   get selectedPlaysSummary(): RangeSummary {
