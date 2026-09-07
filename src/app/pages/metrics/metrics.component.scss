@@ -51,8 +51,7 @@
   height: 0.75rem;
 }
 
-.metrics-range-menu,
-.metrics-custom-panel {
+.metrics-range-menu {
   position: absolute;
   right: 0;
   top: calc(100% + 0.45rem);
@@ -140,7 +139,7 @@
 }
 
 .metrics-chart-panel {
-  margin-bottom: 1.05rem;
+  margin-bottom: 1rem;
 }
 
 .metrics-chart-wrap {
@@ -202,6 +201,10 @@
 
 .metrics-chart-node {
   opacity: 0;
+}
+
+.site-usage-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .metrics-chart-axis {
