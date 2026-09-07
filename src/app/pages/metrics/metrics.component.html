@@ -250,20 +250,63 @@
       <h2 class="mt-0 mb-1">Uso do site</h2>
       <p class="metrics-subtitle">Métricas agregadas e privadas, coletadas pelo domínio principal.</p>
     </div>
+    <div class="metrics-header-actions" *ngIf="siteUsage">
+      <div class="metrics-range-dropdown metrics-site-usage-range-dropdown" [class.is-open]="siteUsageRangeMenuOpen">
+        <button type="button" class="metrics-range-trigger" (click)="toggleSiteUsageRangeMenu($event)">
+          <span>{{ siteUsageSelectedRangeLabel }}</span>
+          <svg viewBox="0 0 12 12" class="metrics-range-caret" aria-hidden="true">
+            <path d="M2.25 4.5L6 8.25L9.75 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </button>
+        <div class="metrics-range-menu" *ngIf="siteUsageRangeMenuOpen">
+          <button *ngFor="let option of rangeOptions" type="button" class="metrics-range-option" [class.is-active]="siteUsageSelectedRangeKey === option.key" (click)="selectSiteUsageRange(option.key)">
+            <span>{{ option.label }}</span><small>{{ option.subtitle }}</small>
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <p class="section-hint mb-3" *ngIf="siteUsageLoading">Carregando métricas do site...</p>
   <p class="error mb-3" *ngIf="siteUsageError">{{ siteUsageError.message }}</p>
   <ng-container *ngIf="siteUsage as usage">
     <div class="metrics-top-grid">
-      <div class="metrics-stat-card"><div class="metrics-stat-label">Visitantes estimados</div><div class="metrics-stat-value">{{ formatSiteMetric(usage.totals.visitors) }}</div><div class="metrics-stat-delta">{{ siteMetricChange(usage.totals.visitors, usage.comparison.visitors) }}</div></div>
-      <div class="metrics-stat-card"><div class="metrics-stat-label">Visualizações</div><div class="metrics-stat-value">{{ formatSiteMetric(usage.totals.pageviews) }}</div><div class="metrics-stat-delta">{{ siteMetricChange(usage.totals.pageviews, usage.comparison.pageviews) }}</div></div>
-      <div class="metrics-stat-card"><div class="metrics-stat-label">Sessões</div><div class="metrics-stat-value">{{ formatSiteMetric(usage.totals.sessions) }}</div><div class="metrics-stat-delta">{{ siteMetricChange(usage.totals.sessions, usage.comparison.sessions) }}</div></div>
+      <div class="metrics-stat-card">
+        <div class="metrics-stat-label">Visitantes estimados <span class="metrics-info" title="Estimativa de pessoas únicas no período. O Umami não identifica nem exibe visitantes individualmente." aria-label="Estimativa de pessoas únicas no período. O Umami não identifica nem exibe visitantes individualmente.">i</span></div>
+        <div class="metrics-stat-value">{{ formatSiteMetric(usage.totals.visitors) }}</div><div class="metrics-stat-delta">{{ siteMetricChange(usage.totals.visitors, usage.comparison.visitors) }}</div>
+      </div>
+      <div class="metrics-stat-card" [class.is-selected]="selectedSiteUsageChartMetric === 'pageviews'" role="button" tabindex="0" (click)="selectSiteUsageChartMetric('pageviews')">
+        <div class="metrics-stat-label">Visualizações <span class="metrics-info" title="Quantidade total de páginas ou telas carregadas no período." aria-label="Quantidade total de páginas ou telas carregadas no período.">i</span></div>
+        <div class="metrics-stat-value">{{ formatSiteMetric(usage.totals.pageviews) }}</div><div class="metrics-stat-delta">{{ siteMetricChange(usage.totals.pageviews, usage.comparison.pageviews) }}</div>
+      </div>
+      <div class="metrics-stat-card" [class.is-selected]="selectedSiteUsageChartMetric === 'sessions'" role="button" tabindex="0" (click)="selectSiteUsageChartMetric('sessions')">
+        <div class="metrics-stat-label">Sessões <span class="metrics-info" title="Visitas agrupadas por atividade contínua; uma pessoa pode gerar mais de uma sessão." aria-label="Visitas agrupadas por atividade contínua; uma pessoa pode gerar mais de uma sessão.">i</span></div>
+        <div class="metrics-stat-value">{{ formatSiteMetric(usage.totals.sessions) }}</div><div class="metrics-stat-delta">{{ siteMetricChange(usage.totals.sessions, usage.comparison.sessions) }}</div>
+      </div>
     </div>
+    <section class="metrics-chart-panel" *ngIf="siteUsageSeries.length">
+      <div class="metrics-chart-wrap">
+        <div class="metrics-chart-overlay">
+          <div class="metrics-chart-guide" *ngIf="siteUsageChartTooltipPosition as tooltip" [style.left.%]="tooltip.x"></div>
+          <div class="metrics-chart-tooltip" *ngIf="hoveredSiteUsagePoint && siteUsageChartTooltipPosition as tooltip" [style.left.%]="tooltip.x" [style.top.%]="tooltip.y">
+            <span class="metrics-chart-tooltip-date">{{ hoveredSiteUsagePoint.tooltipLabel }}</span>
+            <div class="metrics-chart-tooltip-row"><span>{{ siteUsageChartMetricLabel }}</span><strong>{{ formatSiteMetric(siteUsageChartTooltipValue) }}</strong></div>
+          </div>
+          <div *ngIf="siteUsageChartTooltipPosition as tooltip" class="metrics-chart-marker" [style.left.%]="tooltip.x" [style.top.%]="(tooltip.y / 120) * 100"><span class="metrics-chart-marker-core" style="background:#2f8f83"></span></div>
+        </div>
+        <svg viewBox="0 0 100 120" preserveAspectRatio="none" class="metrics-chart-svg" role="img" [attr.aria-label]="siteUsageChartLabel" (mousemove)="handleSiteUsageChartPointerMove($event)" (mouseleave)="clearSiteUsageHover()">
+          <defs><linearGradient id="siteUsageChartFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#2f8f83" stop-opacity="0.3" /><stop offset="100%" stop-color="#2f8f83" stop-opacity="0.04" /></linearGradient></defs>
+          <path [attr.d]="siteUsageChartAreaPath" class="metrics-chart-area" fill="url(#siteUsageChartFill)" vector-effect="non-scaling-stroke"></path>
+          <path [attr.d]="siteUsageChartPath" class="metrics-chart-line" style="stroke:#2f8f83" vector-effect="non-scaling-stroke"></path>
+          <g *ngFor="let point of siteUsageChartPoints"><circle [attr.cx]="point.x" [attr.cy]="point.y" r="2.2" class="metrics-chart-node" [class.is-active]="point.date === hoveredSiteUsagePoint?.date" (mouseenter)="hoveredSiteUsagePoint = point" tabindex="0"></circle></g>
+        </svg>
+        <div class="metrics-chart-axis"><span *ngFor="let label of siteUsageChartLabels" [style.left.%]="label.x">{{ label.label }}</span></div>
+      </div>
+    </section>
     <div class="metrics-top-grid" style="margin-top:1rem;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));">
-      <div><h3>Conteúdo mais acessado</h3><p *ngFor="let row of usage.topPages">{{ row.label }} <strong>({{ formatSiteMetric(row.value) }})</strong></p></div>
-      <div><h3>Origem dos acessos</h3><p *ngFor="let row of usage.referrers">{{ row.label }} <strong>({{ formatSiteMetric(row.value) }})</strong></p></div>
-      <div><h3>Dispositivos</h3><p *ngFor="let row of usage.devices">{{ row.label }} <strong>({{ formatSiteMetric(row.value) }})</strong></p></div>
+      <div><h3>Conteúdo mais acessado <span class="metrics-info" title="Páginas ou rotas públicas com mais visualizações no período." aria-label="Páginas ou rotas públicas com mais visualizações no período.">i</span></h3><p *ngFor="let row of usage.topPages">{{ row.label }} <strong>({{ formatSiteMetric(row.value) }})</strong></p></div>
+      <div><h3>Origem dos acessos <span class="metrics-info" title="Sites ou campanhas que encaminharam visitantes para o domínio." aria-label="Sites ou campanhas que encaminharam visitantes para o domínio.">i</span></h3><p *ngFor="let row of usage.referrers">{{ row.label }} <strong>({{ formatSiteMetric(row.value) }})</strong></p></div>
+      <div><h3>Dispositivos <span class="metrics-info" title="Tipo de dispositivo usado para acessar o site, em dados agregados." aria-label="Tipo de dispositivo usado para acessar o site, em dados agregados.">i</span></h3><p *ngFor="let row of usage.devices">{{ row.label }} <strong>({{ formatSiteMetric(row.value) }})</strong></p></div>
     </div>
     <p class="section-hint">Visitantes são estimativas agregadas com foco em privacidade, não identificadores de pessoas. Período: últimos {{ usage.range.requestedDays }} dias.</p>
   </ng-container>

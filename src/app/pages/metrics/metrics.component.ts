@@ -69,6 +69,14 @@ type YouTubeChartPoint = YouTubeDailyPoint & {
   y: number;
 };
 
+type SiteUsageDailyPoint = {
+  date: string;
+  label: string;
+  tooltipLabel: string;
+  pageviews: number;
+  sessions: number;
+};
+
 type PresetRangeKey = '90' | '30' | '7';
 type RangeKey = PresetRangeKey;
 
@@ -102,6 +110,10 @@ export class MetricsComponent implements OnInit {
   siteUsage?: SiteUsageMetricsSnapshot;
   siteUsageError?: SiteUsageMetricsErrorResponse;
   siteUsageLoading = true;
+  siteUsageRangeMenuOpen = false;
+  siteUsageSelectedRangeKey: RangeKey = '30';
+  selectedSiteUsageChartMetric: 'pageviews' | 'sessions' = 'pageviews';
+  hoveredSiteUsagePoint?: SiteUsageDailyPoint;
   loading = true;
   youtubeLoading = true;
   sections: MetricsSection[] = [];
@@ -157,10 +169,12 @@ export class MetricsComponent implements OnInit {
     this.loadSiteUsageMetrics();
   }
 
-  private loadSiteUsageMetrics(): void {
+  private loadSiteUsageMetrics(days = Number(this.siteUsageSelectedRangeKey)): void {
+    const requestId = ++this.siteUsageRequestSeq;
     this.siteUsageLoading = true;
-    this.apiService.getSiteUsageMetrics(30).subscribe({
+    this.apiService.getSiteUsageMetrics(days).subscribe({
       next: (response) => {
+        if (requestId !== this.siteUsageRequestSeq) return;
         this.siteUsageLoading = false;
         if ('ok' in response && response.ok === false) {
           this.siteUsage = undefined;
@@ -171,6 +185,7 @@ export class MetricsComponent implements OnInit {
         this.siteUsage = response;
       },
       error: () => {
+        if (requestId !== this.siteUsageRequestSeq) return;
         this.siteUsageLoading = false;
         this.siteUsage = undefined;
         this.siteUsageError = { source: 'umami', fetchedAt: new Date().toISOString(), ok: false, code: 'fetch_failed', message: 'Não foi possível carregar as métricas do site.' };
@@ -188,6 +203,8 @@ export class MetricsComponent implements OnInit {
     return `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}% vs. período anterior`;
   }
 
+  private siteUsageRequestSeq = 0;
+
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: MouseEvent): void {
     const target = event.target as HTMLElement | null;
@@ -196,6 +213,9 @@ export class MetricsComponent implements OnInit {
     }
     if (!target?.closest('.metrics-youtube-range-dropdown')) {
       this.youtubeRangeMenuOpen = false;
+    }
+    if (!target?.closest('.metrics-site-usage-range-dropdown')) {
+      this.siteUsageRangeMenuOpen = false;
     }
   }
 
@@ -330,6 +350,23 @@ export class MetricsComponent implements OnInit {
     this.youtubeRangeMenuOpen = !this.youtubeRangeMenuOpen;
   }
 
+  toggleSiteUsageRangeMenu(event?: MouseEvent): void {
+    event?.stopPropagation();
+    this.siteUsageRangeMenuOpen = !this.siteUsageRangeMenuOpen;
+  }
+
+  selectSiteUsageRange(key: RangeKey): void {
+    this.siteUsageSelectedRangeKey = key;
+    this.siteUsageRangeMenuOpen = false;
+    this.hoveredSiteUsagePoint = undefined;
+    this.loadSiteUsageMetrics(Number(key));
+  }
+
+  selectSiteUsageChartMetric(metric: 'pageviews' | 'sessions'): void {
+    this.selectedSiteUsageChartMetric = metric;
+    this.hoveredSiteUsagePoint = undefined;
+  }
+
   selectRange(key: RangeKey): void {
     this.selectedRangeKey = key;
     this.rangeMenuOpen = false;
@@ -411,6 +448,28 @@ export class MetricsComponent implements OnInit {
 
   clearYouTubeHover(): void {
     this.hoveredYouTubePoint = undefined;
+  }
+
+  handleSiteUsageChartPointerMove(event: MouseEvent): void {
+    const svg = event.currentTarget as SVGSVGElement | null;
+    if (!svg || !this.siteUsageChartPoints.length) return;
+    const bounds = svg.getBoundingClientRect();
+    const offsetX = ((event.clientX - bounds.left) / bounds.width) * 100;
+    const clampedX = Math.max(0, Math.min(100, offsetX));
+    let closest = this.siteUsageChartPoints[0];
+    let closestDistance = Math.abs(closest.x - clampedX);
+    for (const point of this.siteUsageChartPoints.slice(1)) {
+      const distance = Math.abs(point.x - clampedX);
+      if (distance < closestDistance) {
+        closest = point;
+        closestDistance = distance;
+      }
+    }
+    this.hoveredSiteUsagePoint = this.siteUsageSeries[closest.index];
+  }
+
+  clearSiteUsageHover(): void {
+    this.hoveredSiteUsagePoint = undefined;
   }
 
   handleChartPointerMove(event: MouseEvent): void {
@@ -509,6 +568,66 @@ export class MetricsComponent implements OnInit {
       default:
         return 'Últimos 30 dias';
     }
+  }
+
+  get siteUsageSelectedRangeLabel(): string {
+    return this.rangeOptions.find((option) => option.key === this.siteUsageSelectedRangeKey)?.label ?? 'Últimos 30 dias';
+  }
+
+  get siteUsageSeries(): SiteUsageDailyPoint[] {
+    return (this.siteUsage?.series ?? []).map((point) => ({
+      ...point,
+      label: new Date(`${point.date}T00:00:00`).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' }),
+      tooltipLabel: new Date(`${point.date}T00:00:00`).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' }),
+    }));
+  }
+
+  get siteUsageChartLabel(): string {
+    return `${this.selectedSiteUsageChartMetric === 'sessions' ? 'Sessões' : 'Visualizações'} do site por dia`;
+  }
+
+  get siteUsageChartMetricLabel(): string {
+    return this.selectedSiteUsageChartMetric === 'sessions' ? 'Sessões' : 'Visualizações';
+  }
+
+  get siteUsageChartPoints(): Array<SiteUsageDailyPoint & { x: number; y: number; index: number }> {
+    const series = this.siteUsageSeries;
+    const values = series.map((point) => this.siteUsageChartValue(point));
+    const max = Math.max(...values, 1);
+    return series.map((point, index) => ({
+      ...point,
+      index,
+      x: series.length === 1 ? 50 : 6 + index * (88 / (series.length - 1)),
+      y: Math.max(14, 92 - Math.round((this.siteUsageChartValue(point) / max) * 72)),
+    }));
+  }
+
+  get siteUsageChartPath(): string {
+    return this.buildSeriesPath(this.siteUsageChartPoints.map((point) => ({ ...point, plays: this.siteUsageChartValue(point) })));
+  }
+
+  get siteUsageChartAreaPath(): string {
+    return this.siteUsageChartPoints.length < 2 ? '' : `${this.siteUsageChartPath} L 94 110 L 6 110 Z`;
+  }
+
+  get siteUsageChartTooltipPosition(): { x: number; y: number } | null {
+    const point = this.siteUsageChartPoints.find((item) => item.date === this.hoveredSiteUsagePoint?.date);
+    return point ? { x: point.x, y: point.y } : null;
+  }
+
+  get siteUsageChartTooltipValue(): number {
+    return this.hoveredSiteUsagePoint ? this.siteUsageChartValue(this.hoveredSiteUsagePoint) : 0;
+  }
+
+  get siteUsageChartLabels(): Array<{ label: string; x: number }> {
+    const points = this.siteUsageChartPoints;
+    if (!points.length) return [];
+    const interval = points.length >= 30 ? 5 : 1;
+    return points.filter((point) => point.index === points.length - 1 || point.index % interval === 0).map((point) => ({ label: point.label, x: point.x }));
+  }
+
+  private siteUsageChartValue(point: SiteUsageDailyPoint): number {
+    return this.selectedSiteUsageChartMetric === 'sessions' ? point.sessions : point.pageviews;
   }
 
   get selectedPlaysSummary(): RangeSummary {
