@@ -1,5 +1,17 @@
 # Docs Index - Dragao Careca Admin Web
 
+## Production deployment
+
+The live admin web is one of the four application checkouts managed by
+`dragaocareca-deploy`. The VPS checkout is
+`/srv/dragaocareca/apps/dragaocareca-admin-web`, pinned to an immutable commit
+in `/srv/dragaocareca/deploy/secrets/repositories.env`. Do not deploy by
+copying a local `dist/` directory or editing the VPS checkout manually.
+
+After pushing a change, update the admin-web SHA through the deployment
+runbook. The Compose build recreates only the requested service and keeps the
+Caddy edge and application data outside this repository.
+
 This file remains the compressed compatibility index that older prompts and the repo’s AGENTS instructions can read first.
 
 Canonical docs now follow the GSD-default flat `docs/*.md` layout:
