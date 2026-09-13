@@ -22,12 +22,18 @@ const trailerCandidateStatus = (episodeId = 42, overrides: Partial<TrailerCandid
   resolution: '1280×1280',
   profileId: 'dc-square-waveform',
   profileRevision: 2,
-  sourceFingerprint: `fingerprint-${episodeId}`,
+  sourceFingerprint: 'a'.repeat(64),
   isCurrent: true,
   outputValid: true,
   createdAt: '2026-09-12T10:00:00.000Z',
   updatedAt: '2026-09-12T10:01:00.000Z',
   readyAt: '2026-09-12T10:01:00.000Z',
+  transcriptStatus: 'done',
+  transcriptProgress: 100,
+  transcriptText: 'Automatic trailer transcript',
+  transcriptProvider: 'fake-transcription',
+  transcriptErrorCategory: null,
+  transcriptErrorMessage: null,
   ...overrides,
 });
 
@@ -63,12 +69,23 @@ describe('ManageComponent summary flow', () => {
       'getCurrentTrailerCandidate',
       'getTrailerCandidate',
       'createTrailerCandidatePreviewGrant',
+      'generateTrailerCandidate',
+      'retryTrailerCandidate',
+      'startYoutubeTrailerJob',
     ]);
     apiService.listEpisodes.and.returnValue(of([]));
     apiService.listStructuredEntryCatalog.and.returnValue(of({ guests: [], musicCredits: [] }));
     apiService.getCurrentTrailerCandidate.and.returnValue(throwError(() => ({ status: 404 })));
     apiService.getTrailerCandidate.and.returnValue(of(trailerCandidateStatus()));
     apiService.createTrailerCandidatePreviewGrant.and.callFake((episodeId, candidateId) => of(trailerCandidatePreviewGrant(episodeId, candidateId)));
+    apiService.generateTrailerCandidate.and.callFake((episodeId, transcriptText, expectedSourceFingerprint) => of(trailerCandidateStatus(episodeId, {
+      candidateId: 'generated-candidate', status: 'pending', progress: 0, durationSeconds: null, resolution: null,
+      transcriptText, sourceFingerprint: expectedSourceFingerprint,
+    })));
+    apiService.retryTrailerCandidate.and.callFake((episodeId, candidateId) => of(trailerCandidateStatus(episodeId, {
+      candidateId, status: 'pending', progress: 0, durationSeconds: null, resolution: null,
+    })));
+    apiService.startYoutubeTrailerJob.and.returnValue(of({} as YoutubeTrailerJobSnapshot));
     apiService.transcribeEpisodeWithWhisper = jasmine.createSpy('transcribeEpisodeWithWhisper');
     apiService.downloadEpisodeArtifact.and.returnValue(of(new HttpResponse<Blob>({
       body: new Blob(['zip'], { type: 'application/zip' }),
@@ -681,13 +698,70 @@ describe('ManageComponent summary flow', () => {
     expect(apiService.getCurrentTrailerCandidate).toHaveBeenCalledOnceWith(42);
     expect(candidate?.candidateId).toBe('candidate-42');
     expect(candidate?.version).toBe(3);
-    expect(candidate?.sourceFingerprint).toBe('fingerprint-42');
+    expect(candidate?.sourceFingerprint).toBe('a'.repeat(64));
     expect(candidate?.profileId).toBe('dc-square-waveform');
     expect(candidate?.durationSeconds).toBe(98);
     expect(candidate?.resolution).toBe('1280×1280');
     expect(candidate?.errorMessage).toContain('Check the source files');
     expect(component.getTrailerCandidateStatusLabel(candidate!)).toBe('Trailer ready for review');
     expect(component.formatTrailerCandidateDuration(candidate?.durationSeconds ?? null)).toBe('1:38');
+  });
+
+  it('keeps edited transcript text when a delayed candidate poll returns generated text', fakeAsync(() => {
+    apiService.getCurrentTrailerCandidate.and.returnValue(of(trailerCandidateStatus(42, {
+      status: 'processing', progress: 20, transcriptText: null, transcriptStatus: 'processing', transcriptProgress: 35,
+    })));
+    apiService.getTrailerCandidate.and.returnValue(of(trailerCandidateStatus(42, {
+      status: 'processing', progress: 70, transcriptText: 'Late provider transcript', transcriptStatus: 'done', transcriptProgress: 100,
+    })));
+    component.startEdit({
+      episodeId: 42, title: 'Episode 42', summary: 'Summary', pubDate: '2026-07-24T00:00:00.000Z', explicit: 'no',
+    });
+
+    component.onTrailerTranscriptChange(component.episodesEditorState, 'Operator edits remain');
+    tick(2500);
+
+    expect(component.getTrailerTranscript(component.episodesEditorState)).toBe('Operator edits remain');
+    component.ngOnDestroy();
+    discardPeriodicTasks();
+  }));
+
+  it('generates from the latest transcript and current source fingerprint', () => {
+    const editor = component.episodesEditorState;
+    const candidate = trailerCandidateStatus(42, { status: 'processing', progress: 20, transcriptText: 'Old generated text' });
+    apiService.getCurrentTrailerCandidate.and.returnValue(of(candidate));
+    component.startEdit({
+      episodeId: 42, title: 'Episode 42', summary: 'Summary', pubDate: '2026-07-24T00:00:00.000Z', explicit: 'no',
+    });
+    component.onTrailerTranscriptChange(editor, 'Exact operator transcript\nwith edits');
+
+    component.generateTrailer(editor);
+
+    expect(apiService.generateTrailerCandidate).toHaveBeenCalledOnceWith(42, 'Exact operator transcript\nwith edits', 'a'.repeat(64));
+    expect(component.getTrailerTranscript(editor)).toBe('Exact operator transcript\nwith edits');
+    expect(component.getTrailerCandidate(editor)?.candidateId).toBe('generated-candidate');
+  });
+
+  it('retries only the exact API-marked retryable candidate', () => {
+    const editor = component.episodesEditorState;
+    const retryable = trailerCandidateStatus(42, { status: 'retryable', progress: 42, errorCategory: 'render_failed' });
+    apiService.getCurrentTrailerCandidate.and.returnValue(of(retryable));
+    component.startEdit({
+      episodeId: 42, title: 'Episode 42', summary: 'Summary', pubDate: '2026-07-24T00:00:00.000Z', explicit: 'no',
+    });
+    expect(component.canRetryTrailerGeneration(editor)).toBeTrue();
+
+    component.retryTrailerGeneration(editor);
+
+    expect(apiService.retryTrailerCandidate).toHaveBeenCalledOnceWith(42, retryable.candidateId, retryable.sourceFingerprint);
+    expect(component.getTrailerCandidate(editor)?.candidateId).toBe(retryable.candidateId);
+    apiService.getCurrentTrailerCandidate.and.returnValue(of(trailerCandidateStatus(42, { status: 'processing' })));
+    component.startEdit({
+      episodeId: 42, title: 'Episode 42', summary: 'Summary', pubDate: '2026-07-24T00:00:00.000Z', explicit: 'no',
+    });
+    expect(component.canRetryTrailerGeneration(editor)).toBeFalse();
+    expect(apiService.retryTrailerCandidate).toHaveBeenCalledTimes(1);
+    component.ngOnDestroy();
   });
 
   it('uses only the exact API-issued grant for the current ready candidate and clears it when currentness changes', () => {
@@ -1220,6 +1294,7 @@ describe('ManageComponent YouTube lifecycle RED scaffold', () => {
     editor.formModel.title = 'Title';
     editor.formModel.summary = 'Summary';
     editor.formModel.hashtags = '#rpg';
+    (component as any).setTrailerVideoState(editor, { status: 'finalized', episodeId: 42 });
     apiService.startYoutubeTrailerJob.and.returnValue(of(snapshot()));
     apiService.getYoutubeTrailerJobStatus.and.returnValue(of(snapshot({ status: 'transferring', progress: { confirmedBytes: 25, totalBytes: 100, processingPartsProcessed: null, processingPartsTotal: null, processingTimeLeftMs: null } })));
 
@@ -1238,6 +1313,7 @@ describe('ManageComponent YouTube lifecycle RED scaffold', () => {
     editor.formModel.trailerVideoFileName = 'episodes/42/trailer.mp4';
     editor.formModel.title = 'Title';
     editor.formModel.summary = 'Summary';
+    (component as any).setTrailerVideoState(editor, { status: 'finalized', episodeId: 42 });
     const pending = new Subject<YoutubeTrailerJobSnapshot>();
     apiService.startYoutubeTrailerJob.and.returnValue(pending.asObservable());
     apiService.getYoutubeTrailerJobStatus.and.returnValue(of(snapshot()));
@@ -1270,6 +1346,7 @@ describe('ManageComponent YouTube lifecycle RED scaffold', () => {
     const editor = component.addEditorState;
     editor.formModel.episodeId = 42;
     editor.formModel.trailerVideoFileName = 'episodes/42/trailer.mp4';
+    (component as any).setTrailerVideoState(editor, { status: 'finalized', episodeId: 42 });
     const queued = snapshot();
     const cancelled = snapshot({ status: 'cancelled', cancellation: { requestedAt: '2026-08-11T00:00:00Z', cancelledAt: '2026-08-11T00:01:00Z', boundary: 'local-cancelled' } });
     apiService.startYoutubeTrailerJob.and.returnValue(of(queued));
@@ -1416,7 +1493,7 @@ describe('EpisodeFormComponent trailer video card', () => {
       'listEpisodes', 'reserveEpisodeDraft', 'uploadEpisodeTrailerVideo', 'createEpisode',
       'getEpisodeTranscriptionStatus', 'getEpisodeGeneratedSummaryStatus', 'startEpisodeArtifactJob',
       'getEpisodeArtifactJobStatus', 'downloadEpisodeArtifact', 'getCurrentTrailerCandidate',
-      'createTrailerCandidatePreviewGrant',
+      'createTrailerCandidatePreviewGrant', 'generateTrailerCandidate', 'retryTrailerCandidate', 'startYoutubeTrailerJob',
     ]);
     apiService.listEpisodes.and.returnValue(of([]));
     apiService.getCurrentTrailerCandidate.and.returnValue(throwError(() => ({ status: 404 })));
@@ -1432,7 +1509,7 @@ describe('EpisodeFormComponent trailer video card', () => {
     fixture.detectChanges();
   });
 
-  it('renders a dedicated MP4 card with lifecycle status and no provider controls', () => {
+  it('renders the exact three trailer actions in order and keeps YouTube disabled until an MP4 is staged', () => {
     const cards = Array.from(fixture.nativeElement.querySelectorAll('.upload-card')) as HTMLElement[];
     const card = cards.find((candidate) => Boolean(candidate.textContent?.includes('Trailer video')));
     expect(card).not.toBeNull();
@@ -1442,8 +1519,38 @@ describe('EpisodeFormComponent trailer video card', () => {
     const renderedCard = card as HTMLElement;
     expect(renderedCard.textContent).toContain('.mp4');
     expect(renderedCard.querySelector('input')?.getAttribute('accept')).toBe('.mp4,video/mp4');
-    expect(renderedCard.textContent).not.toContain('YouTube');
+    const actionButtons = Array.from(renderedCard.querySelectorAll('.trailer-actions button')) as HTMLButtonElement[];
+    expect(actionButtons.map((button) => button.textContent?.trim())).toEqual([
+      'Choose or replace MP4', 'Generate trailer', 'Upload to YouTube',
+    ]);
+    expect(actionButtons[2].disabled).toBeTrue();
+    expect(renderedCard.querySelector('label[for^="trailer-transcript-"]')?.textContent?.trim()).toBe('Trailer transcript');
+    expect(renderedCard.textContent).toContain('Upload to YouTube becomes available after an MP4 is staged.');
     expect(renderedCard.textContent).not.toContain('Publish');
+  });
+
+  it('stages a manual MP4 without starting YouTube and starts transfer only on button action', () => {
+    const editor = manage.addEditorState;
+    editor.formModel.episodeId = 42;
+    editor.formModel.title = 'Episode title';
+    editor.formModel.episodeNumber = 42;
+    apiService.reserveEpisodeDraft.and.returnValue(of({ draftId: 'draft-manual-42', episodeId: 42, state: 'reserved', expiresAt: '2026-09-14T00:00:00Z' }));
+    apiService.uploadEpisodeTrailerVideo.and.returnValue(of(new HttpResponse<EpisodeTrailerVideoUploadResponse>({
+      body: { episodeId: 42, draftId: 'draft-manual-42', state: 'staged', trailerVideoFileName: null, message: 'Trailer video staged.' },
+    })));
+    apiService.startYoutubeTrailerJob.and.returnValue(new Subject<YoutubeTrailerJobSnapshot>().asObservable());
+    fixture.componentInstance.editor = editor;
+
+    manage.uploadMedia(editor, 'trailerVideo', new File(['mp4'], 'manual.mp4', { type: 'video/mp4' }));
+    fixture.detectChanges();
+
+    expect(manage.getTrailerVideoStatus(editor)).toBe('staged');
+    expect(apiService.startYoutubeTrailerJob).not.toHaveBeenCalled();
+    const youtubeButton = fixture.nativeElement.querySelector('[data-upload-to-youtube]') as HTMLButtonElement;
+    expect(youtubeButton.disabled).toBeFalse();
+    youtubeButton.click();
+    expect(apiService.startYoutubeTrailerJob).toHaveBeenCalledOnceWith(42, 'Trailer - DC 42 - Episode title', '', 'draft-manual-42', []);
+    manage.ngOnDestroy();
   });
 
   it('renders the exact private API URL in native controls and direct link with accessible candidate context', () => {

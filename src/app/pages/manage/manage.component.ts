@@ -80,6 +80,9 @@ interface YoutubeTrailerJobState {
 
 interface TrailerCandidateReviewState {
   candidate: TrailerCandidateReviewStatus | null;
+  transcriptText: string;
+  transcriptDirty: boolean;
+  generationInFlight: boolean;
   episodeId: number | null;
   generation: number;
   sourceFingerprint: string | null;
@@ -775,6 +778,108 @@ export class ManageComponent implements OnInit, OnDestroy {
     return this.getTrailerCandidateReviewState(editor).candidate;
   }
 
+  getTrailerTranscript(editor: EpisodeEditorState): string {
+    return this.getTrailerCandidateReviewState(editor).transcriptText;
+  }
+
+  onTrailerTranscriptChange(editor: EpisodeEditorState, value: string): void {
+    const state = this.getTrailerCandidateReviewState(editor);
+    state.transcriptText = value;
+    state.transcriptDirty = true;
+  }
+
+  getTrailerTranscriptStatusLabel(candidate: TrailerCandidateReviewStatus): string {
+    switch (candidate.transcriptStatus) {
+      case 'pending': return 'Trailer transcript queued';
+      case 'processing': return `Transcribing trailer audio… ${candidate.transcriptProgress}%`;
+      case 'done': return 'Trailer transcript ready to edit';
+      case 'error': return candidate.transcriptErrorMessage || 'Trailer transcription failed; you can edit the transcript or generate a waveform-only trailer.';
+      default: return 'Waiting for trailer audio and cover';
+    }
+  }
+
+  canGenerateTrailer(editor: EpisodeEditorState): boolean {
+    const state = this.getTrailerCandidateReviewState(editor);
+    const candidate = state.candidate;
+    return Boolean(candidate?.isCurrent && candidate.sourceFingerprint)
+      && !state.loading && !state.generationInFlight
+      && !this.isSaveTransactionInFlight(editor);
+  }
+
+  generateTrailer(editor: EpisodeEditorState): void {
+    const state = this.getTrailerCandidateReviewState(editor);
+    const candidate = state.candidate;
+    const episodeId = editor.formModel.episodeId;
+    if (!this.canGenerateTrailer(editor) || !candidate || !episodeId) return;
+    const generation = state.generation;
+    const sourceFingerprint = candidate.sourceFingerprint;
+    const transcriptText = state.transcriptText;
+    if (state.timer !== null) window.clearTimeout(state.timer);
+    state.timer = null;
+    state.subscription?.unsubscribe();
+    state.subscription = null;
+    state.generationInFlight = true;
+    state.error = '';
+    state.subscription = this.apiService.generateTrailerCandidate(episodeId, transcriptText, sourceFingerprint).subscribe({
+      next: (created) => {
+        if (!this.isActiveTrailerCandidateRequest(editor, episodeId, generation)
+          || created.sourceFingerprint !== sourceFingerprint) return;
+        state.subscription = null;
+        state.generationInFlight = false;
+        state.candidate = created;
+        state.sourceFingerprint = created.sourceFingerprint;
+        state.transcriptText = transcriptText;
+        state.transcriptDirty = false;
+        this.syncTrailerCandidatePreview(editor, created, generation);
+        this.scheduleTrailerCandidatePoll(editor, created, generation);
+      },
+      error: () => {
+        if (!this.isActiveTrailerCandidateRequest(editor, episodeId, generation)) return;
+        state.subscription = null;
+        state.generationInFlight = false;
+        state.error = 'Trailer generation could not be queued. Refresh the current trailer inputs and try again.';
+      },
+    });
+  }
+
+  canRetryTrailerGeneration(editor: EpisodeEditorState): boolean {
+    const candidate = this.getTrailerCandidate(editor);
+    return Boolean(candidate?.isCurrent && candidate.status === 'retryable' && !this.getTrailerCandidateReviewState(editor).generationInFlight);
+  }
+
+  getTrailerVideoGenerationLabel(editor: EpisodeEditorState): string {
+    return this.getTrailerCandidateReviewState(editor).generationInFlight ? 'Generating trailer…' : 'Generate trailer';
+  }
+
+  retryTrailerGeneration(editor: EpisodeEditorState): void {
+    const state = this.getTrailerCandidateReviewState(editor);
+    const candidate = state.candidate;
+    if (!this.canRetryTrailerGeneration(editor) || !candidate) return;
+    const generation = state.generation;
+    if (state.timer !== null) window.clearTimeout(state.timer);
+    state.timer = null;
+    state.subscription?.unsubscribe();
+    state.subscription = null;
+    state.generationInFlight = true;
+    state.error = '';
+    state.subscription = this.apiService.retryTrailerCandidate(candidate.episodeId, candidate.candidateId, candidate.sourceFingerprint).subscribe({
+      next: (retried) => {
+        if (!this.isActiveTrailerCandidateRequest(editor, candidate.episodeId, generation)
+          || retried.candidateId !== candidate.candidateId || retried.sourceFingerprint !== candidate.sourceFingerprint) return;
+        state.subscription = null;
+        state.generationInFlight = false;
+        state.candidate = retried;
+        this.scheduleTrailerCandidatePoll(editor, retried, generation);
+      },
+      error: () => {
+        if (!this.isActiveTrailerCandidateRequest(editor, candidate.episodeId, generation)) return;
+        state.subscription = null;
+        state.generationInFlight = false;
+        state.error = 'Trailer generation retry was rejected. Refresh the candidate status and try again.';
+      },
+    });
+  }
+
   isTrailerCandidateLoading(editor: EpisodeEditorState): boolean {
     return this.getTrailerCandidateReviewState(editor).loading;
   }
@@ -826,6 +931,9 @@ export class ManageComponent implements OnInit, OnDestroy {
     if (!state) {
       state = {
         candidate: null,
+        transcriptText: '',
+        transcriptDirty: false,
+        generationInFlight: false,
         episodeId: null,
         generation: 0,
         sourceFingerprint: null,
@@ -856,6 +964,9 @@ export class ManageComponent implements OnInit, OnDestroy {
     this.clearTrailerCandidatePreview(state);
     Object.assign(state, {
       candidate: null,
+      transcriptText: '',
+      transcriptDirty: false,
+      generationInFlight: false,
       episodeId: null,
       generation,
       sourceFingerprint: null,
@@ -882,13 +993,14 @@ export class ManageComponent implements OnInit, OnDestroy {
   }
 
   private loadCurrentTrailerCandidate(editor: EpisodeEditorState): void {
-    const episodeId = editor.editingEpisodeId;
-    if (!episodeId || editor.formModel.episodeId !== episodeId) return;
+    const episodeId = editor.formModel.episodeId;
+    if (!this.apiService.getCurrentTrailerCandidate
+      || !Number.isInteger(episodeId) || (episodeId ?? 0) <= 0 || !this.isTrailerCandidateEditorActive(editor, episodeId!)) return;
     const state = this.getTrailerCandidateReviewState(editor);
     this.clearTrailerCandidatePreview(state);
     const generation = (this.trailerCandidateReviewGenerations.get(editor) ?? 0) + 1;
     this.trailerCandidateReviewGenerations.set(editor, generation);
-    Object.assign(state, { candidate: null, episodeId, generation, sourceFingerprint: null, loading: true, error: '', timer: null, subscription: null });
+    Object.assign(state, { candidate: null, episodeId, generation, sourceFingerprint: null, loading: true, error: '', timer: null, subscription: null, generationInFlight: false });
     state.subscription = this.apiService.getCurrentTrailerCandidate(episodeId).subscribe({
       next: (candidate) => {
         if (!this.isActiveTrailerCandidateRequest(editor, episodeId, generation)) return;
@@ -896,6 +1008,7 @@ export class ManageComponent implements OnInit, OnDestroy {
         state.loading = false;
         state.candidate = candidate;
         state.sourceFingerprint = candidate.sourceFingerprint;
+        if (!state.transcriptDirty && typeof candidate.transcriptText === 'string') state.transcriptText = candidate.transcriptText;
         this.syncTrailerCandidatePreview(editor, candidate, generation);
         this.scheduleTrailerCandidatePoll(editor, candidate, generation);
       },
@@ -915,12 +1028,16 @@ export class ManageComponent implements OnInit, OnDestroy {
 
   private isActiveTrailerCandidateRequest(editor: EpisodeEditorState, episodeId: number, generation: number): boolean {
     const state = this.getTrailerCandidateReviewState(editor);
-    return editor === this.episodesEditorState
-      && editor.editingEpisodeId === episodeId
+    return this.isTrailerCandidateEditorActive(editor, episodeId)
       && editor.formModel.episodeId === episodeId
       && state.episodeId === episodeId
       && state.generation === generation
       && this.trailerCandidateReviewGenerations.get(editor) === generation;
+  }
+
+  private isTrailerCandidateEditorActive(editor: EpisodeEditorState, episodeId: number): boolean {
+    return (editor === this.addEditorState && editor.editingEpisodeId === null)
+      || (editor === this.episodesEditorState && editor.editingEpisodeId === episodeId);
   }
 
   private scheduleTrailerCandidatePoll(editor: EpisodeEditorState, candidate: TrailerCandidateReviewStatus, generation: number): void {
@@ -938,6 +1055,7 @@ export class ManageComponent implements OnInit, OnDestroy {
             || updated.sourceFingerprint !== candidate.sourceFingerprint) return;
           state.subscription = null;
           state.candidate = updated;
+          if (!state.transcriptDirty && typeof updated.transcriptText === 'string') state.transcriptText = updated.transcriptText;
           this.syncTrailerCandidatePreview(editor, updated, generation);
           this.scheduleTrailerCandidatePoll(editor, updated, generation);
         },
@@ -1036,6 +1154,9 @@ export class ManageComponent implements OnInit, OnDestroy {
     this.trailerCandidateReviewGenerations.set(editor, generation);
     Object.assign(state, {
       candidate: null,
+      transcriptText: '',
+      transcriptDirty: false,
+      generationInFlight: false,
       sourceFingerprint: null,
       generation,
       loading: false,
@@ -1056,6 +1177,7 @@ export class ManageComponent implements OnInit, OnDestroy {
     return Number.isInteger(editor.formModel.episodeId)
       && (editor.formModel.episodeId ?? 0) > 0
       && Boolean(this.getYoutubeSourceIdentity(editor))
+      && ['staged', 'finalized'].includes(this.getTrailerVideoState(editor).status)
       && !this.getTrailerTitleValidationError(editor)
       && state.startInFlight === null
       && !(snapshot && !['failed', 'cancelled', 'obsolete'].includes(snapshot.status));
@@ -3351,14 +3473,6 @@ export class ManageComponent implements OnInit, OnDestroy {
         if (response.state === 'staged') {
           state.status = 'staged';
           state.progress = 100;
-          // The draft has a server-issued episode identity, so the private
-          // YouTube transfer can begin before Save promotes local media.
-          if (response.youtubeJob) {
-            this.storeYoutubeTrailerJob(editor, response.youtubeJob, this.getYoutubeSourceIdentity(editor));
-            this.ensureYoutubeTrailerJobPolling(editor, response.youtubeJob.jobId);
-          } else {
-            this.startYoutubeTrailerJob(editor);
-          }
         } else {
           state.status = 'finalized';
           state.progress = 100;
@@ -3419,7 +3533,7 @@ export class ManageComponent implements OnInit, OnDestroy {
     }
 
     const changesTrailerSource = kind === 'trailer' || kind === 'cover';
-    if (changesTrailerSource && editor.editingEpisodeId === episodeId) {
+    if (changesTrailerSource) {
       this.invalidateTrailerCandidateForSourceChange(editor);
     }
 
@@ -3503,7 +3617,7 @@ export class ManageComponent implements OnInit, OnDestroy {
               this.successMessage = episode.message;
             }
             this.uploadStates[kind] = { ...this.uploadStates[kind], progress: 100 };
-            if (changesTrailerSource && editor.editingEpisodeId === episodeId) {
+            if (changesTrailerSource) {
               this.loadCurrentTrailerCandidate(editor);
             }
           }
@@ -3511,7 +3625,7 @@ export class ManageComponent implements OnInit, OnDestroy {
         error: (error) => {
           this.errorMessage = error?.error?.message ?? `Could not upload ${definition.label.toLowerCase()}.`;
           this.uploadStates[kind] = { ...this.uploadStates[kind], progress: 0 };
-          if (changesTrailerSource && editor.editingEpisodeId === episodeId) {
+          if (changesTrailerSource) {
             this.loadCurrentTrailerCandidate(editor);
           }
         },

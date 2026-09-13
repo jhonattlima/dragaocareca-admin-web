@@ -403,6 +403,12 @@ export interface TrailerCandidateReviewStatus {
   createdAt: string;
   updatedAt: string;
   readyAt: string | null;
+  transcriptStatus: 'not_started' | 'pending' | 'processing' | 'done' | 'error';
+  transcriptProgress: number;
+  transcriptText: string | null;
+  transcriptProvider: string | null;
+  transcriptErrorCategory: string | null;
+  transcriptErrorMessage: string | null;
 }
 
 export interface TrailerCandidatePreviewGrant {
@@ -538,6 +544,20 @@ export class ApiService {
 
   getTrailerCandidate(episodeId: number, candidateId: string): Observable<TrailerCandidateReviewStatus> {
     return this.http.get<TrailerCandidateReviewStatus>(`${environment.apiBaseUrl}/episodes/${episodeId}/trailer-candidates/${encodeURIComponent(candidateId)}`);
+  }
+
+  generateTrailerCandidate(episodeId: number, transcriptText: string, expectedSourceFingerprint: string): Observable<TrailerCandidateReviewStatus> {
+    return this.http.post<TrailerCandidateReviewStatus>(
+      `${environment.apiBaseUrl}/episodes/${episodeId}/trailer-candidates`,
+      { transcriptText, expectedSourceFingerprint },
+    );
+  }
+
+  retryTrailerCandidate(episodeId: number, candidateId: string, expectedSourceFingerprint: string): Observable<TrailerCandidateReviewStatus> {
+    return this.http.post<TrailerCandidateReviewStatus>(
+      `${environment.apiBaseUrl}/episodes/${episodeId}/trailer-candidates/${encodeURIComponent(candidateId)}/retry`,
+      { expectedSourceFingerprint },
+    );
   }
 
   createTrailerCandidatePreviewGrant(episodeId: number, candidateId: string): Observable<TrailerCandidatePreviewGrant> {
