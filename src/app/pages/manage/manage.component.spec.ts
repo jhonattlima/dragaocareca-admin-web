@@ -1729,6 +1729,7 @@ describe('EpisodeFormComponent trailer video card', () => {
     fixture.detectChanges();
     expect(card.querySelector('[data-destination="instagram_reel"]')?.textContent).toContain(longId);
     expect(card.querySelector('[data-destination="telegram"]')?.textContent).toContain('pending');
+    expect(card.querySelector('[data-destination="telegram"]')?.textContent).toContain('existing early-access link and topic stay unchanged');
     expect(card.querySelector('[data-destination="youtube"]')?.textContent).toContain('separate manual action');
     expect(card.textContent).toContain('Waiting for the separate Upload to YouTube action.');
     expect(card.querySelectorAll('.trailer-status-action').length).toBe(1);

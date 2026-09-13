@@ -210,6 +210,7 @@
                     <h4 class="small fw-semibold mb-1">Telegram</h4>
                     <p class="small mb-1">{{ controller.getTelegramReplacementLabel(editor) }}</p>
                     <ng-container *ngIf="replacement.telegram.configured">
+                      <p class="small mb-1">The existing early-access link and topic stay unchanged; the post is updated in place.</p>
                       <p *ngIf="replacement.telegram.destinations.guild_trailer as guild" class="small mb-1">
                         Supporters group: {{ guild.status.replace('_', ' ') }}
                         <span *ngIf="guild.messageId"> · message {{ guild.messageId }}</span>
