@@ -1028,6 +1028,66 @@ describe('ManageComponent summary flow', () => {
     component.ngOnDestroy();
   });
 
+  it('binds the synthetic approval proof to the exact API candidate, preview grant, version, fingerprint, and revision', () => {
+    const episodeId = 991731;
+    const candidateId = 'b4bb3ee0-0f72-4dc0-85f8-839aef1c1a01';
+    const sourceFingerprint = 'ce28f91322de7e9a6ef3a5ca5e1f7e996391f81df74afe8b6d16a5b16fd0944f';
+    const sourceRevision = 'episode:991731:3168d37c32d6333157bac06ef4b3a5647ecfc036d91e9a5fbd8d75f3996d9022';
+    const candidate = trailerCandidateStatus(episodeId, {
+      candidateId, version: 1, sourceFingerprint, profileId: 'square-reels-karaoke-v2', profileRevision: 2,
+    });
+    const grant = trailerCandidatePreviewGrant(episodeId, candidateId);
+    apiService.getCurrentTrailerCandidate.and.returnValue(of(candidate));
+    apiService.createTrailerCandidatePreviewGrant.and.returnValue(of(grant));
+    apiService.decideTrailerCandidate.and.returnValue(of({
+      status: 'approved', candidateId, episodeId, version: 1, sourceFingerprint, sourceRevision,
+    }));
+    apiService.getTrailerReplacementStatus.and.returnValue(of(trailerReplacementStatus(episodeId, { sourceRevision })));
+    spyOn(window, 'confirm').and.returnValue(true);
+
+    component.startEdit({ episodeId, title: 'Synthetic release proof 1', summary: 'Summary', pubDate: '2026-09-13T00:00:00.000Z', explicit: 'no' });
+
+    expect(apiService.getCurrentTrailerCandidate).toHaveBeenCalledOnceWith(episodeId);
+    expect(apiService.createTrailerCandidatePreviewGrant).toHaveBeenCalledOnceWith(episodeId, candidateId);
+    expect(component.getTrailerCandidatePreviewUrl(component.episodesEditorState)).toBe(`http://localhost:3000${grant.previewUrl}`);
+    component.decideTrailerCandidate(component.episodesEditorState, 'approve');
+
+    expect(apiService.decideTrailerCandidate).toHaveBeenCalledOnceWith(episodeId, candidateId, 'approve', 1, sourceFingerprint);
+    expect(apiService.getTrailerReplacementStatus).toHaveBeenCalledOnceWith(episodeId, sourceRevision);
+    expect(component.getTrailerReplacementStatus(component.episodesEditorState)?.sourceRevision).toBe(sourceRevision);
+    component.ngOnDestroy();
+  });
+
+  it('keeps the exact synthetic review entry unapproved and never treats rejection as canonical delivery', () => {
+    const episodeId = 991732;
+    const candidateId = 'b4bb3ee0-0f72-4dc0-85f8-839aef1c1a02';
+    const sourceFingerprint = 'a3c889123e2f84012e95ac7e0c7f88d9129d5ba4c030f6fba3a53ecb437c591d';
+    const candidate = trailerCandidateStatus(episodeId, {
+      candidateId, version: 1, sourceFingerprint, profileId: 'square-reels-karaoke-v2', profileRevision: 2,
+    });
+    apiService.getCurrentTrailerCandidate.and.returnValue(of(candidate));
+    apiService.createTrailerCandidatePreviewGrant.and.returnValue(of(trailerCandidatePreviewGrant(episodeId, candidateId)));
+    apiService.decideTrailerCandidate.and.returnValue(of({
+      status: 'rejected', candidateId, episodeId, version: 1, sourceFingerprint,
+    }));
+    spyOn(window, 'confirm').and.returnValue(true);
+
+    component.startEdit({ episodeId, title: 'Synthetic release proof 2', summary: 'Summary', pubDate: '2026-09-13T00:00:00.000Z', explicit: 'no' });
+
+    expect(apiService.getCurrentTrailerCandidate).toHaveBeenCalledOnceWith(episodeId);
+    expect(apiService.createTrailerCandidatePreviewGrant).toHaveBeenCalledOnceWith(episodeId, candidateId);
+    expect(component.getTrailerCandidatePreviewUrl(component.episodesEditorState)).toContain(`/episodes/${episodeId}/trailer-candidates/${candidateId}/preview`);
+    expect(component.getTrailerCandidate(component.episodesEditorState)?.status).toBe('ready');
+    component.decideTrailerCandidate(component.episodesEditorState, 'reject');
+
+    expect(apiService.decideTrailerCandidate).toHaveBeenCalledOnceWith(episodeId, candidateId, 'reject', 1, sourceFingerprint);
+    expect(apiService.getTrailerReplacementStatus).not.toHaveBeenCalled();
+    expect(component.getTrailerCandidate(component.episodesEditorState)?.status).toBe('superseded');
+    expect(component.getTrailerCandidatePreviewUrl(component.episodesEditorState)).toBeNull();
+    expect(component.getTrailerDecisionMessage(component.episodesEditorState)).toContain('current trailer was not replaced');
+    component.ngOnDestroy();
+  });
+
   it('keeps stale conflicts visibly disabled and never reports a failed decision as success', () => {
     apiService.getCurrentTrailerCandidate.and.returnValue(of(trailerCandidateStatus(42)));
     apiService.decideTrailerCandidate.and.returnValue(of({
