@@ -36,6 +36,44 @@
   margin-top: 0.5rem;
 }
 
+.trailer-decision-actions,
+.trailer-destination-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.trailer-decision,
+.trailer-status-action,
+.trailer-status-refresh {
+  min-height: 44px;
+  white-space: normal;
+}
+
+.trailer-replacement-status,
+.trailer-destination {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.trailer-replacement-status {
+  border-top: 1px solid rgba(52, 60, 73, 0.16);
+  padding-top: 1rem;
+}
+
+.trailer-destination {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(52, 60, 73, 0.16);
+  border-radius: 0.5rem;
+  flex: 1 1 14rem;
+  padding: 0.75rem;
+}
+
+.trailer-destination a,
+.trailer-destination p {
+  overflow-wrap: anywhere;
+}
+
 .trailer-action {
   min-height: 44px;
   white-space: normal;

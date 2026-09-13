@@ -127,7 +127,13 @@
                 <div class="small fw-semibold" data-trailer-candidate-status>{{ controller.getTrailerCandidateStatusLabel(candidate) }}</div>
                 <div class="small mt-1">Version {{ candidate.version }} · {{ controller.formatTrailerCandidateDuration(candidate.durationSeconds) }} · {{ candidate.resolution || 'Resolution unavailable' }}</div>
                 <div class="small">Profile {{ candidate.profileId }} r{{ candidate.profileRevision }} · {{ candidate.progress }}%</div>
-                <p *ngIf="candidate.errorMessage" class="small text-danger mt-2 mb-0" role="status">{{ candidate.errorMessage }}</p>
+                <div *ngIf="candidate.status === 'processing' && candidate.progress >= 0" class="progress upload-progress mt-2" role="progressbar" aria-label="Trailer generation progress" [attr.aria-valuenow]="candidate.progress" aria-valuemin="0" aria-valuemax="100">
+                  <div class="progress-bar" [style.width.%]="candidate.progress">{{ candidate.progress }}%</div>
+                </div>
+                <div *ngIf="candidate.status === 'processing' && candidate.progress < 0" class="progress upload-progress mt-2" aria-label="Trailer generation progress indeterminate">
+                  <div class="progress-bar progress-bar-indeterminate" style="width: 100%"><span class="visually-hidden">Trailer generation progress is not available yet</span></div>
+                </div>
+                <p *ngIf="candidate.errorMessage" class="small text-danger mt-2 mb-0" role="alert">{{ candidate.errorMessage }}</p>
                 <p *ngIf="candidate.transcriptErrorMessage" class="small text-warning-emphasis mt-1 mb-0" role="status">{{ candidate.transcriptErrorMessage }}</p>
                 <button
                   *ngIf="controller.canRetryTrailerGeneration(editor)"
@@ -138,6 +144,19 @@
                   (click)="controller.retryTrailerGeneration(editor)">
                   Retry trailer generation
                 </button>
+                <div *ngIf="candidate.status === 'stale' || !candidate.isCurrent" class="small text-warning-emphasis mt-2" data-stale-candidate>
+                  This candidate uses older episode assets and cannot be approved. Generate a new trailer from the current assets.
+                </div>
+                <div *ngIf="controller.canDecideTrailerCandidate(editor)" class="trailer-decision-actions mt-3" data-trailer-decisions>
+                  <button class="btn btn-trailer-generate trailer-decision" type="button" data-approve-trailer
+                    [disabled]="controller.getTrailerDecisionLoading(editor)"
+                    (click)="controller.decideTrailerCandidate(editor, 'approve')">Approve trailer</button>
+                  <button class="btn btn-outline-danger trailer-decision" type="button" data-reject-trailer
+                    [disabled]="controller.getTrailerDecisionLoading(editor)"
+                    (click)="controller.decideTrailerCandidate(editor, 'reject')">Reject trailer</button>
+                </div>
+                <p *ngIf="controller.getTrailerDecisionMessage(editor)" class="small mt-2 mb-0" role="status">{{ controller.getTrailerDecisionMessage(editor) }}</p>
+                <p *ngIf="controller.getTrailerDecisionError(editor)" class="small text-danger mt-2 mb-0" role="alert">{{ controller.getTrailerDecisionError(editor) }}</p>
                 <p *ngIf="controller.isTrailerCandidatePreviewLoading(editor)" class="small mt-2 mb-0">Preparing private trailer preview…</p>
                 <p *ngIf="controller.getTrailerCandidatePreviewError(editor)" class="small text-danger mt-2 mb-0" role="alert">{{ controller.getTrailerCandidatePreviewError(editor) }}</p>
                 <div *ngIf="controller.getTrailerCandidatePreviewUrl(editor) as previewUrl" class="trailer-candidate-preview mt-2" data-trailer-candidate-preview>
@@ -155,9 +174,63 @@
                   </a>
                 </div>
               </ng-container>
-              <p *ngIf="!controller.getTrailerCandidate(editor) && !controller.isTrailerCandidateLoading(editor)" class="small mt-2 mb-0 text-muted">
-                No trailer candidate to review yet. Upload a cover and trailer audio to start automatic generation, or stage an MP4 manually.
-              </p>
+              <div *ngIf="!controller.getTrailerCandidate(editor) && !controller.isTrailerCandidateLoading(editor)" class="small mt-2 mb-0 text-muted" data-trailer-empty-state>
+                <h3 class="h6">No trailer candidate to review</h3>
+                <p class="mb-0">Upload the cover and trailer audio to start automatic generation, or choose an MP4 to stage a finished trailer.</p>
+              </div>
+              <section *ngIf="controller.getTrailerReplacementStatus(editor) as replacement" class="trailer-replacement-status mt-3" data-trailer-replacement aria-labelledby="trailer-replacement-heading">
+                <h3 id="trailer-replacement-heading" class="h6 mb-1">Replacement status</h3>
+                <p class="small fw-semibold mb-2" data-replacement-summary role="status">{{ controller.getTrailerReplacementSummary(editor) }}</p>
+                <p *ngIf="controller.getTrailerReplacementError(editor)" class="small text-danger" role="alert">{{ controller.getTrailerReplacementError(editor) }}</p>
+                <button class="btn btn-sm btn-outline-secondary trailer-status-refresh" type="button" (click)="controller.refreshTrailerReplacementStatus(editor)">
+                  {{ controller.getTrailerReplacementLoading(editor) ? 'Refreshing replacement status…' : 'Refresh replacement status' }}
+                </button>
+                <div class="trailer-destination-list mt-2">
+                  <article *ngFor="let destination of controller.getMetaReplacementEntries(editor)" class="trailer-destination" [attr.data-destination]="destination.key">
+                    <h4 class="small fw-semibold mb-1">{{ destination.label }}</h4>
+                    <p class="small mb-1">Status: {{ destination.status.lifecycle.replace('_', ' ') }} · predecessor: {{ destination.status.retirementStatus.replace('_', ' ') }}</p>
+                    <p *ngIf="destination.status.predecessor" class="small mb-1">
+                      Previous trailer:
+                      <a *ngIf="destination.status.predecessor.permalink as oldLink" [href]="oldLink" target="_blank" rel="noopener noreferrer">{{ destination.status.predecessor.remoteId }}</a>
+                      <span *ngIf="!destination.status.predecessor.permalink">{{ destination.status.predecessor.remoteId }}</span>
+                    </p>
+                    <p *ngIf="destination.status.successor" class="small mb-1">
+                      Approved trailer:
+                      <a *ngIf="destination.status.successor.permalink as newLink" [href]="newLink" target="_blank" rel="noopener noreferrer">{{ destination.status.successor.remoteId }}</a>
+                      <span *ngIf="!destination.status.successor.permalink">{{ destination.status.successor.remoteId }}</span>
+                    </p>
+                    <p *ngIf="destination.status.manualInstructions" class="small mb-1">{{ destination.status.manualInstructions }}</p>
+                    <button *ngIf="controller.canConfirmTrailerPredecessorRetirement(editor, destination.key)" class="btn btn-sm btn-outline-warning trailer-status-action" type="button"
+                      [disabled]="controller.isTrailerPredecessorRetirementLoading(editor, destination.key)"
+                      (click)="controller.confirmTrailerPredecessorRetirement(editor, destination.key)">
+                      {{ controller.isTrailerPredecessorRetirementLoading(editor, destination.key) ? 'Confirming…' : 'Confirm old post removed' }}
+                    </button>
+                  </article>
+                  <article class="trailer-destination" data-destination="telegram">
+                    <h4 class="small fw-semibold mb-1">Telegram</h4>
+                    <p class="small mb-1">{{ controller.getTelegramReplacementLabel(editor) }}</p>
+                    <ng-container *ngIf="replacement.telegram.configured">
+                      <p *ngIf="replacement.telegram.destinations.guild_trailer as guild" class="small mb-1">
+                        Supporters group: {{ guild.status.replace('_', ' ') }}
+                        <span *ngIf="guild.messageId"> · message {{ guild.messageId }}</span>
+                      </p>
+                      <p *ngIf="replacement.telegram.destinations.advance_access as access" class="small mb-0">
+                        Early access: {{ access.status.replace('_', ' ') }}
+                        <span *ngIf="access.topicId"> · topic {{ access.topicId }}</span>
+                        <span *ngIf="access.messageThreadId"> · thread {{ access.messageThreadId }}</span>
+                        <span *ngIf="access.messageId"> · message {{ access.messageId }}</span>
+                      </p>
+                    </ng-container>
+                  </article>
+                  <article class="trailer-destination" data-destination="youtube">
+                    <h4 class="small fw-semibold mb-1">YouTube</h4>
+                    <p class="small mb-1">{{ replacement.youtube?.status?.replace('_', ' ') || 'not configured' }} — Upload to YouTube remains a separate manual action.</p>
+                    <p *ngIf="replacement.youtube?.predecessor as ytOld" class="small mb-1">Previous video: <a *ngIf="ytOld.permalink" [href]="ytOld.permalink" target="_blank" rel="noopener noreferrer">{{ ytOld.remoteId }}</a><span *ngIf="!ytOld.permalink">{{ ytOld.remoteId }}</span></p>
+                    <p *ngIf="replacement.youtube?.successor?.permalink as ytNew" class="small mb-0">Approved video: <a [href]="ytNew" target="_blank" rel="noopener noreferrer">Open YouTube successor</a></p>
+                    <p *ngIf="replacement.youtube?.retirementError" class="small text-danger mb-0" role="alert">{{ replacement.youtube?.retirementError }}</p>
+                  </article>
+                </div>
+              </section>
             </section>
             <div *ngIf="controller.getYoutubeTrailerJob(editor) || controller.getYoutubeTrailerJobErrorMessage(editor)" class="youtube-inline-status mt-3" aria-live="polite">
               <div class="small fw-semibold">YouTube: {{ controller.getYoutubeTrailerJobStatusLabel(controller.getYoutubeTrailerJob(editor)) || 'Transfer not started' }}</div>

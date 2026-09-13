@@ -3,7 +3,7 @@ import { HttpEventType, HttpHeaders, HttpResponse } from '@angular/common/http';
 import { discardPeriodicTasks, fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { of, Subject, throwError } from 'rxjs';
-import { ApiService, Episode, EpisodeArtifactJobSnapshot, EpisodeGeneratedSummaryStatus, EpisodeTrailerVideoUploadResponse, EpisodeTranscriptionStatus, HashtagLookupResponse, SuggestedTagsSnapshot, TrailerCandidatePreviewGrant, TrailerCandidateReviewStatus, YoutubeTrailerJobSnapshot } from '../../core/api.service';
+import { ApiService, Episode, EpisodeArtifactJobSnapshot, EpisodeGeneratedSummaryStatus, EpisodeTrailerVideoUploadResponse, EpisodeTranscriptionStatus, HashtagLookupResponse, SuggestedTagsSnapshot, TrailerCandidatePreviewGrant, TrailerCandidateReviewStatus, TrailerReplacementStatus, YoutubeTrailerJobSnapshot } from '../../core/api.service';
 import { EpisodeFormComponent } from './episode-form.component';
 import { ManageComponent } from './manage.component';
 import { environment as developmentEnvironment } from '../../../environments/environment';
@@ -44,6 +44,38 @@ const trailerCandidatePreviewGrant = (episodeId = 42, candidateId = `candidate-$
   expiresAt,
 });
 
+const trailerReplacementStatus = (episodeId = 42, overrides: Partial<TrailerReplacementStatus> = {}): TrailerReplacementStatus => ({
+  episodeId,
+  sourceRevision: `episode:${episodeId}:${'b'.repeat(64)}`,
+  status: 'waiting_for_youtube_action',
+  replacementComplete: false,
+  destinations: {
+    instagram_reel: {
+      destination: 'instagram_reel', lifecycle: 'published', retirementStatus: 'manual_retirement_required', replacementComplete: false,
+      predecessor: { remoteId: 'instagram-old', permalink: 'https://example.test/instagram-old' },
+      successor: { remoteId: 'instagram-new', permalink: 'https://example.test/instagram-new' },
+      manualInstructions: 'Remove the exact predecessor in Meta before confirming.', confirmationEndpoint: '/confirm',
+      retirementActorEmail: null, retirementConfirmedAt: null,
+    },
+    facebook_native_video: {
+      destination: 'facebook_native_video', lifecycle: 'published', retirementStatus: 'confirmed_manually', replacementComplete: true,
+      predecessor: { remoteId: 'facebook-old', permalink: 'https://example.test/facebook-old' },
+      successor: { remoteId: 'facebook-new', permalink: 'https://example.test/facebook-new' },
+      manualInstructions: null, confirmationEndpoint: null, retirementActorEmail: 'operator@example.test', retirementConfirmedAt: '2026-09-13T10:00:00.000Z',
+    },
+  },
+  youtube: { status: 'waiting_for_operator_upload', predecessor: { remoteId: 'youtube-old', permalink: 'https://youtube.com/watch?v=old' }, successor: null, retirementError: null },
+  telegram: {
+    configured: true,
+    status: 'pending',
+    destinations: {
+      guild_trailer: { status: 'pending', messageId: null, fileId: null, topicId: null, messageThreadId: null },
+      advance_access: { status: 'pending', messageId: null, fileId: null, topicId: 'topic-stable', messageThreadId: 'thread-stable' },
+    },
+  },
+  ...overrides,
+});
+
 describe('ManageComponent summary flow', () => {
   let apiService: jasmine.SpyObj<ApiService>;
   let component: ManageComponent;
@@ -71,6 +103,9 @@ describe('ManageComponent summary flow', () => {
       'createTrailerCandidatePreviewGrant',
       'generateTrailerCandidate',
       'retryTrailerCandidate',
+      'decideTrailerCandidate',
+      'getTrailerReplacementStatus',
+      'confirmTrailerPredecessorRetirement',
       'startYoutubeTrailerJob',
     ]);
     apiService.listEpisodes.and.returnValue(of([]));
@@ -85,6 +120,17 @@ describe('ManageComponent summary flow', () => {
     apiService.retryTrailerCandidate.and.callFake((episodeId, candidateId) => of(trailerCandidateStatus(episodeId, {
       candidateId, status: 'pending', progress: 0, durationSeconds: null, resolution: null,
     })));
+    apiService.decideTrailerCandidate.and.callFake((episodeId, candidateId, decision, expectedVersion, expectedSourceFingerprint) => of({
+      status: decision === 'approve' ? 'approved' : 'rejected', candidateId, episodeId, version: expectedVersion, sourceFingerprint: expectedSourceFingerprint,
+      ...(decision === 'approve' ? { sourceRevision: trailerReplacementStatus(episodeId).sourceRevision } : {}),
+    }));
+    apiService.getTrailerReplacementStatus.and.callFake((episodeId) => of(trailerReplacementStatus(episodeId)));
+    apiService.confirmTrailerPredecessorRetirement.and.callFake((episodeId, sourceRevision, destination, predecessorRemoteId) => of({
+      status: 'confirmed', sourceRevision, destination,
+      predecessor: { remoteId: predecessorRemoteId, permalink: 'https://example.test/old' },
+      successor: { remoteId: 'successor', permalink: 'https://example.test/new' },
+      retirementStatus: 'confirmed_manually', retirementActorEmail: 'operator@example.test', retirementConfirmedAt: new Date().toISOString(), replacementComplete: false,
+    }));
     apiService.startYoutubeTrailerJob.and.returnValue(of({} as YoutubeTrailerJobSnapshot));
     apiService.transcribeEpisodeWithWhisper = jasmine.createSpy('transcribeEpisodeWithWhisper');
     apiService.downloadEpisodeArtifact.and.returnValue(of(new HttpResponse<Blob>({
@@ -918,6 +964,94 @@ describe('ManageComponent summary flow', () => {
     expect(component.episodesEditorState.formModel.summaryManuallyEdited).toBeTrue();
     (component as unknown as { clearEpisodeGenerationPolling: () => void }).clearEpisodeGenerationPolling();
   });
+
+  it('decides only the exact displayed candidate and loads API replacement truth by returned revision', () => {
+    const revision = `episode:42:${'c'.repeat(64)}`;
+    apiService.getCurrentTrailerCandidate.and.returnValue(of(trailerCandidateStatus(42)));
+    apiService.decideTrailerCandidate.and.returnValue(of({
+      status: 'approved', candidateId: 'candidate-42', episodeId: 42, version: 3,
+      sourceFingerprint: 'a'.repeat(64), sourceRevision: revision,
+    }));
+    apiService.getTrailerReplacementStatus.and.returnValue(of(trailerReplacementStatus(42, { sourceRevision: revision })));
+    spyOn(window, 'confirm').and.returnValue(true);
+    component.startEdit({ episodeId: 42, title: 'Episode 42', summary: 'Summary', pubDate: '2026-07-24T00:00:00.000Z', explicit: 'no' });
+
+    component.decideTrailerCandidate(component.episodesEditorState, 'approve');
+
+    expect(apiService.decideTrailerCandidate).toHaveBeenCalledOnceWith(42, 'candidate-42', 'approve', 3, 'a'.repeat(64));
+    expect(apiService.getTrailerReplacementStatus).toHaveBeenCalledOnceWith(42, revision);
+    expect(component.getTrailerReplacementStatus(component.episodesEditorState)?.replacementComplete).toBeFalse();
+    expect(component.getTrailerReplacementSummary(component.episodesEditorState)).toContain('separate Upload to YouTube action');
+    expect(component.getTelegramReplacementLabel(component.episodesEditorState)).toContain('pending');
+    expect(component.canDecideTrailerCandidate(component.episodesEditorState)).toBeFalse();
+    component.ngOnDestroy();
+  });
+
+  it('keeps stale conflicts visibly disabled and never reports a failed decision as success', () => {
+    apiService.getCurrentTrailerCandidate.and.returnValue(of(trailerCandidateStatus(42)));
+    apiService.decideTrailerCandidate.and.returnValue(of({
+      status: 'conflict', candidateId: 'candidate-42', episodeId: 42, version: 3,
+      sourceFingerprint: 'a'.repeat(64), code: 'stale',
+    }));
+    spyOn(window, 'confirm').and.returnValue(true);
+    component.startEdit({ episodeId: 42, title: 'Episode 42', summary: 'Summary', pubDate: '2026-07-24T00:00:00.000Z', explicit: 'no' });
+
+    component.decideTrailerCandidate(component.episodesEditorState, 'approve');
+
+    expect(component.getTrailerCandidate(component.episodesEditorState)?.isCurrent).toBeFalse();
+    expect(component.canDecideTrailerCandidate(component.episodesEditorState)).toBeFalse();
+    expect(component.getTrailerDecisionError(component.episodesEditorState)).toContain('no longer eligible');
+    expect(component.getTrailerDecisionMessage(component.episodesEditorState)).toBe('');
+    expect(apiService.getTrailerReplacementStatus).not.toHaveBeenCalled();
+    component.ngOnDestroy();
+  });
+
+  it('confirms the exact Meta predecessor and leaves it incomplete when confirmation fails', () => {
+    const revision = trailerReplacementStatus().sourceRevision;
+    const status = trailerReplacementStatus();
+    apiService.getCurrentTrailerCandidate.and.returnValue(of(trailerCandidateStatus(42)));
+    apiService.decideTrailerCandidate.and.returnValue(of({
+      status: 'approved', candidateId: 'candidate-42', episodeId: 42, version: 3,
+      sourceFingerprint: 'a'.repeat(64), sourceRevision: revision,
+    }));
+    apiService.getTrailerReplacementStatus.and.returnValue(of(status));
+    apiService.confirmTrailerPredecessorRetirement.and.returnValue(throwError(() => new Error('conflict')));
+    spyOn(window, 'confirm').and.returnValue(true);
+    component.startEdit({ episodeId: 42, title: 'Episode 42', summary: 'Summary', pubDate: '2026-07-24T00:00:00.000Z', explicit: 'no' });
+    component.decideTrailerCandidate(component.episodesEditorState, 'approve');
+
+    component.confirmTrailerPredecessorRetirement(component.episodesEditorState, 'instagram_reel');
+
+    expect(apiService.confirmTrailerPredecessorRetirement).toHaveBeenCalledOnceWith(42, revision, 'instagram_reel', 'instagram-old');
+    expect(component.getTrailerReplacementStatus(component.episodesEditorState)?.destinations.instagram_reel?.replacementComplete).toBeFalse();
+    expect(component.getTrailerReplacementError(component.episodesEditorState)).toContain('exact predecessor remains incomplete');
+    component.ngOnDestroy();
+  });
+
+  it('polls incomplete replacement status with a bounded timer and stops at API terminal completion', fakeAsync(() => {
+    const revision = trailerReplacementStatus().sourceRevision;
+    apiService.getCurrentTrailerCandidate.and.returnValue(of(trailerCandidateStatus(42)));
+    apiService.decideTrailerCandidate.and.returnValue(of({
+      status: 'approved', candidateId: 'candidate-42', episodeId: 42, version: 3,
+      sourceFingerprint: 'a'.repeat(64), sourceRevision: revision,
+    }));
+    apiService.getTrailerReplacementStatus.and.returnValues(
+      of(trailerReplacementStatus(42, { sourceRevision: revision })),
+      of(trailerReplacementStatus(42, { sourceRevision: revision, status: 'complete', replacementComplete: true, telegram: { configured: true, status: 'complete', destinations: {} }, youtube: null })),
+    );
+    spyOn(window, 'confirm').and.returnValue(true);
+    component.startEdit({ episodeId: 42, title: 'Episode 42', summary: 'Summary', pubDate: '2026-07-24T00:00:00.000Z', explicit: 'no' });
+    component.decideTrailerCandidate(component.episodesEditorState, 'approve');
+    expect(apiService.getTrailerReplacementStatus).toHaveBeenCalledTimes(1);
+
+    tick(5000);
+
+    expect(apiService.getTrailerReplacementStatus).toHaveBeenCalledTimes(2);
+    expect(component.getTrailerReplacementStatus(component.episodesEditorState)?.replacementComplete).toBeTrue();
+    tick(60_000);
+    expect(apiService.getTrailerReplacementStatus).toHaveBeenCalledTimes(2);
+    component.ngOnDestroy();
+  }));
 });
 
 describe('ManageComponent artifact download modal', () => {
@@ -1494,10 +1628,22 @@ describe('EpisodeFormComponent trailer video card', () => {
       'getEpisodeTranscriptionStatus', 'getEpisodeGeneratedSummaryStatus', 'startEpisodeArtifactJob',
       'getEpisodeArtifactJobStatus', 'downloadEpisodeArtifact', 'getCurrentTrailerCandidate',
       'createTrailerCandidatePreviewGrant', 'generateTrailerCandidate', 'retryTrailerCandidate', 'startYoutubeTrailerJob',
+      'decideTrailerCandidate', 'getTrailerReplacementStatus', 'confirmTrailerPredecessorRetirement',
     ]);
     apiService.listEpisodes.and.returnValue(of([]));
     apiService.getCurrentTrailerCandidate.and.returnValue(throwError(() => ({ status: 404 })));
     apiService.createTrailerCandidatePreviewGrant.and.callFake((episodeId, candidateId) => of(trailerCandidatePreviewGrant(episodeId, candidateId)));
+    apiService.decideTrailerCandidate.and.callFake((episodeId, candidateId, decision, version, sourceFingerprint) => of({
+      status: decision === 'approve' ? 'approved' : 'rejected', candidateId, episodeId, version, sourceFingerprint,
+      ...(decision === 'approve' ? { sourceRevision: trailerReplacementStatus(episodeId).sourceRevision } : {}),
+    }));
+    apiService.getTrailerReplacementStatus.and.callFake((episodeId) => of(trailerReplacementStatus(episodeId)));
+    apiService.confirmTrailerPredecessorRetirement.and.callFake((episodeId, sourceRevision, destination, predecessorRemoteId) => of({
+      status: 'confirmed', sourceRevision, destination,
+      predecessor: { remoteId: predecessorRemoteId, permalink: 'https://example.test/old' },
+      successor: { remoteId: 'successor', permalink: 'https://example.test/new' },
+      retirementStatus: 'confirmed_manually', retirementActorEmail: 'operator@example.test', retirementConfirmedAt: new Date().toISOString(), replacementComplete: false,
+    }));
     manage = new ManageComponent(apiService);
     await TestBed.configureTestingModule({
       declarations: [EpisodeFormComponent],
@@ -1527,6 +1673,96 @@ describe('EpisodeFormComponent trailer video card', () => {
     expect(renderedCard.querySelector('label[for^="trailer-transcript-"]')?.textContent?.trim()).toBe('Trailer transcript');
     expect(renderedCard.textContent).toContain('Upload to YouTube becomes available after an MP4 is staged.');
     expect(renderedCard.textContent).not.toContain('Publish');
+  });
+
+  it('renders an explicit empty state without implying preview or destination success', () => {
+    const empty = fixture.nativeElement.querySelector('[data-trailer-empty-state]') as HTMLElement;
+    expect(empty).not.toBeNull();
+    expect(empty.querySelector('h3')?.textContent?.trim()).toBe('No trailer candidate to review');
+    expect(empty.textContent).toContain('Upload the cover and trailer audio to start automatic generation');
+    expect(empty.textContent).toContain('choose an MP4 to stage a finished trailer');
+    expect(fixture.nativeElement.querySelector('[data-trailer-candidate-preview]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-trailer-replacement]')).toBeNull();
+  });
+
+  it('renders populated provenance, a long editable transcript, independent destinations, and narrow-width wrapping', async () => {
+    const longTranscript = `${'Dragon Careca trailer words '.repeat(1500)}ending`;
+    const longId = `remote-${'identifier-'.repeat(30)}`;
+    const defaults = trailerReplacementStatus(42);
+    const status = trailerReplacementStatus(42, {
+      destinations: {
+        instagram_reel: {
+          ...defaults.destinations.instagram_reel!,
+          predecessor: { remoteId: longId, permalink: `https://example.test/${'old-link-'.repeat(30)}` },
+        },
+        facebook_native_video: defaults.destinations.facebook_native_video!,
+      },
+    });
+    apiService.getCurrentTrailerCandidate.and.returnValue(of(trailerCandidateStatus(42, { transcriptText: longTranscript })));
+    apiService.getTrailerReplacementStatus.and.returnValue(of(status));
+    spyOn(window, 'confirm').and.returnValue(true);
+    manage.startEdit({ episodeId: 42, title: 'Episode 42', summary: 'Summary', pubDate: '2026-07-24T00:00:00.000Z', explicit: 'no' });
+    fixture.componentInstance.editor = manage.episodesEditorState;
+    await fixture.whenStable();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const card = (Array.from(fixture.nativeElement.querySelectorAll('.upload-card')) as HTMLElement[])
+      .find((candidate) => candidate.textContent?.includes('Trailer video')) as HTMLElement;
+    expect(card).toBeTruthy();
+    expect(manage.getTrailerCandidate(manage.episodesEditorState)?.transcriptText).toBe(longTranscript);
+    expect(manage.getTrailerTranscript(manage.episodesEditorState)).toBe(longTranscript);
+    const transcript = card.querySelector('.trailer-transcript') as HTMLTextAreaElement;
+    expect(transcript.value).toBe(longTranscript);
+    expect(transcript.rows).toBe(5);
+    expect(transcript.getAttribute('aria-describedby')).toContain('trailer-transcript-status-42');
+    expect(card.textContent).toContain('Version 3');
+    expect(card.textContent).toContain('1:38');
+    expect(card.textContent).toContain('1280×1280');
+    expect(card.textContent).toContain('Profile dc-square-waveform r2');
+    expect(card.querySelector('[data-approve-trailer]')).not.toBeNull();
+    expect(card.querySelector('[data-reject-trailer]')).not.toBeNull();
+    expect(getComputedStyle(card.querySelector('[data-approve-trailer]') as HTMLElement).minHeight).toBe('44px');
+
+    manage.decideTrailerCandidate(manage.episodesEditorState, 'approve');
+    fixture.detectChanges();
+    expect(card.querySelector('[data-destination="instagram_reel"]')?.textContent).toContain(longId);
+    expect(card.querySelector('[data-destination="telegram"]')?.textContent).toContain('pending');
+    expect(card.querySelector('[data-destination="youtube"]')?.textContent).toContain('separate manual action');
+    expect(card.textContent).toContain('Waiting for the separate Upload to YouTube action.');
+    expect(card.querySelectorAll('.trailer-status-action').length).toBe(1);
+    expect(card.querySelector('video')?.getAttribute('aria-label')).toContain('candidate version 3');
+    expect(getComputedStyle(card.querySelector('.trailer-destination a') as HTMLAnchorElement).overflowWrap).toBe('anywhere');
+
+    fixture.nativeElement.style.width = '320px';
+    window.dispatchEvent(new Event('resize'));
+    fixture.detectChanges();
+    expect(getComputedStyle(card.querySelector('.trailer-actions') as HTMLElement).flexWrap).toBe('wrap');
+    expect(card.scrollWidth).toBeLessThanOrEqual(card.clientWidth);
+    manage.ngOnDestroy();
+  });
+
+  it('announces candidate loading politely and exposes safe retryable errors as alerts', () => {
+    const pending = new Subject<TrailerCandidateReviewStatus>();
+    apiService.getCurrentTrailerCandidate.and.returnValue(pending.asObservable());
+    manage.startEdit({ episodeId: 42, title: 'Episode 42', summary: 'Summary', pubDate: '2026-07-24T00:00:00.000Z', explicit: 'no' });
+    fixture.componentInstance.editor = manage.episodesEditorState;
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Loading generated trailer status');
+    expect(fixture.nativeElement.querySelector('.trailer-candidate-review')?.getAttribute('aria-live')).toBe('polite');
+
+    pending.next(trailerCandidateStatus(42, {
+      status: 'retryable', progress: -1, errorCategory: 'render_failed',
+      errorMessage: 'Rendering failed safely. Retry trailer generation or choose an MP4.',
+    }));
+    pending.complete();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[role="alert"]')?.textContent).toContain('Retry trailer generation');
+    expect(fixture.nativeElement.querySelector('[data-retry-trailer-generation]')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-trailer-candidate-preview]')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('Choose or replace MP4');
+    manage.ngOnDestroy();
   });
 
   it('stages a manual MP4 without starting YouTube and starts transfer only on button action', () => {

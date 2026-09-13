@@ -418,6 +418,66 @@ export interface TrailerCandidatePreviewGrant {
   expiresAt: string;
 }
 
+export interface TrailerCandidateDecisionResponse {
+  status: 'approved' | 'rejected' | 'replayed' | 'conflict';
+  candidateId?: string;
+  episodeId?: number;
+  version?: number;
+  sourceFingerprint?: string;
+  sourceRevision?: string;
+  code?: string;
+}
+
+export interface TrailerReplacementDestinationStatus {
+  destination: 'instagram_reel' | 'facebook_native_video';
+  lifecycle: string;
+  retirementStatus: 'waiting_for_successor' | 'manual_retirement_required' | 'confirmed_manually' | 'retired_automatically' | 'not_applicable';
+  replacementComplete: boolean;
+  predecessor: { remoteId: string; permalink: string | null } | null;
+  successor: { remoteId: string; permalink: string | null } | null;
+  manualInstructions: string | null;
+  confirmationEndpoint: string | null;
+  retirementActorEmail: string | null;
+  retirementConfirmedAt: string | null;
+}
+
+export interface TrailerReplacementStatus {
+  episodeId: number;
+  sourceRevision: string;
+  status: 'complete' | 'waiting_for_successor' | 'waiting_for_operator_retirement' | 'waiting_for_youtube_action' | 'waiting_for_youtube_public_success' | 'waiting_for_youtube_retirement' | 'waiting_for_telegram';
+  replacementComplete: boolean;
+  destinations: Partial<Record<'instagram_reel' | 'facebook_native_video', TrailerReplacementDestinationStatus>>;
+  youtube: null | {
+    status: string;
+    predecessor: { remoteId: string; permalink: string | null } | null;
+    successor: { remoteId: string | null; permalink: string | null; jobId: string } | null;
+    retirementError: string | null;
+  };
+  telegram: {
+    configured: boolean;
+    status: 'not_applicable' | 'pending' | 'in_progress' | 'complete' | 'replayed' | 'temporary_failure' | 'permanent_failure' | 'unknown';
+    destinations: Partial<Record<'guild_trailer' | 'advance_access', {
+      status: 'pending' | 'in_progress' | 'complete' | 'replayed' | 'temporary_failure' | 'permanent_failure' | 'unknown';
+      messageId: string | null;
+      fileId: string | null;
+      topicId: string | null;
+      messageThreadId: string | null;
+    }>>;
+  };
+}
+
+export interface TrailerRetirementConfirmationResponse {
+  status: string;
+  sourceRevision: string;
+  destination: 'instagram_reel' | 'facebook_native_video';
+  predecessor: { remoteId: string; permalink: string | null } | null;
+  successor: { remoteId: string; permalink: string | null } | null;
+  retirementStatus: TrailerReplacementDestinationStatus['retirementStatus'];
+  retirementActorEmail: string | null;
+  retirementConfirmedAt: string | null;
+  replacementComplete: boolean;
+}
+
 export interface HealthStatus {
   status: string;
   uptime: number;
@@ -564,6 +624,26 @@ export class ApiService {
     return this.http.post<TrailerCandidatePreviewGrant>(
       `${environment.apiBaseUrl}/episodes/${episodeId}/trailer-candidates/${encodeURIComponent(candidateId)}/preview-grant`,
       {},
+    );
+  }
+
+  decideTrailerCandidate(episodeId: number, candidateId: string, decision: 'approve' | 'reject', expectedVersion: number, expectedSourceFingerprint: string): Observable<TrailerCandidateDecisionResponse> {
+    return this.http.post<TrailerCandidateDecisionResponse>(
+      `${environment.apiBaseUrl}/episodes/${episodeId}/trailer-candidates/${encodeURIComponent(candidateId)}/decision`,
+      { decision, expectedVersion, expectedSourceFingerprint },
+    );
+  }
+
+  getTrailerReplacementStatus(episodeId: number, sourceRevision: string): Observable<TrailerReplacementStatus> {
+    return this.http.get<TrailerReplacementStatus>(
+      `${environment.apiBaseUrl}/episodes/${episodeId}/trailer-replacements/${encodeURIComponent(sourceRevision)}`,
+    );
+  }
+
+  confirmTrailerPredecessorRetirement(episodeId: number, sourceRevision: string, destination: 'instagram_reel' | 'facebook_native_video', predecessorRemoteId: string): Observable<TrailerRetirementConfirmationResponse> {
+    return this.http.post<TrailerRetirementConfirmationResponse>(
+      `${environment.apiBaseUrl}/episodes/${episodeId}/trailer-replacements/${encodeURIComponent(sourceRevision)}/destinations/${destination}/retirement/confirm`,
+      { predecessorRemoteId, confirmation: 'removed_manually' },
     );
   }
 

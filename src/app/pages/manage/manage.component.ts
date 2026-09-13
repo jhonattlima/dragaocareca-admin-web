@@ -11,6 +11,7 @@ import {
   EpisodeTrailerVideoUploadResponse,
   TrailerCandidateReviewStatus,
   TrailerCandidatePreviewGrant,
+  TrailerReplacementStatus,
   YoutubeTrailerJobSnapshot,
   StructuredEntryCatalogResponse,
   HashtagLookupResponse,
@@ -98,6 +99,17 @@ interface TrailerCandidateReviewState {
   previewError: string;
   previewExpiryTimer: number | null;
   previewSubscription: Subscription | null;
+  decisionLoading: boolean;
+  decisionMessage: string;
+  decisionError: string;
+  decisionMade: boolean;
+  replacementStatus: TrailerReplacementStatus | null;
+  replacementLoading: boolean;
+  replacementError: string;
+  retirementLoading: string | null;
+  replacementTimer: number | null;
+  replacementSubscription: Subscription | null;
+  replacementPollCount: number;
 }
 
 type SaveTransactionPhase = 'saving' | 'committing' | 'success' | 'error';
@@ -778,6 +790,188 @@ export class ManageComponent implements OnInit, OnDestroy {
     return this.getTrailerCandidateReviewState(editor).candidate;
   }
 
+  canDecideTrailerCandidate(editor: EpisodeEditorState): boolean {
+    const candidate = this.getTrailerCandidate(editor);
+    const state = this.getTrailerCandidateReviewState(editor);
+    return Boolean(candidate?.isCurrent && candidate.status === 'ready' && candidate.outputValid
+      && !state.decisionLoading && !state.decisionMade && !state.generationInFlight && !this.isSaveTransactionInFlight(editor));
+  }
+
+  decideTrailerCandidate(editor: EpisodeEditorState, decision: 'approve' | 'reject'): void {
+    const candidate = this.getTrailerCandidate(editor);
+    const state = this.getTrailerCandidateReviewState(editor);
+    if (!candidate || !this.canDecideTrailerCandidate(editor)) return;
+    const confirmation = decision === 'approve'
+      ? 'Approve this exact candidate? It will replace the current trailer and start the configured replacement workflow. YouTube upload remains a separate action.'
+      : 'Reject this candidate? It will not replace the current trailer or be sent to any destination.';
+    if (!window.confirm(confirmation)) return;
+
+    state.decisionLoading = true;
+    state.decisionError = '';
+    state.decisionMessage = '';
+    state.replacementError = '';
+    const generation = state.generation;
+    this.apiService.decideTrailerCandidate(candidate.episodeId, candidate.candidateId, decision, candidate.version, candidate.sourceFingerprint).subscribe({
+      next: (result) => {
+        if (!this.isActiveTrailerCandidateRequest(editor, candidate.episodeId, generation)
+          || result.candidateId !== candidate.candidateId
+          || result.version !== candidate.version
+          || result.sourceFingerprint !== candidate.sourceFingerprint) return;
+        state.decisionLoading = false;
+        state.decisionMade = true;
+        if (result.status === 'conflict') {
+          state.candidate = { ...candidate, isCurrent: false, status: 'stale' };
+          state.decisionError = 'This candidate changed or is no longer eligible. Refresh its status before deciding.';
+          return;
+        }
+        if (decision === 'reject') {
+          state.candidate = { ...candidate, isCurrent: false, status: 'superseded' };
+          state.decisionMessage = 'Candidate rejected. The current trailer was not replaced.';
+          return;
+        }
+        if (!result.sourceRevision) {
+          state.decisionError = 'The candidate was approved, but replacement status could not be linked. Refresh the episode before reporting completion.';
+          return;
+        }
+        state.decisionMessage = 'Candidate approved. The current trailer was replaced locally; configured destination replacement has started. YouTube remains a separate manual action.';
+        this.loadTrailerReplacementStatus(editor, candidate.episodeId, result.sourceRevision, generation);
+      },
+      error: () => {
+        if (!this.isActiveTrailerCandidateRequest(editor, candidate.episodeId, generation)) return;
+        state.decisionLoading = false;
+        state.decisionError = 'The decision was not confirmed. Refresh the candidate status and try again.';
+      },
+    });
+  }
+
+  getTrailerDecisionLoading(editor: EpisodeEditorState): boolean {
+    return this.getTrailerCandidateReviewState(editor).decisionLoading;
+  }
+
+  getTrailerDecisionMessage(editor: EpisodeEditorState): string {
+    return this.getTrailerCandidateReviewState(editor).decisionMessage;
+  }
+
+  getTrailerDecisionError(editor: EpisodeEditorState): string {
+    return this.getTrailerCandidateReviewState(editor).decisionError;
+  }
+
+  getTrailerReplacementStatus(editor: EpisodeEditorState): TrailerReplacementStatus | null {
+    return this.getTrailerCandidateReviewState(editor).replacementStatus;
+  }
+
+  getTrailerReplacementLoading(editor: EpisodeEditorState): boolean {
+    return this.getTrailerCandidateReviewState(editor).replacementLoading;
+  }
+
+  getTrailerReplacementError(editor: EpisodeEditorState): string {
+    return this.getTrailerCandidateReviewState(editor).replacementError;
+  }
+
+  getMetaReplacementEntries(editor: EpisodeEditorState): Array<{ key: 'instagram_reel' | 'facebook_native_video'; label: string; status: NonNullable<TrailerReplacementStatus['destinations']['instagram_reel']> }> {
+    const destinations = this.getTrailerReplacementStatus(editor)?.destinations;
+    return (['instagram_reel', 'facebook_native_video'] as const).flatMap((key) => destinations?.[key]
+      ? [{ key, label: key === 'instagram_reel' ? 'Instagram Reel' : 'Facebook video', status: destinations[key]! }]
+      : []);
+  }
+
+  getTrailerReplacementSummary(editor: EpisodeEditorState): string {
+    const status = this.getTrailerReplacementStatus(editor);
+    if (!status) return 'Replacement status is not available; completion is unconfirmed.';
+    if (status.replacementComplete) return 'Trailer replacement is confirmed complete across all configured destinations.';
+    switch (status.status) {
+      case 'waiting_for_operator_retirement': return 'Successors are live, but a linked Meta predecessor still needs manual retirement confirmation.';
+      case 'waiting_for_youtube_action': return 'Waiting for the separate Upload to YouTube action.';
+      case 'waiting_for_youtube_public_success': return 'Waiting for YouTube public-success confirmation.';
+      case 'waiting_for_youtube_retirement': return 'YouTube predecessor retirement is not confirmed.';
+      case 'waiting_for_telegram': return 'Telegram trailer/access replacement is still pending or unconfirmed.';
+      case 'waiting_for_successor': return 'One or more configured destinations have not confirmed the replacement yet.';
+      default: return 'Destination replacement remains incomplete.';
+    }
+  }
+
+  getTelegramReplacementLabel(editor: EpisodeEditorState): string {
+    const telegram = this.getTrailerReplacementStatus(editor)?.telegram;
+    if (!telegram?.configured || telegram.status === 'not_applicable') return 'Telegram replacement: not configured for this workflow.';
+    if (telegram.status === 'complete' || telegram.status === 'replayed') return 'Telegram trailer and advance-access posts replaced in place.';
+    if (telegram.status === 'in_progress') return 'Telegram is replacing the existing trailer and advance-access posts in place.';
+    if (telegram.status === 'temporary_failure' || telegram.status === 'unknown' || telegram.status === 'permanent_failure') return `Telegram replacement: ${telegram.status.replaceAll('_', ' ')}; completion is unconfirmed.`;
+    return 'Telegram trailer and advance-access replacement is pending.';
+  }
+
+  canConfirmTrailerPredecessorRetirement(editor: EpisodeEditorState, destination: 'instagram_reel' | 'facebook_native_video'): boolean {
+    const item = this.getTrailerReplacementStatus(editor)?.destinations[destination];
+    return Boolean(item?.predecessor && item.retirementStatus === 'manual_retirement_required'
+      && !this.getTrailerCandidateReviewState(editor).retirementLoading);
+  }
+
+  isTrailerPredecessorRetirementLoading(editor: EpisodeEditorState, destination: 'instagram_reel' | 'facebook_native_video'): boolean {
+    return this.getTrailerCandidateReviewState(editor).retirementLoading === destination;
+  }
+
+  refreshTrailerReplacementStatus(editor: EpisodeEditorState): void {
+    const state = this.getTrailerCandidateReviewState(editor);
+    if (state.replacementStatus) {
+      state.replacementPollCount = 0;
+      this.loadTrailerReplacementStatus(editor, state.replacementStatus.episodeId, state.replacementStatus.sourceRevision, state.generation);
+    }
+  }
+
+  confirmTrailerPredecessorRetirement(editor: EpisodeEditorState, destination: 'instagram_reel' | 'facebook_native_video'): void {
+    const state = this.getTrailerCandidateReviewState(editor);
+    const replacement = state.replacementStatus;
+    const item = replacement?.destinations[destination];
+    if (!replacement || !item?.predecessor || item.retirementStatus !== 'manual_retirement_required' || state.retirementLoading) return;
+    if (!window.confirm(`Confirm only after you remove the linked old post in Meta. This confirmation applies to predecessor ${item.predecessor.remoteId} for revision ${replacement.sourceRevision}.`)) return;
+    state.retirementLoading = destination;
+    state.replacementError = '';
+    this.apiService.confirmTrailerPredecessorRetirement(replacement.episodeId, replacement.sourceRevision, destination, item.predecessor.remoteId).subscribe({
+      next: (response) => {
+        if (state.replacementStatus?.sourceRevision !== response.sourceRevision
+          || response.destination !== destination
+          || response.predecessor?.remoteId !== item.predecessor?.remoteId) return;
+        state.retirementLoading = null;
+        this.loadTrailerReplacementStatus(editor, replacement.episodeId, replacement.sourceRevision, state.generation);
+      },
+      error: () => {
+        state.retirementLoading = null;
+        state.replacementError = 'Meta retirement confirmation was not accepted. The exact predecessor remains incomplete.';
+      },
+    });
+  }
+
+  private loadTrailerReplacementStatus(editor: EpisodeEditorState, episodeId: number, sourceRevision: string, generation: number, polling = false): void {
+    const state = this.getTrailerCandidateReviewState(editor);
+    if (state.replacementTimer !== null) window.clearTimeout(state.replacementTimer);
+    state.replacementTimer = null;
+    state.replacementSubscription?.unsubscribe();
+    state.replacementSubscription = null;
+    if (!polling) state.replacementPollCount = 0;
+    state.replacementLoading = true;
+    state.replacementError = '';
+    state.replacementSubscription = this.apiService.getTrailerReplacementStatus(episodeId, sourceRevision).subscribe({
+      next: (status) => {
+        if (!this.isActiveTrailerCandidateRequest(editor, episodeId, generation) || status.episodeId !== episodeId || status.sourceRevision !== sourceRevision) return;
+        state.replacementLoading = false;
+        state.replacementSubscription = null;
+        state.replacementStatus = status;
+        if (!status.replacementComplete && state.replacementPollCount < 20) {
+          state.replacementTimer = window.setTimeout(() => {
+            state.replacementTimer = null;
+            state.replacementPollCount += 1;
+            this.loadTrailerReplacementStatus(editor, episodeId, sourceRevision, generation, true);
+          }, 5000);
+        }
+      },
+      error: () => {
+        if (!this.isActiveTrailerCandidateRequest(editor, episodeId, generation)) return;
+        state.replacementLoading = false;
+        state.replacementSubscription = null;
+        state.replacementError = 'Replacement status could not be loaded. Its completion remains unconfirmed.';
+      },
+    });
+  }
+
   getTrailerTranscript(editor: EpisodeEditorState): string {
     return this.getTrailerCandidateReviewState(editor).transcriptText;
   }
@@ -949,6 +1143,17 @@ export class ManageComponent implements OnInit, OnDestroy {
         previewError: '',
         previewExpiryTimer: null,
         previewSubscription: null,
+        decisionLoading: false,
+        decisionMessage: '',
+        decisionError: '',
+        decisionMade: false,
+        replacementStatus: null,
+        replacementLoading: false,
+        replacementError: '',
+        retirementLoading: null,
+        replacementTimer: null,
+        replacementSubscription: null,
+        replacementPollCount: 0,
       };
       this.trailerCandidateReviewStates.set(editor, state);
     }
@@ -961,6 +1166,10 @@ export class ManageComponent implements OnInit, OnDestroy {
     const state = this.getTrailerCandidateReviewState(editor);
     if (state.timer !== null) window.clearTimeout(state.timer);
     state.subscription?.unsubscribe();
+    if (state.replacementTimer !== null) window.clearTimeout(state.replacementTimer);
+    state.replacementTimer = null;
+    state.replacementSubscription?.unsubscribe();
+    state.replacementSubscription = null;
     this.clearTrailerCandidatePreview(state);
     Object.assign(state, {
       candidate: null,
@@ -974,6 +1183,17 @@ export class ManageComponent implements OnInit, OnDestroy {
       error: '',
       timer: null,
       subscription: null,
+      decisionLoading: false,
+      decisionMessage: '',
+      decisionError: '',
+      decisionMade: false,
+      replacementStatus: null,
+      replacementLoading: false,
+      replacementError: '',
+      retirementLoading: null,
+      replacementTimer: null,
+      replacementSubscription: null,
+      replacementPollCount: 0,
     });
   }
 
@@ -997,10 +1217,14 @@ export class ManageComponent implements OnInit, OnDestroy {
     if (!this.apiService.getCurrentTrailerCandidate
       || !Number.isInteger(episodeId) || (episodeId ?? 0) <= 0 || !this.isTrailerCandidateEditorActive(editor, episodeId!)) return;
     const state = this.getTrailerCandidateReviewState(editor);
+    if (state.replacementTimer !== null) window.clearTimeout(state.replacementTimer);
+    state.replacementTimer = null;
+    state.replacementSubscription?.unsubscribe();
+    state.replacementSubscription = null;
     this.clearTrailerCandidatePreview(state);
     const generation = (this.trailerCandidateReviewGenerations.get(editor) ?? 0) + 1;
     this.trailerCandidateReviewGenerations.set(editor, generation);
-    Object.assign(state, { candidate: null, episodeId, generation, sourceFingerprint: null, loading: true, error: '', timer: null, subscription: null, generationInFlight: false });
+    Object.assign(state, { candidate: null, episodeId, generation, sourceFingerprint: null, loading: true, error: '', timer: null, subscription: null, generationInFlight: false, decisionLoading: false, decisionMessage: '', decisionError: '', decisionMade: false, replacementStatus: null, replacementLoading: false, replacementError: '', retirementLoading: null, replacementPollCount: 0 });
     state.subscription = this.apiService.getCurrentTrailerCandidate(episodeId).subscribe({
       next: (candidate) => {
         if (!this.isActiveTrailerCandidateRequest(editor, episodeId, generation)) return;
@@ -1150,6 +1374,10 @@ export class ManageComponent implements OnInit, OnDestroy {
     this.clearTrailerCandidatePreview(state);
     if (state.timer !== null) window.clearTimeout(state.timer);
     state.subscription?.unsubscribe();
+    if (state.replacementTimer !== null) window.clearTimeout(state.replacementTimer);
+    state.replacementTimer = null;
+    state.replacementSubscription?.unsubscribe();
+    state.replacementSubscription = null;
     const generation = (this.trailerCandidateReviewGenerations.get(editor) ?? state.generation) + 1;
     this.trailerCandidateReviewGenerations.set(editor, generation);
     Object.assign(state, {
