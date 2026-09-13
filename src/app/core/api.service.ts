@@ -405,6 +405,13 @@ export interface TrailerCandidateReviewStatus {
   readyAt: string | null;
 }
 
+export interface TrailerCandidatePreviewGrant {
+  episodeId: number;
+  candidateId: string;
+  previewUrl: string;
+  expiresAt: string;
+}
+
 export interface HealthStatus {
   status: string;
   uptime: number;
@@ -531,6 +538,13 @@ export class ApiService {
 
   getTrailerCandidate(episodeId: number, candidateId: string): Observable<TrailerCandidateReviewStatus> {
     return this.http.get<TrailerCandidateReviewStatus>(`${environment.apiBaseUrl}/episodes/${episodeId}/trailer-candidates/${encodeURIComponent(candidateId)}`);
+  }
+
+  createTrailerCandidatePreviewGrant(episodeId: number, candidateId: string): Observable<TrailerCandidatePreviewGrant> {
+    return this.http.post<TrailerCandidatePreviewGrant>(
+      `${environment.apiBaseUrl}/episodes/${episodeId}/trailer-candidates/${encodeURIComponent(candidateId)}/preview-grant`,
+      {},
+    );
   }
 
   uploadEpisodeCover(episodeId: number, file: File): Observable<HttpEvent<Episode>> {

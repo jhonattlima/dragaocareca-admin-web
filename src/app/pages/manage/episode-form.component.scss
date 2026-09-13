@@ -20,6 +20,15 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
+.trailer-candidate-preview-video {
+  aspect-ratio: 1 / 1;
+  background: #000;
+  display: block;
+  max-width: 100%;
+  object-fit: contain;
+  width: min(100%, 360px);
+}
+
 .auto-grow-textarea {
   field-sizing: content;
   max-height: 35rem;

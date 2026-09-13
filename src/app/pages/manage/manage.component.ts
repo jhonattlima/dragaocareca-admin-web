@@ -10,6 +10,7 @@ import {
   EpisodeTrailerVideoDraftReservation,
   EpisodeTrailerVideoUploadResponse,
   TrailerCandidateReviewStatus,
+  TrailerCandidatePreviewGrant,
   YoutubeTrailerJobSnapshot,
   StructuredEntryCatalogResponse,
   HashtagLookupResponse,
@@ -86,6 +87,14 @@ interface TrailerCandidateReviewState {
   error: string;
   timer: number | null;
   subscription: Subscription | null;
+  previewUrl: string | null;
+  previewCandidateId: string | null;
+  previewSourceFingerprint: string | null;
+  previewExpiresAt: number | null;
+  previewLoading: boolean;
+  previewError: string;
+  previewExpiryTimer: number | null;
+  previewSubscription: Subscription | null;
 }
 
 type SaveTransactionPhase = 'saving' | 'committing' | 'success' | 'error';
@@ -774,6 +783,24 @@ export class ManageComponent implements OnInit, OnDestroy {
     return this.getTrailerCandidateReviewState(editor).error;
   }
 
+  getTrailerCandidatePreviewUrl(editor: EpisodeEditorState): string | null {
+    const state = this.getTrailerCandidateReviewState(editor);
+    const candidate = state.candidate;
+    return candidate?.isCurrent && candidate.status === 'ready' && candidate.outputValid
+      && state.previewCandidateId === candidate.candidateId
+      && state.previewSourceFingerprint === candidate.sourceFingerprint
+      ? state.previewUrl
+      : null;
+  }
+
+  isTrailerCandidatePreviewLoading(editor: EpisodeEditorState): boolean {
+    return this.getTrailerCandidateReviewState(editor).previewLoading;
+  }
+
+  getTrailerCandidatePreviewError(editor: EpisodeEditorState): string {
+    return this.getTrailerCandidateReviewState(editor).previewError;
+  }
+
   getTrailerCandidateStatusLabel(candidate: TrailerCandidateReviewStatus): string {
     if (!candidate.isCurrent) return 'This trailer candidate is out of date';
     switch (candidate.status) {
@@ -806,6 +833,14 @@ export class ManageComponent implements OnInit, OnDestroy {
         error: '',
         timer: null,
         subscription: null,
+        previewUrl: null,
+        previewCandidateId: null,
+        previewSourceFingerprint: null,
+        previewExpiresAt: null,
+        previewLoading: false,
+        previewError: '',
+        previewExpiryTimer: null,
+        previewSubscription: null,
       };
       this.trailerCandidateReviewStates.set(editor, state);
     }
@@ -818,6 +853,7 @@ export class ManageComponent implements OnInit, OnDestroy {
     const state = this.getTrailerCandidateReviewState(editor);
     if (state.timer !== null) window.clearTimeout(state.timer);
     state.subscription?.unsubscribe();
+    this.clearTrailerCandidatePreview(state);
     Object.assign(state, {
       candidate: null,
       episodeId: null,
@@ -830,10 +866,26 @@ export class ManageComponent implements OnInit, OnDestroy {
     });
   }
 
+  private clearTrailerCandidatePreview(state: TrailerCandidateReviewState): void {
+    if (state.previewExpiryTimer !== null) window.clearTimeout(state.previewExpiryTimer);
+    state.previewSubscription?.unsubscribe();
+    Object.assign(state, {
+      previewUrl: null,
+      previewCandidateId: null,
+      previewSourceFingerprint: null,
+      previewExpiresAt: null,
+      previewLoading: false,
+      previewError: '',
+      previewExpiryTimer: null,
+      previewSubscription: null,
+    });
+  }
+
   private loadCurrentTrailerCandidate(editor: EpisodeEditorState): void {
     const episodeId = editor.editingEpisodeId;
     if (!episodeId || editor.formModel.episodeId !== episodeId) return;
     const state = this.getTrailerCandidateReviewState(editor);
+    this.clearTrailerCandidatePreview(state);
     const generation = (this.trailerCandidateReviewGenerations.get(editor) ?? 0) + 1;
     this.trailerCandidateReviewGenerations.set(editor, generation);
     Object.assign(state, { candidate: null, episodeId, generation, sourceFingerprint: null, loading: true, error: '', timer: null, subscription: null });
@@ -844,6 +896,7 @@ export class ManageComponent implements OnInit, OnDestroy {
         state.loading = false;
         state.candidate = candidate;
         state.sourceFingerprint = candidate.sourceFingerprint;
+        this.syncTrailerCandidatePreview(editor, candidate, generation);
         this.scheduleTrailerCandidatePoll(editor, candidate, generation);
       },
       error: (error) => {
@@ -885,6 +938,7 @@ export class ManageComponent implements OnInit, OnDestroy {
             || updated.sourceFingerprint !== candidate.sourceFingerprint) return;
           state.subscription = null;
           state.candidate = updated;
+          this.syncTrailerCandidatePreview(editor, updated, generation);
           this.scheduleTrailerCandidatePoll(editor, updated, generation);
         },
         error: () => {
@@ -894,6 +948,101 @@ export class ManageComponent implements OnInit, OnDestroy {
         },
       });
     }, 2500);
+  }
+
+  private syncTrailerCandidatePreview(editor: EpisodeEditorState, candidate: TrailerCandidateReviewStatus, generation: number): void {
+    const state = this.getTrailerCandidateReviewState(editor);
+    if (!candidate.isCurrent || candidate.status !== 'ready' || !candidate.outputValid) {
+      this.clearTrailerCandidatePreview(state);
+      return;
+    }
+    if (state.previewCandidateId === candidate.candidateId
+      && state.previewSourceFingerprint === candidate.sourceFingerprint
+      && state.previewUrl
+      && state.previewExpiresAt !== null
+      && state.previewExpiresAt > Date.now()) return;
+    if (state.previewLoading
+      && state.previewCandidateId === candidate.candidateId
+      && state.previewSourceFingerprint === candidate.sourceFingerprint) return;
+
+    this.clearTrailerCandidatePreview(state);
+    state.previewCandidateId = candidate.candidateId;
+    state.previewSourceFingerprint = candidate.sourceFingerprint;
+    state.previewLoading = true;
+    const request = this.apiService.createTrailerCandidatePreviewGrant(candidate.episodeId, candidate.candidateId).subscribe({
+      next: (grant) => {
+        if (!this.isActiveTrailerCandidateRequest(editor, candidate.episodeId, generation)
+          || state.candidate?.candidateId !== candidate.candidateId
+          || state.candidate.sourceFingerprint !== candidate.sourceFingerprint
+          || !state.candidate.isCurrent || state.candidate.status !== 'ready' || !state.candidate.outputValid) return;
+        state.previewSubscription = null;
+        state.previewLoading = false;
+        const previewUrl = this.validateTrailerCandidatePreviewGrant(grant, candidate);
+        if (!previewUrl) {
+          state.previewError = 'The private trailer preview could not be opened. Refresh the episode to try again.';
+          return;
+        }
+        const expiresAt = Date.parse(grant.expiresAt);
+        state.previewUrl = previewUrl;
+        state.previewExpiresAt = expiresAt;
+        const refreshIn = Math.max(1000, expiresAt - Date.now() - 15000);
+        state.previewExpiryTimer = window.setTimeout(() => {
+          if (!this.isActiveTrailerCandidateRequest(editor, candidate.episodeId, generation)
+            || state.candidate?.candidateId !== candidate.candidateId
+            || state.candidate?.sourceFingerprint !== candidate.sourceFingerprint) return;
+          state.previewUrl = null;
+          state.previewExpiresAt = null;
+          state.previewExpiryTimer = null;
+          const currentCandidate = state.candidate;
+          if (currentCandidate) this.syncTrailerCandidatePreview(editor, currentCandidate, generation);
+        }, refreshIn);
+      },
+      error: () => {
+        if (!this.isActiveTrailerCandidateRequest(editor, candidate.episodeId, generation)
+          || state.candidate?.candidateId !== candidate.candidateId
+          || state.candidate.sourceFingerprint !== candidate.sourceFingerprint) return;
+        state.previewSubscription = null;
+        state.previewLoading = false;
+        state.previewError = 'The private trailer preview could not be opened. Refresh the episode to try again.';
+      },
+    });
+    state.previewSubscription = request.closed ? null : request;
+  }
+
+  private validateTrailerCandidatePreviewGrant(grant: TrailerCandidatePreviewGrant, candidate: TrailerCandidateReviewStatus): string | null {
+    if (grant.episodeId !== candidate.episodeId || grant.candidateId !== candidate.candidateId
+      || typeof grant.previewUrl !== 'string' || !grant.previewUrl
+      || !Number.isFinite(Date.parse(grant.expiresAt)) || Date.parse(grant.expiresAt) <= Date.now()) return null;
+    try {
+      const apiBase = new URL(environment.apiBaseUrl);
+      const preview = new URL(grant.previewUrl, apiBase);
+      const expectedPath = `/v1/episodes/${candidate.episodeId}/trailer-candidates/${encodeURIComponent(candidate.candidateId)}/preview`;
+      const grants = preview.searchParams.getAll('grant');
+      if (preview.origin !== apiBase.origin || preview.pathname !== expectedPath
+        || grants.length !== 1 || !/^[A-Za-z0-9_-]{43}$/u.test(grants[0])
+        || Array.from(preview.searchParams.keys()).some((key) => key !== 'grant')) return null;
+      return preview.toString();
+    } catch {
+      return null;
+    }
+  }
+
+  private invalidateTrailerCandidateForSourceChange(editor: EpisodeEditorState): void {
+    const state = this.getTrailerCandidateReviewState(editor);
+    this.clearTrailerCandidatePreview(state);
+    if (state.timer !== null) window.clearTimeout(state.timer);
+    state.subscription?.unsubscribe();
+    const generation = (this.trailerCandidateReviewGenerations.get(editor) ?? state.generation) + 1;
+    this.trailerCandidateReviewGenerations.set(editor, generation);
+    Object.assign(state, {
+      candidate: null,
+      sourceFingerprint: null,
+      generation,
+      loading: false,
+      error: '',
+      timer: null,
+      subscription: null,
+    });
   }
 
   private getYoutubeSourceIdentity(editor: EpisodeEditorState): string {
@@ -3269,6 +3418,11 @@ export class ManageComponent implements OnInit, OnDestroy {
       return;
     }
 
+    const changesTrailerSource = kind === 'trailer' || kind === 'cover';
+    if (changesTrailerSource && editor.editingEpisodeId === episodeId) {
+      this.invalidateTrailerCandidateForSourceChange(editor);
+    }
+
     if (kind === 'audio') {
       const retryFiles = this.retryableUploadFiles.get(editor) ?? {};
       retryFiles[kind] = file;
@@ -3349,11 +3503,17 @@ export class ManageComponent implements OnInit, OnDestroy {
               this.successMessage = episode.message;
             }
             this.uploadStates[kind] = { ...this.uploadStates[kind], progress: 100 };
+            if (changesTrailerSource && editor.editingEpisodeId === episodeId) {
+              this.loadCurrentTrailerCandidate(editor);
+            }
           }
         },
         error: (error) => {
           this.errorMessage = error?.error?.message ?? `Could not upload ${definition.label.toLowerCase()}.`;
           this.uploadStates[kind] = { ...this.uploadStates[kind], progress: 0 };
+          if (changesTrailerSource && editor.editingEpisodeId === episodeId) {
+            this.loadCurrentTrailerCandidate(editor);
+          }
         },
       });
   }
@@ -3383,6 +3543,11 @@ export class ManageComponent implements OnInit, OnDestroy {
 
     this.errorMessage = '';
     this.successMessage = '';
+
+    const changesTrailerSource = kind === 'trailer' || kind === 'cover';
+    if (changesTrailerSource && editor.editingEpisodeId === episodeId) {
+      this.invalidateTrailerCandidateForSourceChange(editor);
+    }
 
     if (kind === 'trailerVideo') {
       this.clearYoutubeTrailerJobPolling(editor);
@@ -3419,9 +3584,15 @@ export class ManageComponent implements OnInit, OnDestroy {
         next: (episode) => {
           editor.formModel[definition.fileField] = episode[definition.fileField] ?? '';
           this.successMessage = `${definition.label} removed.`;
+          if (changesTrailerSource && editor.editingEpisodeId === episodeId) {
+            this.loadCurrentTrailerCandidate(editor);
+          }
         },
         error: (error) => {
           this.errorMessage = error?.error?.message ?? `Could not delete ${definition.label.toLowerCase()}.`;
+          if (changesTrailerSource && editor.editingEpisodeId === episodeId) {
+            this.loadCurrentTrailerCandidate(editor);
+          }
         },
       });
   }

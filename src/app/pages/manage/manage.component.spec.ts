@@ -3,7 +3,7 @@ import { HttpEventType, HttpHeaders, HttpResponse } from '@angular/common/http';
 import { discardPeriodicTasks, fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { of, Subject, throwError } from 'rxjs';
-import { ApiService, Episode, EpisodeArtifactJobSnapshot, EpisodeGeneratedSummaryStatus, EpisodeTrailerVideoUploadResponse, EpisodeTranscriptionStatus, HashtagLookupResponse, SuggestedTagsSnapshot, TrailerCandidateReviewStatus, YoutubeTrailerJobSnapshot } from '../../core/api.service';
+import { ApiService, Episode, EpisodeArtifactJobSnapshot, EpisodeGeneratedSummaryStatus, EpisodeTrailerVideoUploadResponse, EpisodeTranscriptionStatus, HashtagLookupResponse, SuggestedTagsSnapshot, TrailerCandidatePreviewGrant, TrailerCandidateReviewStatus, YoutubeTrailerJobSnapshot } from '../../core/api.service';
 import { EpisodeFormComponent } from './episode-form.component';
 import { ManageComponent } from './manage.component';
 import { environment as developmentEnvironment } from '../../../environments/environment';
@@ -31,6 +31,13 @@ const trailerCandidateStatus = (episodeId = 42, overrides: Partial<TrailerCandid
   ...overrides,
 });
 
+const trailerCandidatePreviewGrant = (episodeId = 42, candidateId = `candidate-${episodeId}`, token = 'A'.repeat(43), expiresAt = new Date(Date.now() + 60_000).toISOString()): TrailerCandidatePreviewGrant => ({
+  episodeId,
+  candidateId,
+  previewUrl: `/v1/episodes/${episodeId}/trailer-candidates/${encodeURIComponent(candidateId)}/preview?grant=${token}`,
+  expiresAt,
+});
+
 describe('ManageComponent summary flow', () => {
   let apiService: jasmine.SpyObj<ApiService>;
   let component: ManageComponent;
@@ -55,11 +62,13 @@ describe('ManageComponent summary flow', () => {
       'lookupHashtag',
       'getCurrentTrailerCandidate',
       'getTrailerCandidate',
+      'createTrailerCandidatePreviewGrant',
     ]);
     apiService.listEpisodes.and.returnValue(of([]));
     apiService.listStructuredEntryCatalog.and.returnValue(of({ guests: [], musicCredits: [] }));
     apiService.getCurrentTrailerCandidate.and.returnValue(throwError(() => ({ status: 404 })));
     apiService.getTrailerCandidate.and.returnValue(of(trailerCandidateStatus()));
+    apiService.createTrailerCandidatePreviewGrant.and.callFake((episodeId, candidateId) => of(trailerCandidatePreviewGrant(episodeId, candidateId)));
     apiService.transcribeEpisodeWithWhisper = jasmine.createSpy('transcribeEpisodeWithWhisper');
     apiService.downloadEpisodeArtifact.and.returnValue(of(new HttpResponse<Blob>({
       body: new Blob(['zip'], { type: 'application/zip' }),
@@ -681,6 +690,90 @@ describe('ManageComponent summary flow', () => {
     expect(component.formatTrailerCandidateDuration(candidate?.durationSeconds ?? null)).toBe('1:38');
   });
 
+  it('uses only the exact API-issued grant for the current ready candidate and clears it when currentness changes', () => {
+    apiService.getCurrentTrailerCandidate.and.returnValues(
+      of(trailerCandidateStatus(42)),
+      of(trailerCandidateStatus(42, { isCurrent: false, status: 'stale' })),
+    );
+    const exactGrant = trailerCandidatePreviewGrant(42, 'candidate-42', 'B'.repeat(43));
+    apiService.createTrailerCandidatePreviewGrant.and.returnValue(of(exactGrant));
+    component.startEdit({
+      episodeId: 42, title: 'Episode 42', summary: 'Summary', pubDate: '2026-07-24T00:00:00.000Z', explicit: 'no',
+    });
+
+    expect(apiService.createTrailerCandidatePreviewGrant).toHaveBeenCalledOnceWith(42, 'candidate-42');
+    expect(component.getTrailerCandidatePreviewUrl(component.episodesEditorState)).toBe(`http://localhost:3000${exactGrant.previewUrl}`);
+
+    component.startEdit({
+      episodeId: 42, title: 'Episode 42', summary: 'Summary', pubDate: '2026-07-24T00:00:00.000Z', explicit: 'no',
+    });
+    expect(component.getTrailerCandidatePreviewUrl(component.episodesEditorState)).toBeNull();
+    expect(apiService.createTrailerCandidatePreviewGrant).toHaveBeenCalledTimes(1);
+    component.ngOnDestroy();
+  });
+
+  it('does not let a late preview grant from the previous editor bind to the active editor', () => {
+    const oldGrant = new Subject<TrailerCandidatePreviewGrant>();
+    const activeGrant = new Subject<TrailerCandidatePreviewGrant>();
+    apiService.getCurrentTrailerCandidate.and.returnValues(of(trailerCandidateStatus(42)), of(trailerCandidateStatus(43)));
+    apiService.createTrailerCandidatePreviewGrant.and.returnValues(oldGrant.asObservable(), activeGrant.asObservable());
+    component.startEdit({
+      episodeId: 42, title: 'Episode 42', summary: 'Summary', pubDate: '2026-07-24T00:00:00.000Z', explicit: 'no',
+    });
+    component.startEdit({
+      episodeId: 43, title: 'Episode 43', summary: 'Summary', pubDate: '2026-07-25T00:00:00.000Z', explicit: 'no',
+    });
+
+    oldGrant.next(trailerCandidatePreviewGrant(42));
+    expect(component.getTrailerCandidatePreviewUrl(component.episodesEditorState)).toBeNull();
+    activeGrant.next(trailerCandidatePreviewGrant(43));
+    expect(component.getTrailerCandidatePreviewUrl(component.episodesEditorState)).toContain('/episodes/43/trailer-candidates/candidate-43/preview');
+    component.ngOnDestroy();
+  });
+
+  it('clears the old preview as soon as trailer source replacement starts and reloads currentness after staging', () => {
+    apiService.getCurrentTrailerCandidate.and.returnValues(
+      of(trailerCandidateStatus(42)),
+      of(trailerCandidateStatus(42, { isCurrent: false, status: 'stale' })),
+    );
+    apiService.uploadEpisodeTrailer.and.returnValue(of(new HttpResponse<Episode>({
+      body: { episodeId: 42, trailerFileName: 'episodes/42/new-trailer.mp3' } as Episode,
+    })));
+    component.startEdit({
+      episodeId: 42, title: 'Episode 42', summary: 'Summary', pubDate: '2026-07-24T00:00:00.000Z', explicit: 'no',
+    });
+    const editor = component.episodesEditorState;
+    expect(component.getTrailerCandidatePreviewUrl(editor)).not.toBeNull();
+
+    component.uploadMedia(editor, 'trailer', new File(['audio'], 'new-trailer.mp3', { type: 'audio/mpeg' }));
+    expect(component.getTrailerCandidatePreviewUrl(editor)).toBeNull();
+    expect(component.getTrailerCandidate(editor)?.isCurrent).toBeFalse();
+    expect(apiService.createTrailerCandidatePreviewGrant).toHaveBeenCalledOnceWith(42, 'candidate-42');
+    component.ngOnDestroy();
+  });
+
+  it('refreshes an expiring native preview grant without changing its candidate binding', fakeAsync(() => {
+    let grantNumber = 0;
+    apiService.getCurrentTrailerCandidate.and.returnValue(of(trailerCandidateStatus(42)));
+    apiService.createTrailerCandidatePreviewGrant.and.callFake((episodeId, candidateId) => {
+      grantNumber += 1;
+      return of(trailerCandidatePreviewGrant(episodeId, candidateId, String.fromCharCode(64 + grantNumber).repeat(43), new Date(Date.now() + 15_000).toISOString()));
+    });
+    component.startEdit({
+      episodeId: 42, title: 'Episode 42', summary: 'Summary', pubDate: '2026-07-24T00:00:00.000Z', explicit: 'no',
+    });
+    const firstUrl = component.getTrailerCandidatePreviewUrl(component.episodesEditorState);
+    tick(1000);
+    const secondUrl = component.getTrailerCandidatePreviewUrl(component.episodesEditorState);
+
+    expect(firstUrl).not.toBeNull();
+    expect(secondUrl).not.toBe(firstUrl);
+    expect(apiService.createTrailerCandidatePreviewGrant).toHaveBeenCalledTimes(2);
+    expect(component.getTrailerCandidate(component.episodesEditorState)?.candidateId).toBe('candidate-42');
+    component.ngOnDestroy();
+    discardPeriodicTasks();
+  }));
+
   it('ignores a delayed candidate response after switching to another episode editor', () => {
     const oldResponse = new Subject<TrailerCandidateReviewStatus>();
     const currentResponse = new Subject<TrailerCandidateReviewStatus>();
@@ -695,6 +788,32 @@ describe('ManageComponent summary flow', () => {
     oldResponse.next(trailerCandidateStatus(42));
     expect(component.getTrailerCandidate(component.episodesEditorState)).toBeNull();
     currentResponse.next(trailerCandidateStatus(43));
+    expect(component.getTrailerCandidate(component.episodesEditorState)?.candidateId).toBe('candidate-43');
+    component.ngOnDestroy();
+  });
+
+  it('exposes empty, loading, safe error, and populated candidate states', () => {
+    apiService.getCurrentTrailerCandidate.and.returnValue(throwError(() => ({ status: 404 })));
+    component.startEdit({
+      episodeId: 42, title: 'Episode 42', summary: 'Summary', pubDate: '2026-07-24T00:00:00.000Z', explicit: 'no',
+    });
+    expect(component.getTrailerCandidate(component.episodesEditorState)).toBeNull();
+    expect(component.getTrailerCandidateError(component.episodesEditorState)).toBe('');
+
+    const pending = new Subject<TrailerCandidateReviewStatus>();
+    apiService.getCurrentTrailerCandidate.and.returnValue(pending.asObservable());
+    component.startEdit({
+      episodeId: 43, title: 'Episode 43', summary: 'Summary', pubDate: '2026-07-25T00:00:00.000Z', explicit: 'no',
+    });
+    expect(component.isTrailerCandidateLoading(component.episodesEditorState)).toBeTrue();
+    pending.error({ status: 500 });
+    expect(component.isTrailerCandidateLoading(component.episodesEditorState)).toBeFalse();
+    expect(component.getTrailerCandidateError(component.episodesEditorState)).toContain('could not be loaded');
+
+    apiService.getCurrentTrailerCandidate.and.returnValue(of(trailerCandidateStatus(43)));
+    component.startEdit({
+      episodeId: 43, title: 'Episode 43', summary: 'Summary', pubDate: '2026-07-25T00:00:00.000Z', explicit: 'no',
+    });
     expect(component.getTrailerCandidate(component.episodesEditorState)?.candidateId).toBe('candidate-43');
     component.ngOnDestroy();
   });
@@ -1296,9 +1415,12 @@ describe('EpisodeFormComponent trailer video card', () => {
     apiService = jasmine.createSpyObj<ApiService>('ApiService', [
       'listEpisodes', 'reserveEpisodeDraft', 'uploadEpisodeTrailerVideo', 'createEpisode',
       'getEpisodeTranscriptionStatus', 'getEpisodeGeneratedSummaryStatus', 'startEpisodeArtifactJob',
-      'getEpisodeArtifactJobStatus', 'downloadEpisodeArtifact',
+      'getEpisodeArtifactJobStatus', 'downloadEpisodeArtifact', 'getCurrentTrailerCandidate',
+      'createTrailerCandidatePreviewGrant',
     ]);
     apiService.listEpisodes.and.returnValue(of([]));
+    apiService.getCurrentTrailerCandidate.and.returnValue(throwError(() => ({ status: 404 })));
+    apiService.createTrailerCandidatePreviewGrant.and.callFake((episodeId, candidateId) => of(trailerCandidatePreviewGrant(episodeId, candidateId)));
     manage = new ManageComponent(apiService);
     await TestBed.configureTestingModule({
       declarations: [EpisodeFormComponent],
@@ -1322,6 +1444,30 @@ describe('EpisodeFormComponent trailer video card', () => {
     expect(renderedCard.querySelector('input')?.getAttribute('accept')).toBe('.mp4,video/mp4');
     expect(renderedCard.textContent).not.toContain('YouTube');
     expect(renderedCard.textContent).not.toContain('Publish');
+  });
+
+  it('renders the exact private API URL in native controls and direct link with accessible candidate context', () => {
+    const editor = manage.episodesEditorState;
+    apiService.getCurrentTrailerCandidate.and.returnValue(of(trailerCandidateStatus(42)));
+    manage.startEdit({
+      episodeId: 42, title: 'Episode 42', summary: 'Summary', pubDate: '2026-07-24T00:00:00.000Z', explicit: 'no',
+    });
+    fixture.componentInstance.editor = editor;
+    fixture.detectChanges();
+
+    const video = fixture.nativeElement.querySelector('[data-trailer-candidate-preview] video') as HTMLVideoElement;
+    const link = fixture.nativeElement.querySelector('[data-trailer-candidate-preview] a') as HTMLAnchorElement;
+    const expectedUrl = `http://localhost:3000${trailerCandidatePreviewGrant().previewUrl}`;
+    expect(video).not.toBeNull();
+    expect(video.controls).toBeTrue();
+    expect(video.src).toBe(expectedUrl);
+    expect(video.getAttribute('aria-label')).toContain('episode 42, candidate version 3');
+    expect(video.getAttribute('referrerpolicy')).toBe('no-referrer');
+    expect(link.href).toBe(expectedUrl);
+    expect(link.rel).toContain('noreferrer');
+    expect(apiService.createTrailerCandidatePreviewGrant).toHaveBeenCalledOnceWith(42, 'candidate-42');
+    expect(fixture.nativeElement.textContent).toContain('Choose or replace MP4');
+    fixture.componentInstance.controller.ngOnDestroy();
   });
 
   it('keeps the last-known-good filename visible while a replacement uploads', () => {

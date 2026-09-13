@@ -80,6 +80,22 @@
                 <div class="small mt-1">Version {{ candidate.version }} · {{ controller.formatTrailerCandidateDuration(candidate.durationSeconds) }} · {{ candidate.resolution || 'Resolution unavailable' }}</div>
                 <div class="small">Profile {{ candidate.profileId }} r{{ candidate.profileRevision }} · {{ candidate.progress }}%</div>
                 <p *ngIf="candidate.errorMessage" class="small text-danger mt-2 mb-0" role="status">{{ candidate.errorMessage }}</p>
+                <p *ngIf="controller.isTrailerCandidatePreviewLoading(editor)" class="small mt-2 mb-0">Preparing private trailer preview…</p>
+                <p *ngIf="controller.getTrailerCandidatePreviewError(editor)" class="small text-danger mt-2 mb-0" role="alert">{{ controller.getTrailerCandidatePreviewError(editor) }}</p>
+                <div *ngIf="controller.getTrailerCandidatePreviewUrl(editor) as previewUrl" class="trailer-candidate-preview mt-2" data-trailer-candidate-preview>
+                  <video
+                    class="trailer-candidate-preview-video"
+                    controls
+                    preload="metadata"
+                    referrerpolicy="no-referrer"
+                    [src]="previewUrl"
+                    [attr.aria-label]="'Trailer preview for episode ' + candidate.episodeId + ', candidate version ' + candidate.version">
+                    Your browser does not support trailer video playback.
+                  </video>
+                  <a class="small d-inline-block mt-1" [href]="previewUrl" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">
+                    Open episode {{ candidate.episodeId }} trailer preview in a new tab
+                  </a>
+                </div>
               </ng-container>
             </section>
             <div *ngIf="editor.formModel.trailerVideoFileName || editor.trailerVideoDraftId" class="youtube-inline-status mt-3" aria-live="polite">
