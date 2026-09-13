@@ -9,6 +9,7 @@ import {
   EpisodeWriteInput,
   EpisodeTrailerVideoDraftReservation,
   EpisodeTrailerVideoUploadResponse,
+  TrailerCandidateReviewStatus,
   YoutubeTrailerJobSnapshot,
   StructuredEntryCatalogResponse,
   HashtagLookupResponse,
@@ -74,6 +75,17 @@ interface YoutubeTrailerJobState {
   pollingSubscription: Subscription | null;
   startInFlight: symbol | null;
   error: string;
+}
+
+interface TrailerCandidateReviewState {
+  candidate: TrailerCandidateReviewStatus | null;
+  episodeId: number | null;
+  generation: number;
+  sourceFingerprint: string | null;
+  loading: boolean;
+  error: string;
+  timer: number | null;
+  subscription: Subscription | null;
 }
 
 type SaveTransactionPhase = 'saving' | 'committing' | 'success' | 'error';
@@ -236,6 +248,8 @@ export class ManageComponent implements OnInit, OnDestroy {
   private readonly retryableUploadFiles = new WeakMap<EpisodeEditorState, Partial<Record<UploadKind, File>>>();
   private readonly trailerVideoReservations = new WeakMap<EpisodeEditorState, Subscription>();
   private readonly youtubeTrailerJobStates = new WeakMap<EpisodeEditorState, YoutubeTrailerJobState>();
+  private readonly trailerCandidateReviewStates = new WeakMap<EpisodeEditorState, TrailerCandidateReviewState>();
+  private readonly trailerCandidateReviewGenerations = new WeakMap<EpisodeEditorState, number>();
   private readonly saveTransactionStates = new WeakMap<EpisodeEditorState, SaveTransactionState>();
   private readonly hashtagLookupStates = new WeakMap<EpisodeEditorState, HashtagLookupState>();
   private readonly generationVersions = new WeakMap<EpisodeEditorState, number>();
@@ -406,6 +420,8 @@ export class ManageComponent implements OnInit, OnDestroy {
     this.clearHashtagLookup(this.episodesEditorState);
     this.cancelTrailerVideoWork(this.addEditorState, 'canceled');
     this.cancelTrailerVideoWork(this.episodesEditorState, 'canceled');
+    this.clearTrailerCandidateReview(this.addEditorState);
+    this.clearTrailerCandidateReview(this.episodesEditorState);
     this.artifactObjectUrls.forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
     this.artifactObjectUrls.clear();
   }
@@ -659,6 +675,7 @@ export class ManageComponent implements OnInit, OnDestroy {
   startEdit(episode: Episode): void {
     this.activeTab = 'episodes';
     const editor = this.episodesEditorState;
+    this.clearTrailerCandidateReview(editor);
     this.clearYoutubeTrailerJobPolling(editor);
     this.clearHashtagLookup(editor);
     editor.editingEpisodeId = episode.episodeId;
@@ -718,6 +735,7 @@ export class ManageComponent implements OnInit, OnDestroy {
     });
     this.restoreEpisodeGenerationPolling(episode.episodeId, editor);
     this.restoreCurrentYoutubeTrailerJob(editor);
+    this.loadCurrentTrailerCandidate(editor);
   }
 
   private restoreEpisodeGenerationPolling(episodeId: number, editor: EpisodeEditorState): void {
@@ -742,6 +760,140 @@ export class ManageComponent implements OnInit, OnDestroy {
 
   getYoutubeTrailerJob(editor: EpisodeEditorState): YoutubeTrailerJobSnapshot | null {
     return this.getYoutubeTrailerJobState(editor).snapshot;
+  }
+
+  getTrailerCandidate(editor: EpisodeEditorState): TrailerCandidateReviewStatus | null {
+    return this.getTrailerCandidateReviewState(editor).candidate;
+  }
+
+  isTrailerCandidateLoading(editor: EpisodeEditorState): boolean {
+    return this.getTrailerCandidateReviewState(editor).loading;
+  }
+
+  getTrailerCandidateError(editor: EpisodeEditorState): string {
+    return this.getTrailerCandidateReviewState(editor).error;
+  }
+
+  getTrailerCandidateStatusLabel(candidate: TrailerCandidateReviewStatus): string {
+    if (!candidate.isCurrent) return 'This trailer candidate is out of date';
+    switch (candidate.status) {
+      case 'pending': return 'Trailer queued for generation';
+      case 'processing': return `Generating trailer… ${candidate.progress}%`;
+      case 'waiting_capacity': return 'Waiting for available trailer-generation capacity';
+      case 'retryable': return 'Trailer generation needs attention';
+      case 'ready': return candidate.outputValid ? 'Trailer ready for review' : 'Trailer output is unavailable';
+      case 'stale': return 'Trailer source changed; generate a new version';
+      case 'superseded': return 'A newer trailer version replaced this candidate';
+    }
+  }
+
+  formatTrailerCandidateDuration(durationSeconds: number | null): string {
+    if (durationSeconds === null || !Number.isFinite(durationSeconds) || durationSeconds < 0) return 'Unknown';
+    const totalSeconds = Math.round(durationSeconds);
+    const minutes = Math.floor(totalSeconds / 60);
+    return `${minutes}:${String(totalSeconds % 60).padStart(2, '0')}`;
+  }
+
+  private getTrailerCandidateReviewState(editor: EpisodeEditorState): TrailerCandidateReviewState {
+    let state = this.trailerCandidateReviewStates.get(editor);
+    if (!state) {
+      state = {
+        candidate: null,
+        episodeId: null,
+        generation: 0,
+        sourceFingerprint: null,
+        loading: false,
+        error: '',
+        timer: null,
+        subscription: null,
+      };
+      this.trailerCandidateReviewStates.set(editor, state);
+    }
+    return state;
+  }
+
+  private clearTrailerCandidateReview(editor: EpisodeEditorState): void {
+    const generation = (this.trailerCandidateReviewGenerations.get(editor) ?? 0) + 1;
+    this.trailerCandidateReviewGenerations.set(editor, generation);
+    const state = this.getTrailerCandidateReviewState(editor);
+    if (state.timer !== null) window.clearTimeout(state.timer);
+    state.subscription?.unsubscribe();
+    Object.assign(state, {
+      candidate: null,
+      episodeId: null,
+      generation,
+      sourceFingerprint: null,
+      loading: false,
+      error: '',
+      timer: null,
+      subscription: null,
+    });
+  }
+
+  private loadCurrentTrailerCandidate(editor: EpisodeEditorState): void {
+    const episodeId = editor.editingEpisodeId;
+    if (!episodeId || editor.formModel.episodeId !== episodeId) return;
+    const state = this.getTrailerCandidateReviewState(editor);
+    const generation = (this.trailerCandidateReviewGenerations.get(editor) ?? 0) + 1;
+    this.trailerCandidateReviewGenerations.set(editor, generation);
+    Object.assign(state, { candidate: null, episodeId, generation, sourceFingerprint: null, loading: true, error: '', timer: null, subscription: null });
+    state.subscription = this.apiService.getCurrentTrailerCandidate(episodeId).subscribe({
+      next: (candidate) => {
+        if (!this.isActiveTrailerCandidateRequest(editor, episodeId, generation)) return;
+        state.subscription = null;
+        state.loading = false;
+        state.candidate = candidate;
+        state.sourceFingerprint = candidate.sourceFingerprint;
+        this.scheduleTrailerCandidatePoll(editor, candidate, generation);
+      },
+      error: (error) => {
+        if (!this.isActiveTrailerCandidateRequest(editor, episodeId, generation)) return;
+        state.subscription = null;
+        state.loading = false;
+        if (error?.status === 404) {
+          state.candidate = null;
+          state.error = '';
+        } else {
+          state.error = 'Trailer review status could not be loaded. Reopen the episode to try again.';
+        }
+      },
+    });
+  }
+
+  private isActiveTrailerCandidateRequest(editor: EpisodeEditorState, episodeId: number, generation: number): boolean {
+    const state = this.getTrailerCandidateReviewState(editor);
+    return editor === this.episodesEditorState
+      && editor.editingEpisodeId === episodeId
+      && editor.formModel.episodeId === episodeId
+      && state.episodeId === episodeId
+      && state.generation === generation
+      && this.trailerCandidateReviewGenerations.get(editor) === generation;
+  }
+
+  private scheduleTrailerCandidatePoll(editor: EpisodeEditorState, candidate: TrailerCandidateReviewStatus, generation: number): void {
+    const state = this.getTrailerCandidateReviewState(editor);
+    if (!candidate.isCurrent || !['pending', 'processing', 'waiting_capacity'].includes(candidate.status)) return;
+    state.timer = window.setTimeout(() => {
+      state.timer = null;
+      if (!this.isActiveTrailerCandidateRequest(editor, candidate.episodeId, generation)
+        || state.candidate?.candidateId !== candidate.candidateId
+        || state.sourceFingerprint !== candidate.sourceFingerprint) return;
+      state.subscription = this.apiService.getTrailerCandidate(candidate.episodeId, candidate.candidateId).subscribe({
+        next: (updated) => {
+          if (!this.isActiveTrailerCandidateRequest(editor, candidate.episodeId, generation)
+            || updated.candidateId !== candidate.candidateId
+            || updated.sourceFingerprint !== candidate.sourceFingerprint) return;
+          state.subscription = null;
+          state.candidate = updated;
+          this.scheduleTrailerCandidatePoll(editor, updated, generation);
+        },
+        error: () => {
+          if (!this.isActiveTrailerCandidateRequest(editor, candidate.episodeId, generation)) return;
+          state.subscription = null;
+          state.error = 'Trailer review status could not be refreshed. Reopen the episode to retry.';
+        },
+      });
+    }, 2500);
   }
 
   private getYoutubeSourceIdentity(editor: EpisodeEditorState): string {

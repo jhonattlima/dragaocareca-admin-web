@@ -3,12 +3,33 @@ import { HttpEventType, HttpHeaders, HttpResponse } from '@angular/common/http';
 import { discardPeriodicTasks, fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { of, Subject, throwError } from 'rxjs';
-import { ApiService, Episode, EpisodeArtifactJobSnapshot, EpisodeGeneratedSummaryStatus, EpisodeTrailerVideoUploadResponse, EpisodeTranscriptionStatus, HashtagLookupResponse, SuggestedTagsSnapshot, YoutubeTrailerJobSnapshot } from '../../core/api.service';
+import { ApiService, Episode, EpisodeArtifactJobSnapshot, EpisodeGeneratedSummaryStatus, EpisodeTrailerVideoUploadResponse, EpisodeTranscriptionStatus, HashtagLookupResponse, SuggestedTagsSnapshot, TrailerCandidateReviewStatus, YoutubeTrailerJobSnapshot } from '../../core/api.service';
 import { EpisodeFormComponent } from './episode-form.component';
 import { ManageComponent } from './manage.component';
 import { environment as developmentEnvironment } from '../../../environments/environment';
 import { environment as stagingEnvironment } from '../../../environments/environment.staging';
 import { environment as productionEnvironment } from '../../../environments/environment.prod';
+
+const trailerCandidateStatus = (episodeId = 42, overrides: Partial<TrailerCandidateReviewStatus> = {}): TrailerCandidateReviewStatus => ({
+  candidateId: `candidate-${episodeId}`,
+  episodeId,
+  version: 3,
+  status: 'ready',
+  progress: 100,
+  errorCategory: null,
+  errorMessage: null,
+  durationSeconds: 98,
+  resolution: '1280×1280',
+  profileId: 'dc-square-waveform',
+  profileRevision: 2,
+  sourceFingerprint: `fingerprint-${episodeId}`,
+  isCurrent: true,
+  outputValid: true,
+  createdAt: '2026-09-12T10:00:00.000Z',
+  updatedAt: '2026-09-12T10:01:00.000Z',
+  readyAt: '2026-09-12T10:01:00.000Z',
+  ...overrides,
+});
 
 describe('ManageComponent summary flow', () => {
   let apiService: jasmine.SpyObj<ApiService>;
@@ -32,9 +53,13 @@ describe('ManageComponent summary flow', () => {
       'updateEpisode',
       'commitYoutubeTrailerJob',
       'lookupHashtag',
+      'getCurrentTrailerCandidate',
+      'getTrailerCandidate',
     ]);
     apiService.listEpisodes.and.returnValue(of([]));
     apiService.listStructuredEntryCatalog.and.returnValue(of({ guests: [], musicCredits: [] }));
+    apiService.getCurrentTrailerCandidate.and.returnValue(throwError(() => ({ status: 404 })));
+    apiService.getTrailerCandidate.and.returnValue(of(trailerCandidateStatus()));
     apiService.transcribeEpisodeWithWhisper = jasmine.createSpy('transcribeEpisodeWithWhisper');
     apiService.downloadEpisodeArtifact.and.returnValue(of(new HttpResponse<Blob>({
       body: new Blob(['zip'], { type: 'application/zip' }),
@@ -635,6 +660,43 @@ describe('ManageComponent summary flow', () => {
     });
     expect(component.episodesEditorState.formModel.summary).toBe('Current summary');
     (component as unknown as { clearEpisodeGenerationPolling: () => void }).clearEpisodeGenerationPolling();
+  });
+
+  it('recovers the API-owned current trailer candidate on editor reload with safe metadata', () => {
+    apiService.getCurrentTrailerCandidate.and.returnValue(of(trailerCandidateStatus(42, { errorCategory: 'render_failed', errorMessage: 'Trailer generation failed. Check the source files and try again.' })));
+    component.startEdit({
+      episodeId: 42, title: 'Episode 42', summary: 'Summary', pubDate: '2026-07-24T00:00:00.000Z', explicit: 'no',
+    });
+
+    const candidate = component.getTrailerCandidate(component.episodesEditorState);
+    expect(apiService.getCurrentTrailerCandidate).toHaveBeenCalledOnceWith(42);
+    expect(candidate?.candidateId).toBe('candidate-42');
+    expect(candidate?.version).toBe(3);
+    expect(candidate?.sourceFingerprint).toBe('fingerprint-42');
+    expect(candidate?.profileId).toBe('dc-square-waveform');
+    expect(candidate?.durationSeconds).toBe(98);
+    expect(candidate?.resolution).toBe('1280×1280');
+    expect(candidate?.errorMessage).toContain('Check the source files');
+    expect(component.getTrailerCandidateStatusLabel(candidate!)).toBe('Trailer ready for review');
+    expect(component.formatTrailerCandidateDuration(candidate?.durationSeconds ?? null)).toBe('1:38');
+  });
+
+  it('ignores a delayed candidate response after switching to another episode editor', () => {
+    const oldResponse = new Subject<TrailerCandidateReviewStatus>();
+    const currentResponse = new Subject<TrailerCandidateReviewStatus>();
+    apiService.getCurrentTrailerCandidate.and.returnValues(oldResponse.asObservable(), currentResponse.asObservable());
+    component.startEdit({
+      episodeId: 42, title: 'Episode 42', summary: 'Summary 42', pubDate: '2026-07-24T00:00:00.000Z', explicit: 'no',
+    });
+    component.startEdit({
+      episodeId: 43, title: 'Episode 43', summary: 'Summary 43', pubDate: '2026-07-25T00:00:00.000Z', explicit: 'no',
+    });
+
+    oldResponse.next(trailerCandidateStatus(42));
+    expect(component.getTrailerCandidate(component.episodesEditorState)).toBeNull();
+    currentResponse.next(trailerCandidateStatus(43));
+    expect(component.getTrailerCandidate(component.episodesEditorState)?.candidateId).toBe('candidate-43');
+    component.ngOnDestroy();
   });
 
   it('preserves an operator summary edit when restored polling completes', () => {

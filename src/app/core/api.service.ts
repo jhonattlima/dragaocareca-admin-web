@@ -383,6 +383,28 @@ export interface EpisodeTrailerVideoUploadResponse {
   youtubeJob?: YoutubeTrailerJobSnapshot | null;
 }
 
+export type TrailerCandidateLifecycle = 'pending' | 'processing' | 'waiting_capacity' | 'retryable' | 'ready' | 'stale' | 'superseded';
+
+export interface TrailerCandidateReviewStatus {
+  candidateId: string;
+  episodeId: number;
+  version: number;
+  status: TrailerCandidateLifecycle;
+  progress: number;
+  errorCategory: string | null;
+  errorMessage: string | null;
+  durationSeconds: number | null;
+  resolution: string | null;
+  profileId: string;
+  profileRevision: number;
+  sourceFingerprint: string;
+  isCurrent: boolean;
+  outputValid: boolean;
+  createdAt: string;
+  updatedAt: string;
+  readyAt: string | null;
+}
+
 export interface HealthStatus {
   status: string;
   uptime: number;
@@ -501,6 +523,14 @@ export class ApiService {
         reportProgress: true,
       },
     );
+  }
+
+  getCurrentTrailerCandidate(episodeId: number): Observable<TrailerCandidateReviewStatus> {
+    return this.http.get<TrailerCandidateReviewStatus>(`${environment.apiBaseUrl}/episodes/${episodeId}/trailer-candidates/current`);
+  }
+
+  getTrailerCandidate(episodeId: number, candidateId: string): Observable<TrailerCandidateReviewStatus> {
+    return this.http.get<TrailerCandidateReviewStatus>(`${environment.apiBaseUrl}/episodes/${episodeId}/trailer-candidates/${encodeURIComponent(candidateId)}`);
   }
 
   uploadEpisodeCover(episodeId: number, file: File): Observable<HttpEvent<Episode>> {

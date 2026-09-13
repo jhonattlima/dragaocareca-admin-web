@@ -72,6 +72,16 @@
               (click)="controller.retryTrailerVideo(editor)">
               Retry upload
             </button>
+            <section *ngIf="upload.kind === 'trailerVideo' && editor.editingEpisodeId" class="trailer-candidate-review mt-3" aria-live="polite" aria-label="Generated trailer status">
+              <p *ngIf="controller.isTrailerCandidateLoading(editor)" class="small mb-2">Loading generated trailer status…</p>
+              <p *ngIf="controller.getTrailerCandidateError(editor)" class="small text-danger mb-2" role="alert">{{ controller.getTrailerCandidateError(editor) }}</p>
+              <ng-container *ngIf="controller.getTrailerCandidate(editor) as candidate">
+                <div class="small fw-semibold" data-trailer-candidate-status>{{ controller.getTrailerCandidateStatusLabel(candidate) }}</div>
+                <div class="small mt-1">Version {{ candidate.version }} · {{ controller.formatTrailerCandidateDuration(candidate.durationSeconds) }} · {{ candidate.resolution || 'Resolution unavailable' }}</div>
+                <div class="small">Profile {{ candidate.profileId }} r{{ candidate.profileRevision }} · {{ candidate.progress }}%</div>
+                <p *ngIf="candidate.errorMessage" class="small text-danger mt-2 mb-0" role="status">{{ candidate.errorMessage }}</p>
+              </ng-container>
+            </section>
             <div *ngIf="editor.formModel.trailerVideoFileName || editor.trailerVideoDraftId" class="youtube-inline-status mt-3" aria-live="polite">
               <div class="small fw-semibold">YouTube: {{ controller.getYoutubeTrailerJobStatusLabel(controller.getYoutubeTrailerJob(editor)) || 'Starting private transfer…' }}</div>
               <div class="progress upload-progress mt-2" *ngIf="controller.isYoutubeTrailerJobProgressDeterminate(editor)" role="progressbar" [attr.aria-valuenow]="controller.getYoutubeTrailerJobProgress(editor)" aria-valuemin="0" aria-valuemax="100">
