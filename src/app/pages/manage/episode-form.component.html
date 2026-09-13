@@ -115,7 +115,7 @@
                 [ngModel]="controller.getTrailerTranscript(editor)"
                 [ngModelOptions]="{ standalone: true }"
                 (ngModelChange)="controller.onTrailerTranscriptChange(editor, $event)"
-                [attr.aria-describedby]="'trailer-transcript-status-' + (editor.editingEpisodeId || editor.formModel.episodeId || 'new')">
+                [attr.aria-describedby]="'trailer-transcript-status-' + (editor.editingEpisodeId || editor.formModel.episodeId || 'new') + ' trailer-caption-status-' + (editor.editingEpisodeId || editor.formModel.episodeId || 'new')">
               </textarea>
               <p *ngIf="controller.isTrailerCandidateLoading(editor)" class="small mb-2">Loading generated trailer status…</p>
               <p *ngIf="controller.getTrailerCandidateError(editor)" class="small text-danger mb-2" role="alert">{{ controller.getTrailerCandidateError(editor) }}</p>
@@ -124,6 +124,35 @@
                   {{ controller.getTrailerTranscriptStatusLabel(candidate) }}
                   <span *ngIf="candidate.transcriptProvider"> · {{ candidate.transcriptProvider }}</span>
                 </p>
+                <div class="trailer-caption-review mb-2" data-trailer-caption-review>
+                  <p
+                    [id]="'trailer-caption-status-' + (editor.editingEpisodeId || editor.formModel.episodeId || 'new')"
+                    class="small mb-1 trailer-caption-status"
+                    data-trailer-caption-status
+                    role="status"
+                    aria-live="polite"
+                    aria-atomic="true">
+                    {{ controller.getTrailerCaptionStatusLabel(editor, candidate) }}
+                  </p>
+                  <div class="form-check trailer-caption-toggle">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      [id]="'include-timed-captions-' + (editor.editingEpisodeId || editor.formModel.episodeId || 'new')"
+                      data-include-timed-captions
+                      [checked]="controller.includeTimedCaptions(editor)"
+                      [disabled]="!controller.isTimedCaptionsEligible(editor) || controller.isTrailerCandidateGenerationInFlight(editor)"
+                      (change)="controller.setIncludeTimedCaptions(editor, $any($event.target).checked)">
+                    <label
+                      class="form-check-label"
+                      [attr.for]="'include-timed-captions-' + (editor.editingEpisodeId || editor.formModel.episodeId || 'new')">
+                      Include timed captions
+                    </label>
+                  </div>
+                  <small *ngIf="controller.getTrailerCaptionHelper(editor, candidate)" class="d-block text-muted trailer-caption-helper" data-trailer-caption-helper>
+                    {{ controller.getTrailerCaptionHelper(editor, candidate) }}
+                  </small>
+                </div>
                 <div class="small fw-semibold" data-trailer-candidate-status>{{ controller.getTrailerCandidateStatusLabel(candidate) }}</div>
                 <div class="small mt-1">Version {{ candidate.version }} · {{ controller.formatTrailerCandidateDuration(candidate.durationSeconds) }} · {{ candidate.resolution || 'Resolution unavailable' }}</div>
                 <div class="small">Profile {{ candidate.profileId }} r{{ candidate.profileRevision }} · {{ candidate.progress }}%</div>
@@ -145,7 +174,7 @@
                   Retry trailer generation
                 </button>
                 <div *ngIf="candidate.status === 'stale' || !candidate.isCurrent" class="small text-warning-emphasis mt-2" data-stale-candidate>
-                  This candidate uses older episode assets and cannot be approved. Generate a new trailer from the current assets.
+                  This candidate uses older episode assets or transcript text and cannot be approved. Generate a new trailer from the current inputs.
                 </div>
                 <div *ngIf="controller.canDecideTrailerCandidate(editor)" class="trailer-decision-actions mt-3" data-trailer-decisions>
                   <button class="btn btn-trailer-generate trailer-decision" type="button" data-approve-trailer

@@ -1726,6 +1726,67 @@ describe('EpisodeFormComponent trailer video card', () => {
     expect(fixture.nativeElement.querySelector('[data-trailer-replacement]')).toBeNull();
   });
 
+  it('keeps the waveform-only default non-blocking while quality calibration is unavailable', async () => {
+    apiService.getCurrentTrailerCandidate.and.returnValue(of(trailerCandidateStatus(42, {
+      captionMode: 'automatic', captionStatus: 'waveform_only', captionReasonCode: 'quality_calibration_unavailable',
+    })));
+    manage.startEdit({ episodeId: 42, title: 'Episode 42', summary: 'Summary', pubDate: '2026-07-24T00:00:00.000Z', explicit: 'no' });
+    fixture.componentInstance.editor = manage.episodesEditorState;
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const card = (Array.from(fixture.nativeElement.querySelectorAll('.upload-card')) as HTMLElement[])
+      .find((candidate) => candidate.textContent?.includes('Trailer video')) as HTMLElement;
+    const checkbox = card.querySelector('[data-include-timed-captions]') as HTMLInputElement;
+    expect(card.querySelector('label[for^="include-timed-captions-"]')?.textContent?.trim()).toBe('Include timed captions');
+    expect(checkbox.checked).toBeFalse();
+    expect(checkbox.disabled).toBeTrue();
+    expect(card.querySelector('[data-trailer-caption-status]')?.textContent).toContain('Timed captions are unavailable for this trailer');
+    expect(card.querySelector('[data-generate-trailer]')?.hasAttribute('disabled')).toBeFalse();
+    expect(card.querySelector('[data-approve-trailer]')).not.toBeNull();
+    expect(card.querySelectorAll('.trailer-actions button').length).toBe(3);
+  });
+
+  it('announces API-eligible and included caption states without exposing reason codes', async () => {
+    apiService.getCurrentTrailerCandidate.and.returnValue(of(trailerCandidateStatus(42, {
+      captionMode: 'automatic', captionStatus: 'eligible', captionReasonCode: null,
+    })));
+    manage.startEdit({ episodeId: 42, title: 'Episode 42', summary: 'Summary', pubDate: '2026-07-24T00:00:00.000Z', explicit: 'no' });
+    fixture.componentInstance.editor = manage.episodesEditorState;
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const checkbox = fixture.nativeElement.querySelector('[data-include-timed-captions]') as HTMLInputElement;
+    const status = fixture.nativeElement.querySelector('[data-trailer-caption-status]') as HTMLElement;
+    expect(checkbox.checked).toBeTrue();
+    expect(checkbox.disabled).toBeFalse();
+    expect(status.getAttribute('role')).toBe('status');
+    expect(status.getAttribute('aria-live')).toBe('polite');
+    expect(status.textContent).toContain('Timed captions are available for this trailer.');
+    expect(fixture.nativeElement.textContent).not.toContain('quality_calibration_unavailable');
+
+    const included = trailerCandidateStatus(42, { captionMode: 'automatic', captionStatus: 'included', captionReasonCode: null });
+    expect(manage.getTrailerCaptionStatusLabel(manage.episodesEditorState, included)).toBe('Timed captions included in this candidate. Review the preview before approving.');
+  });
+
+  it('keeps preview and waveform approval available after caption alignment or render failure', async () => {
+    apiService.getCurrentTrailerCandidate.and.returnValue(of(trailerCandidateStatus(42, {
+      captionMode: 'automatic', captionStatus: 'waveform_only', captionReasonCode: 'caption_render_failed',
+    })));
+    manage.startEdit({ episodeId: 42, title: 'Episode 42', summary: 'Summary', pubDate: '2026-07-24T00:00:00.000Z', explicit: 'no' });
+    fixture.componentInstance.editor = manage.episodesEditorState;
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const card = (Array.from(fixture.nativeElement.querySelectorAll('.upload-card')) as HTMLElement[])
+      .find((candidate) => candidate.textContent?.includes('Trailer video')) as HTMLElement;
+    expect(card.querySelector('[data-trailer-caption-status]')?.textContent).toContain('Timed captions could not be generated. The waveform-only trailer remains available');
+    expect(card.querySelector('[data-trailer-candidate-preview] video')).not.toBeNull();
+    expect(card.querySelector('[data-approve-trailer]')).not.toBeNull();
+    expect(card.querySelector('[data-reject-trailer]')).not.toBeNull();
+    expect(card.querySelector('[data-generate-trailer]')?.hasAttribute('disabled')).toBeFalse();
+  });
+
   it('renders populated provenance, a long editable transcript, independent destinations, and narrow-width wrapping', async () => {
     const longTranscript = `${'Dragon Careca trailer words '.repeat(1500)}ending`;
     const longId = `remote-${'identifier-'.repeat(30)}`;
