@@ -34,6 +34,9 @@ const trailerCandidateStatus = (episodeId = 42, overrides: Partial<TrailerCandid
   transcriptProvider: 'fake-transcription',
   transcriptErrorCategory: null,
   transcriptErrorMessage: null,
+  captionMode: 'automatic',
+  captionStatus: 'waveform_only',
+  captionReasonCode: 'quality_calibration_unavailable',
   ...overrides,
 });
 
@@ -783,9 +786,48 @@ describe('ManageComponent summary flow', () => {
 
     component.generateTrailer(editor);
 
-    expect(apiService.generateTrailerCandidate).toHaveBeenCalledOnceWith(42, 'Exact operator transcript\nwith edits', 'a'.repeat(64));
+    expect(apiService.generateTrailerCandidate).toHaveBeenCalledOnceWith(42, 'Exact operator transcript\nwith edits', 'a'.repeat(64), undefined);
     expect(component.getTrailerTranscript(editor)).toBe('Exact operator transcript\nwith edits');
     expect(component.getTrailerCandidate(editor)?.candidateId).toBe('generated-candidate');
+  });
+
+  it('defaults captions on only for API eligibility and sends explicit opt-out with the latest transcript', () => {
+    const editor = component.episodesEditorState;
+    apiService.getCurrentTrailerCandidate.and.returnValue(of(trailerCandidateStatus(42, {
+      status: 'processing', progress: 20, captionStatus: 'eligible', captionReasonCode: null,
+    })));
+    component.startEdit({
+      episodeId: 42, title: 'Episode 42', summary: 'Summary', pubDate: '2026-07-24T00:00:00.000Z', explicit: 'no',
+    });
+
+    expect(component.isTimedCaptionsEligible(editor)).toBeTrue();
+    expect(component.includeTimedCaptions(editor)).toBeTrue();
+    component.setIncludeTimedCaptions(editor, false);
+    component.onTrailerTranscriptChange(editor, 'Latest edited transcript');
+    component.generateTrailer(editor);
+
+    expect(apiService.generateTrailerCandidate).toHaveBeenCalledOnceWith(42, 'Latest edited transcript', 'a'.repeat(64), false);
+  });
+
+  it('does not let a delayed render overwrite a newer transcript edit or approve its older revision', () => {
+    const editor = component.episodesEditorState;
+    const delayedRender = new Subject<TrailerCandidateReviewStatus>();
+    apiService.getCurrentTrailerCandidate.and.returnValue(of(trailerCandidateStatus(42, { status: 'processing', progress: 20 })));
+    apiService.generateTrailerCandidate.and.returnValue(delayedRender.asObservable());
+    component.startEdit({
+      episodeId: 42, title: 'Episode 42', summary: 'Summary', pubDate: '2026-07-24T00:00:00.000Z', explicit: 'no',
+    });
+    component.onTrailerTranscriptChange(editor, 'Transcript submitted');
+    component.generateTrailer(editor);
+    component.onTrailerTranscriptChange(editor, 'Newer transcript edit');
+
+    delayedRender.next(trailerCandidateStatus(42, {
+      candidateId: 'older-render', status: 'ready', transcriptText: 'Transcript submitted',
+    }));
+
+    expect(component.getTrailerTranscript(editor)).toBe('Newer transcript edit');
+    expect(component.canDecideTrailerCandidate(editor)).toBeFalse();
+    expect(component.canGenerateTrailer(editor)).toBeTrue();
   });
 
   it('retries only the exact API-marked retryable candidate', () => {
