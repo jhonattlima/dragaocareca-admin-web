@@ -384,6 +384,12 @@ export interface EpisodeTrailerVideoUploadResponse {
 }
 
 export type TrailerCandidateLifecycle = 'pending' | 'processing' | 'waiting_capacity' | 'retryable' | 'ready' | 'stale' | 'superseded';
+export type TrailerCaptionMode = 'automatic' | 'disabled';
+export type TrailerCaptionStatus = 'checking' | 'eligible' | 'aligning' | 'rendering' | 'included' | 'waveform_only' | 'unavailable';
+export type TrailerCaptionReasonCode = 'quality_calibration_unavailable' | 'capacity_unavailable' | 'captions_disabled'
+  | 'transcript_unavailable' | 'model_unavailable' | 'aligner_unavailable' | 'alignment_failed'
+  | 'alignment_provenance_stale' | 'alignment_coverage_insufficient' | 'alignment_timing_invalid'
+  | 'quality_below_calibration' | 'caption_render_failed' | null;
 
 export interface TrailerCandidateReviewStatus {
   candidateId: string;
@@ -409,6 +415,9 @@ export interface TrailerCandidateReviewStatus {
   transcriptProvider: string | null;
   transcriptErrorCategory: string | null;
   transcriptErrorMessage: string | null;
+  captionMode: TrailerCaptionMode;
+  captionStatus: TrailerCaptionStatus;
+  captionReasonCode: TrailerCaptionReasonCode;
 }
 
 export interface TrailerCandidatePreviewGrant {
@@ -606,10 +615,10 @@ export class ApiService {
     return this.http.get<TrailerCandidateReviewStatus>(`${environment.apiBaseUrl}/episodes/${episodeId}/trailer-candidates/${encodeURIComponent(candidateId)}`);
   }
 
-  generateTrailerCandidate(episodeId: number, transcriptText: string, expectedSourceFingerprint: string): Observable<TrailerCandidateReviewStatus> {
+  generateTrailerCandidate(episodeId: number, transcriptText: string, expectedSourceFingerprint: string, includeTimedCaptions?: boolean): Observable<TrailerCandidateReviewStatus> {
     return this.http.post<TrailerCandidateReviewStatus>(
       `${environment.apiBaseUrl}/episodes/${episodeId}/trailer-candidates`,
-      { transcriptText, expectedSourceFingerprint },
+      { transcriptText, expectedSourceFingerprint, ...(includeTimedCaptions === undefined ? {} : { includeTimedCaptions }) },
     );
   }
 

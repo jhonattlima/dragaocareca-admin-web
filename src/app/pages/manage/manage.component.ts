@@ -83,6 +83,10 @@ interface TrailerCandidateReviewState {
   candidate: TrailerCandidateReviewStatus | null;
   transcriptText: string;
   transcriptDirty: boolean;
+  transcriptEditVersion: number;
+  includeTimedCaptions: boolean;
+  captionEligible: boolean;
+  captionPreferenceTouched: boolean;
   generationInFlight: boolean;
   episodeId: number | null;
   generation: number;
@@ -794,7 +798,7 @@ export class ManageComponent implements OnInit, OnDestroy {
     const candidate = this.getTrailerCandidate(editor);
     const state = this.getTrailerCandidateReviewState(editor);
     return Boolean(candidate?.isCurrent && candidate.status === 'ready' && candidate.outputValid
-      && !state.decisionLoading && !state.decisionMade && !state.generationInFlight && !this.isSaveTransactionInFlight(editor));
+      && !state.transcriptDirty && !state.decisionLoading && !state.decisionMade && !state.generationInFlight && !this.isSaveTransactionInFlight(editor));
   }
 
   decideTrailerCandidate(editor: EpisodeEditorState, decision: 'approve' | 'reject'): void {
@@ -980,6 +984,63 @@ export class ManageComponent implements OnInit, OnDestroy {
     const state = this.getTrailerCandidateReviewState(editor);
     state.transcriptText = value;
     state.transcriptDirty = true;
+    state.transcriptEditVersion += 1;
+    state.includeTimedCaptions = false;
+    state.captionEligible = false;
+    state.captionPreferenceTouched = false;
+  }
+
+  isTimedCaptionsEligible(editor: EpisodeEditorState): boolean {
+    const state = this.getTrailerCandidateReviewState(editor);
+    return Boolean(!state.transcriptDirty && state.candidate && state.captionEligible);
+  }
+
+  includeTimedCaptions(editor: EpisodeEditorState): boolean {
+    const state = this.getTrailerCandidateReviewState(editor);
+    return state.includeTimedCaptions && this.isTimedCaptionsEligible(editor);
+  }
+
+  setIncludeTimedCaptions(editor: EpisodeEditorState, include: boolean): void {
+    const state = this.getTrailerCandidateReviewState(editor);
+    if (!this.isTimedCaptionsEligible(editor) || state.generationInFlight) return;
+    state.includeTimedCaptions = include;
+    state.captionPreferenceTouched = true;
+  }
+
+  getTrailerCaptionStatusLabel(editor: EpisodeEditorState, candidate: TrailerCandidateReviewStatus): string {
+    if (this.hasTrailerTranscriptChanged(editor)) {
+      return 'Transcript changed since this candidate was generated. Generate again before approving it.';
+    }
+    switch (candidate.captionStatus) {
+      case 'checking': return 'Checking caption availability…';
+      case 'eligible': return 'Timed captions are available for this trailer.';
+      case 'aligning':
+      case 'rendering': return 'Generating trailer with timed captions…';
+      case 'included': return 'Timed captions included in this candidate. Review the preview before approving.';
+      case 'unavailable': return this.isTrailerCaptionFailure(candidate) ? 'Timed captions could not be generated. The waveform-only trailer remains available to review or approve.' : 'Timed captions are unavailable for this trailer. You can still generate, preview, and approve the waveform-only version.';
+      case 'waveform_only':
+        return candidate.captionReasonCode === 'captions_disabled'
+          ? 'Waveform-only trailer. Captions are not included.'
+          : this.isTrailerCaptionFailure(candidate)
+            ? 'Timed captions could not be generated. The waveform-only trailer remains available to review or approve.'
+            : 'Timed captions are unavailable for this trailer. You can still generate, preview, and approve the waveform-only version.';
+      default: return 'Timed captions are unavailable for this trailer. You can still generate, preview, and approve the waveform-only version.';
+    }
+  }
+
+  getTrailerCaptionHelper(editor: EpisodeEditorState, candidate: TrailerCandidateReviewStatus): string {
+    if (this.hasTrailerTranscriptChanged(editor)) return '';
+    if (['eligible', 'included'].includes(candidate.captionStatus)) return 'Turn this off to generate a waveform-only trailer.';
+    if (!this.getTrailerTranscript(editor).trim()) return 'Add or edit the trailer transcript to include timed captions. Captions remain optional.';
+    return '';
+  }
+
+  hasTrailerTranscriptChanged(editor: EpisodeEditorState): boolean {
+    return this.getTrailerCandidateReviewState(editor).transcriptDirty;
+  }
+
+  private isTrailerCaptionFailure(candidate: TrailerCandidateReviewStatus): boolean {
+    return ['alignment_failed', 'alignment_provenance_stale', 'alignment_coverage_insufficient', 'alignment_timing_invalid', 'quality_below_calibration', 'caption_render_failed'].includes(candidate.captionReasonCode ?? '');
   }
 
   getTrailerTranscriptStatusLabel(candidate: TrailerCandidateReviewStatus): string {
@@ -1000,6 +1061,10 @@ export class ManageComponent implements OnInit, OnDestroy {
       && !this.isSaveTransactionInFlight(editor);
   }
 
+  isTrailerCandidateGenerationInFlight(editor: EpisodeEditorState): boolean {
+    return this.getTrailerCandidateReviewState(editor).generationInFlight;
+  }
+
   generateTrailer(editor: EpisodeEditorState): void {
     const state = this.getTrailerCandidateReviewState(editor);
     const candidate = state.candidate;
@@ -1008,22 +1073,32 @@ export class ManageComponent implements OnInit, OnDestroy {
     const generation = state.generation;
     const sourceFingerprint = candidate.sourceFingerprint;
     const transcriptText = state.transcriptText;
+    const transcriptEditVersion = state.transcriptEditVersion;
+    const captionsEligibleAtRequest = this.isTimedCaptionsEligible(editor);
+    const includeTimedCaptions = captionsEligibleAtRequest ? state.includeTimedCaptions : undefined;
     if (state.timer !== null) window.clearTimeout(state.timer);
     state.timer = null;
     state.subscription?.unsubscribe();
     state.subscription = null;
     state.generationInFlight = true;
     state.error = '';
-    state.subscription = this.apiService.generateTrailerCandidate(episodeId, transcriptText, sourceFingerprint).subscribe({
+    state.subscription = this.apiService.generateTrailerCandidate(episodeId, transcriptText, sourceFingerprint, includeTimedCaptions).subscribe({
       next: (created) => {
         if (!this.isActiveTrailerCandidateRequest(editor, episodeId, generation)
           || created.sourceFingerprint !== sourceFingerprint) return;
         state.subscription = null;
         state.generationInFlight = false;
+        if (state.transcriptEditVersion !== transcriptEditVersion) return;
         state.candidate = created;
         state.sourceFingerprint = created.sourceFingerprint;
         state.transcriptText = transcriptText;
         state.transcriptDirty = false;
+        this.syncTrailerCaptionPreference(state, created);
+        if (includeTimedCaptions === false && captionsEligibleAtRequest) {
+          state.captionEligible = true;
+          state.includeTimedCaptions = false;
+          state.captionPreferenceTouched = true;
+        }
         this.syncTrailerCandidatePreview(editor, created, generation);
         this.scheduleTrailerCandidatePoll(editor, created, generation);
       },
@@ -1127,6 +1202,10 @@ export class ManageComponent implements OnInit, OnDestroy {
         candidate: null,
         transcriptText: '',
         transcriptDirty: false,
+        transcriptEditVersion: 0,
+        includeTimedCaptions: false,
+        captionEligible: false,
+        captionPreferenceTouched: false,
         generationInFlight: false,
         episodeId: null,
         generation: 0,
@@ -1175,6 +1254,10 @@ export class ManageComponent implements OnInit, OnDestroy {
       candidate: null,
       transcriptText: '',
       transcriptDirty: false,
+      transcriptEditVersion: state.transcriptEditVersion + 1,
+      includeTimedCaptions: false,
+      captionEligible: false,
+      captionPreferenceTouched: false,
       generationInFlight: false,
       episodeId: null,
       generation,
@@ -1224,7 +1307,7 @@ export class ManageComponent implements OnInit, OnDestroy {
     this.clearTrailerCandidatePreview(state);
     const generation = (this.trailerCandidateReviewGenerations.get(editor) ?? 0) + 1;
     this.trailerCandidateReviewGenerations.set(editor, generation);
-    Object.assign(state, { candidate: null, episodeId, generation, sourceFingerprint: null, loading: true, error: '', timer: null, subscription: null, generationInFlight: false, decisionLoading: false, decisionMessage: '', decisionError: '', decisionMade: false, replacementStatus: null, replacementLoading: false, replacementError: '', retirementLoading: null, replacementPollCount: 0 });
+    Object.assign(state, { candidate: null, episodeId, generation, sourceFingerprint: null, loading: true, error: '', timer: null, subscription: null, generationInFlight: false, decisionLoading: false, decisionMessage: '', decisionError: '', decisionMade: false, replacementStatus: null, replacementLoading: false, replacementError: '', retirementLoading: null, replacementPollCount: 0, includeTimedCaptions: false, captionEligible: false, captionPreferenceTouched: false });
     state.subscription = this.apiService.getCurrentTrailerCandidate(episodeId).subscribe({
       next: (candidate) => {
         if (!this.isActiveTrailerCandidateRequest(editor, episodeId, generation)) return;
@@ -1232,6 +1315,7 @@ export class ManageComponent implements OnInit, OnDestroy {
         state.loading = false;
         state.candidate = candidate;
         state.sourceFingerprint = candidate.sourceFingerprint;
+        this.syncTrailerCaptionPreference(state, candidate);
         if (!state.transcriptDirty && typeof candidate.transcriptText === 'string') state.transcriptText = candidate.transcriptText;
         this.syncTrailerCandidatePreview(editor, candidate, generation);
         this.scheduleTrailerCandidatePoll(editor, candidate, generation);
@@ -1279,6 +1363,7 @@ export class ManageComponent implements OnInit, OnDestroy {
             || updated.sourceFingerprint !== candidate.sourceFingerprint) return;
           state.subscription = null;
           state.candidate = updated;
+          this.syncTrailerCaptionPreference(state, updated);
           if (!state.transcriptDirty && typeof updated.transcriptText === 'string') state.transcriptText = updated.transcriptText;
           this.syncTrailerCandidatePreview(editor, updated, generation);
           this.scheduleTrailerCandidatePoll(editor, updated, generation);
@@ -1351,6 +1436,17 @@ export class ManageComponent implements OnInit, OnDestroy {
     state.previewSubscription = request.closed ? null : request;
   }
 
+  private syncTrailerCaptionPreference(state: TrailerCandidateReviewState, candidate: TrailerCandidateReviewStatus): void {
+    const retryableCaptionFailure = ['alignment_failed', 'alignment_provenance_stale', 'alignment_coverage_insufficient', 'alignment_timing_invalid', 'quality_below_calibration', 'caption_render_failed'].includes(candidate.captionReasonCode ?? '');
+    if (candidate.captionStatus === 'eligible'
+      || (candidate.captionMode === 'automatic' && candidate.captionStatus === 'included')
+      || retryableCaptionFailure) state.captionEligible = true;
+    else if (candidate.captionReasonCode !== 'captions_disabled') state.captionEligible = false;
+    if (state.captionPreferenceTouched) return;
+    state.includeTimedCaptions = candidate.captionMode === 'automatic'
+      && ['eligible', 'included'].includes(candidate.captionStatus);
+  }
+
   private validateTrailerCandidatePreviewGrant(grant: TrailerCandidatePreviewGrant, candidate: TrailerCandidateReviewStatus): string | null {
     if (grant.episodeId !== candidate.episodeId || grant.candidateId !== candidate.candidateId
       || typeof grant.previewUrl !== 'string' || !grant.previewUrl
@@ -1384,6 +1480,10 @@ export class ManageComponent implements OnInit, OnDestroy {
       candidate: null,
       transcriptText: '',
       transcriptDirty: false,
+      transcriptEditVersion: state.transcriptEditVersion + 1,
+      includeTimedCaptions: false,
+      captionEligible: false,
+      captionPreferenceTouched: false,
       generationInFlight: false,
       sourceFingerprint: null,
       generation,

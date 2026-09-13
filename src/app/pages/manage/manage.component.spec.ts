@@ -794,7 +794,7 @@ describe('ManageComponent summary flow', () => {
   it('defaults captions on only for API eligibility and sends explicit opt-out with the latest transcript', () => {
     const editor = component.episodesEditorState;
     apiService.getCurrentTrailerCandidate.and.returnValue(of(trailerCandidateStatus(42, {
-      status: 'processing', progress: 20, captionStatus: 'eligible', captionReasonCode: null,
+      status: 'processing', progress: 20, transcriptText: 'Latest edited transcript', captionStatus: 'eligible', captionReasonCode: null,
     })));
     component.startEdit({
       episodeId: 42, title: 'Episode 42', summary: 'Summary', pubDate: '2026-07-24T00:00:00.000Z', explicit: 'no',
@@ -803,7 +803,6 @@ describe('ManageComponent summary flow', () => {
     expect(component.isTimedCaptionsEligible(editor)).toBeTrue();
     expect(component.includeTimedCaptions(editor)).toBeTrue();
     component.setIncludeTimedCaptions(editor, false);
-    component.onTrailerTranscriptChange(editor, 'Latest edited transcript');
     component.generateTrailer(editor);
 
     expect(apiService.generateTrailerCandidate).toHaveBeenCalledOnceWith(42, 'Latest edited transcript', 'a'.repeat(64), false);
