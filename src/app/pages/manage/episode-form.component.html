@@ -127,7 +127,7 @@
                 <div class="trailer-caption-review mb-2" data-trailer-caption-review>
                   <p
                     [id]="'trailer-caption-status-' + (editor.editingEpisodeId || editor.formModel.episodeId || 'new')"
-                    class="small mb-1 trailer-caption-status"
+                    class="small mb-1 text-break trailer-caption-status"
                     data-trailer-caption-status
                     role="status"
                     aria-live="polite"
@@ -149,7 +149,7 @@
                       Include timed captions
                     </label>
                   </div>
-                  <small *ngIf="controller.getTrailerCaptionHelper(editor, candidate)" class="d-block text-muted trailer-caption-helper" data-trailer-caption-helper>
+                  <small *ngIf="controller.getTrailerCaptionHelper(editor, candidate)" class="d-block text-break text-muted trailer-caption-helper" data-trailer-caption-helper>
                     {{ controller.getTrailerCaptionHelper(editor, candidate) }}
                   </small>
                 </div>

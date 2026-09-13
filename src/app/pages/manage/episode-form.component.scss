@@ -106,32 +106,6 @@
   white-space: pre-wrap;
 }
 
-.trailer-caption-review {
-  border-top: 1px solid rgba(52, 60, 73, 0.16);
-  min-width: 0;
-  overflow-wrap: anywhere;
-  padding-top: 0.75rem;
-}
-
-.trailer-caption-status,
-.trailer-caption-helper {
-  overflow-wrap: anywhere;
-  white-space: normal;
-}
-
-.trailer-caption-toggle {
-  align-items: center;
-  display: flex;
-  gap: 0.35rem;
-  min-height: 44px;
-  padding-left: 1.75rem;
-}
-
-.trailer-caption-toggle .form-check-input {
-  flex: 0 0 auto;
-  margin-top: 0;
-}
-
 .auto-grow-textarea {
   field-sizing: content;
   max-height: 35rem;
