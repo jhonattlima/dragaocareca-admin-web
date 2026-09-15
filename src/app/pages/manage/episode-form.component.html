@@ -8,7 +8,8 @@
   <div class="section-block">
     <h2 class="manage-section-title">File Management</h2>
     <div class="upload-grid mb-3">
-      <div class="upload-grid-item" *ngFor="let upload of controller.uploadDefinitions">
+      <ng-container *ngFor="let upload of controller.fileManagementUploadDefinitions">
+        <div class="upload-grid-item">
         <div
           class="file-card upload-card"
           [class.dragover]="controller.isUploadDragOver(upload.kind)"
@@ -55,9 +56,6 @@
           </ng-template>
           <small *ngIf="upload.kind === 'trailerVideo' && !controller.canGenerateTrailer(editor)" class="d-block mt-1 text-muted">
             Generate becomes available after the current cover and trailer audio are staged.
-          </small>
-          <small *ngIf="upload.kind === 'trailerVideo' && !controller.canStartYoutubeTrailerJob(editor)" class="d-block mt-1 text-muted">
-            Upload to YouTube becomes available after an MP4 is staged.
           </small>
           <button
             class="btn btn-sm btn-outline-danger mt-2 ms-2"
@@ -331,9 +329,12 @@
             [accept]="upload.accept"
             (change)="controller.onUploadInputChange(editor, $event, upload.kind)">
         </div>
-      </div>
+        </div>
+      </ng-container>
     </div>
   </div>
+
+  <app-trailer-video-workspace [controller]="controller" [editor]="editor"></app-trailer-video-workspace>
 
   <div class="section-block save-transaction-status" *ngIf="controller.getSaveTransaction(editor) as transaction" [class.save-transaction-error]="transaction.phase === 'error'" aria-live="polite">
     <h2 class="manage-section-title">Save and YouTube commit</h2>

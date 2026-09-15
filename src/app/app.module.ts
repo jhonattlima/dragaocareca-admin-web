@@ -13,6 +13,7 @@ import { HealthComponent } from './pages/health/health.component';
 import { LoginComponent } from './pages/login/login.component';
 import { ManageComponent } from './pages/manage/manage.component';
 import { EpisodeFormComponent } from './pages/manage/episode-form.component';
+import { TrailerVideoWorkspaceComponent } from './pages/manage/trailer-video-workspace.component';
 import { MastheadComponent } from './pages/masthead/masthead.component';
 import { MetricsComponent } from './pages/metrics/metrics.component';
 
@@ -23,6 +24,7 @@ import { MetricsComponent } from './pages/metrics/metrics.component';
     LoginComponent,
     FeedComponent,
     EpisodeFormComponent,
+    TrailerVideoWorkspaceComponent,
     MastheadComponent,
     ManageComponent,
     MetricsComponent,

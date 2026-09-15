@@ -23,7 +23,7 @@ npx playwright install chromium
 ```
 npm run build
 
-# Run from /home/jhonatt/repos/jhonatt_projects/dragaocareca-admin-api
+# Run from /home/jhonatt/repos/dragaocareca-admin-api
 npm run build
 NODE_ENV=development DISABLE_BACKGROUND_WORKERS=true node dist/scripts/verify-episode-audio-contract.js
 ```

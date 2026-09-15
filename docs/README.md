@@ -60,9 +60,10 @@ The frontend stays thin:
 - `src/app/pages/manage/*`
   - sectioned admin layout
   - episode form + table
-  - file staging cards for audio, trailer, trailer video, and covers
+  - file staging cards for episode audio, trailer audio, and covers
+  - a visually separate trailer-video workspace with MP4 staging, private generated preview, editable transcript, optional caption settings, and manual YouTube upload controls; for a generated candidate, that explicit action approves/replaces the canonical trailer and connected destinations before starting a private YouTube transfer
   - upload progress bars
-  - automatic YouTube private-transfer status, progress, private link, cancellation, restart-after-cancel, and retry controls displayed inside the trailer-video card
+  - YouTube private-transfer status, progress, private link, cancellation, restart-after-cancel, and retry controls displayed in the trailer-video workspace
   - delete controls only when a file is present or staged
   - guest search filter
   - pagination footer separated from rows-per-page control
@@ -214,7 +215,7 @@ The root shell spec is not the feature-verification source of truth. Use the foc
 
 ```text
 Project: dragaocareca-admin-web
-Path: /home/jhonatt/repos/jhonatt_projects/dragaocareca-admin-web
+Path: /home/jhonatt/repos/dragaocareca-admin-web
 Read docs/README.md first, then docs/ARCHITECTURE.md and docs/CONFIGURATION.md when implementing changes.
 Preserve sectioned legacy-like admin layout.
 Keep business logic on backend; frontend should call APIs only.

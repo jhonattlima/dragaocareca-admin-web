@@ -12,8 +12,8 @@ Before making changes, read:
 Angular frontend for `dragaocareca-admin-api`.
 
 Workspace layout:
-- `/home/jhonatt/repos/jhonatt_projects/dragaocareca-admin-api`
-- `/home/jhonatt/repos/jhonatt_projects/dragaocareca-admin-web`
+- `/home/jhonatt/repos/dragaocareca-admin-api`
+- `/home/jhonatt/repos/dragaocareca-admin-web`
 
 ## Run
 

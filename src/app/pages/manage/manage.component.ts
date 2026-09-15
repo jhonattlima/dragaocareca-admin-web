@@ -348,6 +348,10 @@ export class ManageComponent implements OnInit, OnDestroy {
     },
   ];
 
+  get fileManagementUploadDefinitions(): UploadDefinition[] {
+    return this.uploadDefinitions.filter((upload) => upload.kind !== 'trailerVideo');
+  }
+
   constructor(private readonly apiService: ApiService) {}
 
   getEditorState(tab: ManageTab): EpisodeEditorState {
@@ -980,6 +984,14 @@ export class ManageComponent implements OnInit, OnDestroy {
     return this.getTrailerCandidateReviewState(editor).transcriptText;
   }
 
+  private normalizeTrailerTranscriptText(value: string): string {
+    return value
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .join('\n');
+  }
+
   onTrailerTranscriptChange(editor: EpisodeEditorState, value: string): void {
     const state = this.getTrailerCandidateReviewState(editor);
     state.transcriptText = value;
@@ -1009,22 +1021,22 @@ export class ManageComponent implements OnInit, OnDestroy {
 
   getTrailerCaptionStatusLabel(editor: EpisodeEditorState, candidate: TrailerCandidateReviewStatus): string {
     if (this.hasTrailerTranscriptChanged(editor)) {
-      return 'Transcript changed since this candidate was generated. Generate again before approving it.';
+      return 'Transcript changed since this candidate was generated. Generate again to refresh the preview.';
     }
     switch (candidate.captionStatus) {
       case 'checking': return 'Checking caption availability…';
       case 'eligible': return 'Timed captions are available for this trailer.';
       case 'aligning':
       case 'rendering': return 'Generating trailer with timed captions…';
-      case 'included': return 'Timed captions included in this candidate. Review the preview before approving.';
-      case 'unavailable': return this.isTrailerCaptionFailure(candidate) ? 'Timed captions could not be generated. The waveform-only trailer remains available to review or approve.' : 'Timed captions are unavailable for this trailer. You can still generate, preview, and approve the waveform-only version.';
+      case 'included': return 'Timed captions included in this trailer preview.';
+      case 'unavailable': return this.isTrailerCaptionFailure(candidate) ? 'Timed captions could not be generated. The waveform-only trailer preview remains available.' : 'Timed captions are unavailable for this trailer. You can still generate and preview the waveform-only version.';
       case 'waveform_only':
         return candidate.captionReasonCode === 'captions_disabled'
           ? 'Waveform-only trailer. Captions are not included.'
           : this.isTrailerCaptionFailure(candidate)
-            ? 'Timed captions could not be generated. The waveform-only trailer remains available to review or approve.'
-            : 'Timed captions are unavailable for this trailer. You can still generate, preview, and approve the waveform-only version.';
-      default: return 'Timed captions are unavailable for this trailer. You can still generate, preview, and approve the waveform-only version.';
+            ? 'Timed captions could not be generated. The waveform-only trailer preview remains available.'
+            : 'Timed captions are unavailable for this trailer. You can still generate and preview the waveform-only version.';
+      default: return 'Timed captions are unavailable for this trailer. You can still generate and preview the waveform-only version.';
     }
   }
 
@@ -1091,7 +1103,9 @@ export class ManageComponent implements OnInit, OnDestroy {
         if (state.transcriptEditVersion !== transcriptEditVersion) return;
         state.candidate = created;
         state.sourceFingerprint = created.sourceFingerprint;
-        state.transcriptText = transcriptText;
+        state.transcriptText = typeof created.transcriptText === 'string'
+          ? this.normalizeTrailerTranscriptText(created.transcriptText)
+          : this.normalizeTrailerTranscriptText(transcriptText);
         state.transcriptDirty = false;
         this.syncTrailerCaptionPreference(state, created);
         if (includeTimedCaptions === false && captionsEligibleAtRequest) {
@@ -1182,7 +1196,7 @@ export class ManageComponent implements OnInit, OnDestroy {
       case 'processing': return `Generating trailer… ${candidate.progress}%`;
       case 'waiting_capacity': return 'Waiting for available trailer-generation capacity';
       case 'retryable': return 'Trailer generation needs attention';
-      case 'ready': return candidate.outputValid ? 'Trailer ready for review' : 'Trailer output is unavailable';
+      case 'ready': return candidate.outputValid ? 'Trailer preview is ready' : 'Trailer output is unavailable';
       case 'stale': return 'Trailer source changed; generate a new version';
       case 'superseded': return 'A newer trailer version replaced this candidate';
     }
@@ -1316,7 +1330,9 @@ export class ManageComponent implements OnInit, OnDestroy {
         state.candidate = candidate;
         state.sourceFingerprint = candidate.sourceFingerprint;
         this.syncTrailerCaptionPreference(state, candidate);
-        if (!state.transcriptDirty && typeof candidate.transcriptText === 'string') state.transcriptText = candidate.transcriptText;
+        if (!state.transcriptDirty && typeof candidate.transcriptText === 'string') {
+          state.transcriptText = this.normalizeTrailerTranscriptText(candidate.transcriptText);
+        }
         this.syncTrailerCandidatePreview(editor, candidate, generation);
         this.scheduleTrailerCandidatePoll(editor, candidate, generation);
       },
@@ -1364,7 +1380,9 @@ export class ManageComponent implements OnInit, OnDestroy {
           state.subscription = null;
           state.candidate = updated;
           this.syncTrailerCaptionPreference(state, updated);
-          if (!state.transcriptDirty && typeof updated.transcriptText === 'string') state.transcriptText = updated.transcriptText;
+          if (!state.transcriptDirty && typeof updated.transcriptText === 'string') {
+            state.transcriptText = this.normalizeTrailerTranscriptText(updated.transcriptText);
+          }
           this.syncTrailerCandidatePreview(editor, updated, generation);
           this.scheduleTrailerCandidatePoll(editor, updated, generation);
         },
@@ -1495,6 +1513,13 @@ export class ManageComponent implements OnInit, OnDestroy {
   }
 
   private getYoutubeSourceIdentity(editor: EpisodeEditorState): string {
+    const videoState = this.getTrailerVideoState(editor);
+    const candidate = this.getTrailerCandidate(editor);
+    if (!videoState.file && videoState.status !== 'staged'
+      && candidate?.isCurrent && candidate.status === 'ready' && candidate.outputValid
+      && !this.getTrailerCandidateReviewState(editor).decisionMade) {
+      return `candidate:${candidate.candidateId}`;
+    }
     return editor.formModel.trailerVideoFileName?.trim()
       || (editor.trailerVideoDraftId ? `draft:${editor.trailerVideoDraftId}` : '');
   }
@@ -1502,13 +1527,29 @@ export class ManageComponent implements OnInit, OnDestroy {
   canStartYoutubeTrailerJob(editor: EpisodeEditorState): boolean {
     const state = this.getYoutubeTrailerJobState(editor);
     const snapshot = state.snapshot;
+    const videoState = this.getTrailerVideoState(editor);
+    const candidateCanBeApproved = !videoState.file && videoState.status !== 'staged'
+      && this.canDecideTrailerCandidate(editor);
+    const stagedVideoIsReady = Boolean(this.getYoutubeSourceIdentity(editor))
+      && ['staged', 'finalized'].includes(videoState.status);
+    const youtubeJobBlocksStart = snapshot && (candidateCanBeApproved
+      ? ['queued', 'claimed', 'transferring', 'processing', 'cancel_requested'].includes(snapshot.status)
+      : !['failed', 'cancelled', 'obsolete'].includes(snapshot.status));
     return Number.isInteger(editor.formModel.episodeId)
       && (editor.formModel.episodeId ?? 0) > 0
       && Boolean(this.getYoutubeSourceIdentity(editor))
-      && ['staged', 'finalized'].includes(this.getTrailerVideoState(editor).status)
+      && (candidateCanBeApproved || stagedVideoIsReady)
       && !this.getTrailerTitleValidationError(editor)
       && state.startInFlight === null
-      && !(snapshot && !['failed', 'cancelled', 'obsolete'].includes(snapshot.status));
+      && !youtubeJobBlocksStart;
+  }
+
+  getYoutubeTrailerUploadNotice(editor: EpisodeEditorState): string {
+    const videoState = this.getTrailerVideoState(editor);
+    if (!videoState.file && videoState.status !== 'staged' && this.canDecideTrailerCandidate(editor)) {
+      return 'Generated trailer: approve and replace connected destinations, then upload privately to YouTube.';
+    }
+    return 'This action starts a private YouTube upload. It does not publish the video on YouTube.';
   }
 
   isYoutubeTrailerJobActive(editor: EpisodeEditorState): boolean {
@@ -1611,6 +1652,68 @@ export class ManageComponent implements OnInit, OnDestroy {
     state.startInFlight = startToken;
     state.sourceFileName = sourceFileName;
     state.error = '';
+    const candidate = this.getTrailerCandidate(editor);
+    const videoState = this.getTrailerVideoState(editor);
+    const candidateReview = this.getTrailerCandidateReviewState(editor);
+    if (!videoState.file && videoState.status !== 'staged' && this.canDecideTrailerCandidate(editor) && candidate) {
+      candidateReview.decisionLoading = true;
+      candidateReview.decisionError = '';
+      candidateReview.decisionMessage = '';
+      const candidateGeneration = candidateReview.generation;
+      this.apiService.decideTrailerCandidate(episodeId, candidate.candidateId, 'approve', candidate.version, candidate.sourceFingerprint).subscribe({
+        next: (result) => {
+          if (state.startInFlight !== startToken
+            || editor.formModel.episodeId !== episodeId
+            || candidateReview.generation !== candidateGeneration
+            || candidateReview.candidate?.candidateId !== candidate.candidateId
+            || candidateReview.candidate.sourceFingerprint !== candidate.sourceFingerprint) return;
+          candidateReview.decisionLoading = false;
+          candidateReview.decisionMade = true;
+          if (result.status === 'conflict') {
+            state.startInFlight = null;
+            candidateReview.candidate = { ...candidate, isCurrent: false, status: 'stale' };
+            candidateReview.decisionError = 'This trailer changed before approval. Refresh the episode and generate or review the current version again.';
+            state.error = candidateReview.decisionError;
+            return;
+          }
+          if (!result.sourceRevision) {
+            state.startInFlight = null;
+            candidateReview.decisionError = 'The trailer was approved, but its replacement could not be confirmed. Refresh the episode before starting YouTube upload.';
+            state.error = candidateReview.decisionError;
+            return;
+          }
+
+          candidateReview.decisionMessage = 'Trailer approved and replacement started for connected destinations. Starting the private YouTube upload…';
+          this.loadTrailerReplacementStatus(editor, episodeId, result.sourceRevision, candidateGeneration);
+          editor.formModel.trailerVideoFileName = `episodes/${episodeId}/trailer.mp4`;
+          videoState.status = 'finalized';
+          videoState.episodeId = episodeId;
+          videoState.priorFinalFileName = editor.formModel.trailerVideoFileName;
+          const promotedSourceName = this.getYoutubeSourceIdentity(editor);
+          state.sourceFileName = promotedSourceName;
+          this.requestYoutubeTrailerJob(editor, episodeId, promotedSourceName, sourceGeneration, startToken);
+        },
+        error: () => {
+          if (state.startInFlight !== startToken || candidateReview.generation !== candidateGeneration) return;
+          state.startInFlight = null;
+          candidateReview.decisionLoading = false;
+          candidateReview.decisionError = 'The trailer approval was not confirmed. Refresh its status before retrying.';
+          state.error = candidateReview.decisionError;
+        },
+      });
+      return;
+    }
+    this.requestYoutubeTrailerJob(editor, episodeId, sourceFileName, sourceGeneration, startToken);
+  }
+
+  private requestYoutubeTrailerJob(
+    editor: EpisodeEditorState,
+    episodeId: number,
+    sourceFileName: string,
+    sourceGeneration: number,
+    startToken: symbol,
+  ): void {
+    const state = this.getYoutubeTrailerJobState(editor);
     const hashtags = this.serializeHashtags(editor.formModel.hashtags);
     const title = this.getTrailerTitlePrefix(editor);
     this.apiService.startYoutubeTrailerJob(episodeId, title, editor.formModel.summary.trim(), editor.trailerVideoDraftId, hashtags).subscribe({

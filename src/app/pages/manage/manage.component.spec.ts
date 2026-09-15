@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { of, Subject, throwError } from 'rxjs';
 import { ApiService, Episode, EpisodeArtifactJobSnapshot, EpisodeGeneratedSummaryStatus, EpisodeTrailerVideoUploadResponse, EpisodeTranscriptionStatus, HashtagLookupResponse, SuggestedTagsSnapshot, TrailerCandidatePreviewGrant, TrailerCandidateReviewStatus, TrailerReplacementStatus, YoutubeTrailerJobSnapshot } from '../../core/api.service';
 import { EpisodeFormComponent } from './episode-form.component';
+import { TrailerVideoWorkspaceComponent } from './trailer-video-workspace.component';
 import { ManageComponent } from './manage.component';
 import { environment as developmentEnvironment } from '../../../environments/environment';
 import { environment as stagingEnvironment } from '../../../environments/environment.staging';
@@ -752,7 +753,7 @@ describe('ManageComponent summary flow', () => {
     expect(candidate?.durationSeconds).toBe(98);
     expect(candidate?.resolution).toBe('1280×1280');
     expect(candidate?.errorMessage).toContain('Check the source files');
-    expect(component.getTrailerCandidateStatusLabel(candidate!)).toBe('Trailer ready for review');
+    expect(component.getTrailerCandidateStatusLabel(candidate!)).toBe('Trailer preview is ready');
     expect(component.formatTrailerCandidateDuration(candidate?.durationSeconds ?? null)).toBe('1:38');
   });
 
@@ -1469,8 +1470,10 @@ describe('ManageComponent YouTube lifecycle RED scaffold', () => {
     apiService = jasmine.createSpyObj<ApiService>('ApiService', [
       'listEpisodes', 'startYoutubeTrailerJob', 'getCurrentYoutubeTrailerJob',
       'getYoutubeTrailerJobStatus', 'retryYoutubeTrailerJob', 'cancelYoutubeTrailerJob',
+      'getTrailerReplacementStatus',
     ]);
     apiService.listEpisodes.and.returnValue(of([]));
+    apiService.getTrailerReplacementStatus.and.returnValue(of(trailerReplacementStatus(42)));
     component = new ManageComponent(apiService);
     component.addEditorState.formModel.episodeNumber = 42;
   });
@@ -1539,6 +1542,37 @@ describe('ManageComponent YouTube lifecycle RED scaffold', () => {
     expect(apiService.startYoutubeTrailerJob).toHaveBeenCalledOnceWith(42, 'Trailer - DC 42 - Title', 'Summary', null, ['#rpg']);
     expect(component.getYoutubeTrailerJobProgress(editor)).toBe(25);
     component.clearYoutubeTrailerJobPolling(editor);
+    discardPeriodicTasks();
+  }));
+
+  it('approves a generated candidate before starting its private YouTube upload', fakeAsync(() => {
+    const editor = component.episodesEditorState;
+    const candidate = trailerCandidateStatus(42);
+    apiService.getCurrentTrailerCandidate = jasmine.createSpy().and.returnValue(of(candidate));
+    apiService.getTrailerCandidate = jasmine.createSpy().and.returnValue(of(candidate));
+    apiService.createTrailerCandidatePreviewGrant = jasmine.createSpy().and.callFake((episodeId, candidateId) => of(trailerCandidatePreviewGrant(episodeId, candidateId)));
+    apiService.decideTrailerCandidate = jasmine.createSpy().and.returnValue(of({
+      status: 'approved', candidateId: candidate.candidateId, episodeId: 42,
+      version: candidate.version, sourceFingerprint: candidate.sourceFingerprint,
+      sourceRevision: trailerReplacementStatus(42).sourceRevision,
+    }));
+    apiService.startYoutubeTrailerJob.and.returnValue(of(snapshot()));
+    apiService.getYoutubeTrailerJobStatus.and.returnValue(of(snapshot()));
+    component.startEdit({ episodeId: 42, title: 'Episode 42', summary: 'Summary', pubDate: '2026-07-24T00:00:00.000Z', explicit: 'no' });
+    editor.formModel.title = 'Episode 42';
+    editor.formModel.summary = 'Summary';
+    (component as any).getYoutubeTrailerJobState(editor).snapshot = snapshot({ status: 'ready' });
+
+    expect(component.canStartYoutubeTrailerJob(editor)).toBeTrue();
+    expect(component.getYoutubeTrailerUploadNotice(editor)).toContain('approve and replace connected destinations');
+    component.startYoutubeTrailerJob(editor);
+    tick();
+
+    expect(apiService.decideTrailerCandidate).toHaveBeenCalledOnceWith(42, candidate.candidateId, 'approve', candidate.version, candidate.sourceFingerprint);
+    expect(apiService.startYoutubeTrailerJob).toHaveBeenCalledOnceWith(42, 'Trailer - DC 42 - Episode 42', 'Summary', null, []);
+    expect(component.getTrailerVideoStatusLabel(editor)).toContain('finalized');
+    component.clearYoutubeTrailerJobPolling(editor);
+    component.ngOnDestroy();
     discardPeriodicTasks();
   }));
 
@@ -1747,7 +1781,7 @@ describe('EpisodeFormComponent trailer video card', () => {
     }));
     manage = new ManageComponent(apiService);
     await TestBed.configureTestingModule({
-      declarations: [EpisodeFormComponent],
+      declarations: [EpisodeFormComponent, TrailerVideoWorkspaceComponent],
       imports: [CommonModule, FormsModule],
     }).compileComponents();
     fixture = TestBed.createComponent(EpisodeFormComponent);
@@ -1756,14 +1790,9 @@ describe('EpisodeFormComponent trailer video card', () => {
     fixture.detectChanges();
   });
 
-  it('renders the exact three trailer actions in order and keeps YouTube disabled until an MP4 is staged', () => {
-    const cards = Array.from(fixture.nativeElement.querySelectorAll('.upload-card')) as HTMLElement[];
-    const card = cards.find((candidate) => Boolean(candidate.textContent?.includes('Trailer video')));
-    expect(card).not.toBeNull();
-    if (!card) {
-      fail('Trailer video card was not rendered.');
-    }
-    const renderedCard = card as HTMLElement;
+  it('renders a separate trailer workspace with the three upload actions and no approval controls', () => {
+    const renderedCard = fixture.nativeElement.querySelector('.trailer-upload-card') as HTMLElement;
+    expect(renderedCard).not.toBeNull();
     expect(renderedCard.textContent).toContain('.mp4');
     expect(renderedCard.querySelector('input')?.getAttribute('accept')).toBe('.mp4,video/mp4');
     const actionButtons = Array.from(renderedCard.querySelectorAll('.trailer-actions button')) as HTMLButtonElement[];
@@ -1771,17 +1800,20 @@ describe('EpisodeFormComponent trailer video card', () => {
       'Choose or replace MP4', 'Generate trailer', 'Upload to YouTube',
     ]);
     expect(actionButtons[2].disabled).toBeTrue();
-    expect(renderedCard.querySelector('label[for^="trailer-transcript-"]')?.textContent?.trim()).toBe('Trailer transcript');
-    expect(renderedCard.textContent).toContain('Upload to YouTube becomes available after an MP4 is staged.');
+    expect(renderedCard.textContent).toContain('Upload to YouTube becomes available after a trailer is generated or an MP4 is staged.');
     expect(renderedCard.textContent).not.toContain('Publish');
+    expect(fixture.nativeElement.querySelector('.trailer-workspace')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.trailer-transcript-panel label')?.textContent?.trim()).toBe('Trailer transcript');
+    expect(fixture.nativeElement.querySelector('[data-approve-trailer]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-reject-trailer]')).toBeNull();
   });
 
   it('renders an explicit empty state without implying preview or destination success', () => {
     const empty = fixture.nativeElement.querySelector('[data-trailer-empty-state]') as HTMLElement;
     expect(empty).not.toBeNull();
-    expect(empty.querySelector('h3')?.textContent?.trim()).toBe('No trailer candidate to review');
-    expect(empty.textContent).toContain('Upload the cover and trailer audio to start automatic generation');
-    expect(empty.textContent).toContain('choose an MP4 to stage a finished trailer');
+    expect(empty.querySelector('h4')?.textContent?.trim()).toBe('No generated trailer yet');
+    expect(empty.textContent).toContain('Upload the cover and trailer audio');
+    expect(empty.textContent).toContain('stage a finished MP4');
     expect(fixture.nativeElement.querySelector('[data-trailer-candidate-preview]')).toBeNull();
     expect(fixture.nativeElement.querySelector('[data-trailer-replacement]')).toBeNull();
   });
@@ -1795,15 +1827,14 @@ describe('EpisodeFormComponent trailer video card', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    const card = (Array.from(fixture.nativeElement.querySelectorAll('.upload-card')) as HTMLElement[])
-      .find((candidate) => candidate.textContent?.includes('Trailer video')) as HTMLElement;
+    const card = fixture.nativeElement.querySelector('.trailer-workspace') as HTMLElement;
     const checkbox = card.querySelector('[data-include-timed-captions]') as HTMLInputElement;
     expect(card.querySelector('label[for^="include-timed-captions-"]')?.textContent?.trim()).toBe('Include timed captions');
     expect(checkbox.checked).toBeFalse();
     expect(checkbox.disabled).toBeTrue();
     expect(card.querySelector('[data-trailer-caption-status]')?.textContent).toContain('Timed captions are unavailable for this trailer');
     expect(card.querySelector('[data-generate-trailer]')?.hasAttribute('disabled')).toBeFalse();
-    expect(card.querySelector('[data-approve-trailer]')).not.toBeNull();
+    expect(card.querySelector('[data-approve-trailer]')).toBeNull();
     expect(card.querySelectorAll('.trailer-actions button').length).toBe(3);
   });
 
@@ -1826,10 +1857,10 @@ describe('EpisodeFormComponent trailer video card', () => {
     expect(fixture.nativeElement.textContent).not.toContain('quality_calibration_unavailable');
 
     const included = trailerCandidateStatus(42, { captionMode: 'automatic', captionStatus: 'included', captionReasonCode: null });
-    expect(manage.getTrailerCaptionStatusLabel(manage.episodesEditorState, included)).toBe('Timed captions included in this candidate. Review the preview before approving.');
+    expect(manage.getTrailerCaptionStatusLabel(manage.episodesEditorState, included)).toBe('Timed captions included in this trailer preview.');
   });
 
-  it('keeps preview and waveform approval available after caption alignment or render failure', async () => {
+  it('keeps preview available after caption alignment or render failure without decision controls', async () => {
     apiService.getCurrentTrailerCandidate.and.returnValue(of(trailerCandidateStatus(42, {
       captionMode: 'automatic', captionStatus: 'waveform_only', captionReasonCode: 'caption_render_failed',
     })));
@@ -1838,31 +1869,17 @@ describe('EpisodeFormComponent trailer video card', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    const card = (Array.from(fixture.nativeElement.querySelectorAll('.upload-card')) as HTMLElement[])
-      .find((candidate) => candidate.textContent?.includes('Trailer video')) as HTMLElement;
-    expect(card.querySelector('[data-trailer-caption-status]')?.textContent).toContain('Timed captions could not be generated. The waveform-only trailer remains available');
+    const card = fixture.nativeElement.querySelector('.trailer-workspace') as HTMLElement;
+    expect(card.querySelector('[data-trailer-caption-status]')?.textContent).toContain('Timed captions could not be generated. The waveform-only trailer preview remains available');
     expect(card.querySelector('[data-trailer-candidate-preview] video')).not.toBeNull();
-    expect(card.querySelector('[data-approve-trailer]')).not.toBeNull();
-    expect(card.querySelector('[data-reject-trailer]')).not.toBeNull();
+    expect(card.querySelector('[data-approve-trailer]')).toBeNull();
+    expect(card.querySelector('[data-reject-trailer]')).toBeNull();
     expect(card.querySelector('[data-generate-trailer]')?.hasAttribute('disabled')).toBeFalse();
   });
 
-  it('renders populated provenance, a long editable transcript, independent destinations, and narrow-width wrapping', async () => {
+  it('renders the player and long editable transcript in separate parts of the trailer workspace', async () => {
     const longTranscript = `${'Dragon Careca trailer words '.repeat(1500)}ending`;
-    const longId = `remote-${'identifier-'.repeat(30)}`;
-    const defaults = trailerReplacementStatus(42);
-    const status = trailerReplacementStatus(42, {
-      destinations: {
-        instagram_reel: {
-          ...defaults.destinations.instagram_reel!,
-          predecessor: { remoteId: longId, permalink: `https://example.test/${'old-link-'.repeat(30)}` },
-        },
-        facebook_native_video: defaults.destinations.facebook_native_video!,
-      },
-    });
     apiService.getCurrentTrailerCandidate.and.returnValue(of(trailerCandidateStatus(42, { transcriptText: longTranscript })));
-    apiService.getTrailerReplacementStatus.and.returnValue(of(status));
-    spyOn(window, 'confirm').and.returnValue(true);
     manage.startEdit({ episodeId: 42, title: 'Episode 42', summary: 'Summary', pubDate: '2026-07-24T00:00:00.000Z', explicit: 'no' });
     fixture.componentInstance.editor = manage.episodesEditorState;
     await fixture.whenStable();
@@ -1870,39 +1887,48 @@ describe('EpisodeFormComponent trailer video card', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    const card = (Array.from(fixture.nativeElement.querySelectorAll('.upload-card')) as HTMLElement[])
-      .find((candidate) => candidate.textContent?.includes('Trailer video')) as HTMLElement;
+    const card = fixture.nativeElement.querySelector('.trailer-workspace') as HTMLElement;
     expect(card).toBeTruthy();
     expect(manage.getTrailerCandidate(manage.episodesEditorState)?.transcriptText).toBe(longTranscript);
     expect(manage.getTrailerTranscript(manage.episodesEditorState)).toBe(longTranscript);
     const transcript = card.querySelector('.trailer-transcript') as HTMLTextAreaElement;
     expect(transcript.value).toBe(longTranscript);
     expect(transcript.rows).toBe(5);
+    expect(getComputedStyle(transcript).getPropertyValue('field-sizing')).toBe('content');
+    expect(getComputedStyle(transcript).overflowY).toBe('hidden');
     expect(transcript.getAttribute('aria-describedby')).toContain('trailer-transcript-status-42');
     expect(card.textContent).toContain('Version 3');
     expect(card.textContent).toContain('1:38');
     expect(card.textContent).toContain('1280×1280');
     expect(card.textContent).toContain('Profile dc-square-waveform r2');
-    expect(card.querySelector('[data-approve-trailer]')).not.toBeNull();
-    expect(card.querySelector('[data-reject-trailer]')).not.toBeNull();
-    expect(getComputedStyle(card.querySelector('[data-approve-trailer]') as HTMLElement).minHeight).toBe('44px');
-
-    manage.decideTrailerCandidate(manage.episodesEditorState, 'approve');
-    fixture.detectChanges();
-    expect(card.querySelector('[data-destination="instagram_reel"]')?.textContent).toContain(longId);
-    expect(card.querySelector('[data-destination="telegram"]')?.textContent).toContain('pending');
-    expect(card.querySelector('[data-destination="telegram"]')?.textContent).toContain('existing early-access link and topic stay unchanged');
-    expect(card.querySelector('[data-destination="youtube"]')?.textContent).toContain('separate manual action');
-    expect(card.textContent).toContain('Waiting for the separate Upload to YouTube action.');
-    expect(card.querySelectorAll('.trailer-status-action').length).toBe(1);
+    expect(card.querySelector('[data-approve-trailer]')).toBeNull();
+    expect(card.querySelector('[data-reject-trailer]')).toBeNull();
+    const uploadCard = card.querySelector('.trailer-upload-card') as HTMLElement;
+    const transcriptPanel = card.querySelector('.trailer-transcript-panel') as HTMLElement;
+    expect(uploadCard).not.toBe(transcriptPanel);
+    expect(uploadCard.compareDocumentPosition(transcriptPanel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(card.querySelector('video')?.getAttribute('aria-label')).toContain('candidate version 3');
-    expect(getComputedStyle(card.querySelector('.trailer-destination a') as HTMLAnchorElement).overflowWrap).toBe('anywhere');
-
     fixture.nativeElement.style.width = '320px';
     window.dispatchEvent(new Event('resize'));
     fixture.detectChanges();
     expect(getComputedStyle(card.querySelector('.trailer-actions') as HTMLElement).flexWrap).toBe('wrap');
     expect(card.scrollWidth).toBeLessThanOrEqual(card.clientWidth);
+    manage.ngOnDestroy();
+  });
+
+  it('removes blank transcript lines when a generated transcript is loaded', async () => {
+    apiService.getCurrentTrailerCandidate.and.returnValue(of(trailerCandidateStatus(42, {
+      transcriptText: '0:00 Primeira frase.\n\n0:03 Segunda frase.\n  \n0:06 Terceira frase.',
+    })));
+    manage.startEdit({ episodeId: 42, title: 'Episode 42', summary: 'Summary', pubDate: '2026-07-24T00:00:00.000Z', explicit: 'no' });
+    fixture.componentInstance.editor = manage.episodesEditorState;
+    await fixture.whenStable();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const transcript = fixture.nativeElement.querySelector('.trailer-transcript') as HTMLTextAreaElement;
+    expect(transcript.value).toBe('0:00 Primeira frase.\n0:03 Segunda frase.\n0:06 Terceira frase.');
     manage.ngOnDestroy();
   });
 
@@ -1913,7 +1939,7 @@ describe('EpisodeFormComponent trailer video card', () => {
     fixture.componentInstance.editor = manage.episodesEditorState;
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Loading generated trailer status');
-    expect(fixture.nativeElement.querySelector('.trailer-candidate-review')?.getAttribute('aria-live')).toBe('polite');
+    expect(fixture.nativeElement.querySelector('.trailer-preview-panel')?.getAttribute('aria-live')).toBe('polite');
 
     pending.next(trailerCandidateStatus(42, {
       status: 'retryable', progress: -1, errorCategory: 'render_failed',
