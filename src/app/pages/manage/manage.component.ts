@@ -262,6 +262,8 @@ export class ManageComponent implements OnInit, OnDestroy {
   private readonly artifactDeliveryErrors = new Map<number, string>();
   private readonly artifactObjectUrls = new Set<string>();
   private transcriptionClockTimer: number | null = null;
+  private formDraftCacheTimer: number | null = null;
+  private addDraftRestored = false;
   transcriptionClockTick = Date.now();
   private readonly structuredEntrySuggestionCache: Record<'guests' | 'musicCredits', StructuredEntrySuggestion[]> = {
     guests: [],
@@ -427,9 +429,11 @@ export class ManageComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.restoreFormDrafts();
     this.transcriptionClockTimer = window.setInterval(() => {
       this.transcriptionClockTick = Date.now();
     }, 1000);
+    this.formDraftCacheTimer = window.setInterval(() => this.persistFormDrafts(), 500);
     this.loadEpisodes();
   }
 
@@ -437,6 +441,11 @@ export class ManageComponent implements OnInit, OnDestroy {
     if (this.transcriptionClockTimer !== null) {
       clearInterval(this.transcriptionClockTimer);
       this.transcriptionClockTimer = null;
+    }
+    this.persistFormDrafts();
+    if (this.formDraftCacheTimer !== null) {
+      clearInterval(this.formDraftCacheTimer);
+      this.formDraftCacheTimer = null;
     }
 
     if (this.episodeNumberValidationTimer !== null) {
@@ -760,6 +769,7 @@ export class ManageComponent implements OnInit, OnDestroy {
     }
     editor.selectedMembers = [...(episode.authors ?? [])];
     editor.formModel.episodeNumber = episode.episodeNumber ?? episode.episodeId;
+    this.restoreFormDraft(editor, episode.episodeId);
     this.setTrailerVideoState(editor, {
       priorFinalFileName: episode.trailerVideoFileName ?? '',
       status: episode.trailerVideoFileName ? 'finalized' : 'selected',
@@ -1959,6 +1969,10 @@ export class ManageComponent implements OnInit, OnDestroy {
       editor.formModel = this.buildEmptyFormModel();
       editor.selectedMembers = [];
       editor.listDrafts = this.buildEmptyListDrafts();
+      this.clearFormDraft(editor);
+      if (editor === this.addEditorState) {
+        this.addDraftRestored = false;
+      }
     }
 
   saveEpisode(editor: EpisodeEditorState): void {
@@ -3072,6 +3086,94 @@ export class ManageComponent implements OnInit, OnDestroy {
     };
   }
 
+  private readonly formDraftStoragePrefix = 'dragaocareca.admin.form-draft.v1';
+
+  private formDraftStorageKey(editor: EpisodeEditorState): string {
+    return `${this.formDraftStoragePrefix}.${editor === this.addEditorState ? 'add' : 'episodes'}`;
+  }
+
+  private persistFormDrafts(): void {
+    this.persistFormDraft(this.addEditorState);
+    this.persistFormDraft(this.episodesEditorState);
+  }
+
+  private persistFormDraft(editor: EpisodeEditorState): void {
+    try {
+      if (!this.hasMeaningfulDraft(editor)) {
+        window.localStorage.removeItem(this.formDraftStorageKey(editor));
+        return;
+      }
+      const snapshot = {
+        formModel: editor.formModel,
+        selectedMembers: editor.selectedMembers,
+        listDrafts: editor.listDrafts,
+        editingEpisodeId: editor.editingEpisodeId,
+        trailerVideoDraftId: editor.trailerVideoDraftId ?? null,
+        instagramHashtagsManuallyEdited: editor.instagramHashtagsManuallyEdited ?? false,
+        savedAt: Date.now(),
+      };
+      window.localStorage.setItem(this.formDraftStorageKey(editor), JSON.stringify(snapshot));
+    } catch {
+      // Storage may be unavailable or full; the in-memory form remains usable.
+    }
+  }
+
+  private hasMeaningfulDraft(editor: EpisodeEditorState): boolean {
+    const model = editor.formModel;
+    return editor.editingEpisodeId !== null
+      || Boolean(model.title?.trim() || model.summary?.trim() || model.hashtags?.trim()
+        || model.spotifyId?.trim() || model.youtube?.trim() || model.fileName?.trim()
+        || model.coverFileName?.trim() || model.coverLowFileName?.trim()
+        || model.trailerFileName?.trim() || model.trailerVideoFileName?.trim()
+        || model.transcriptFileName?.trim() || model.transcriptStatus !== 'idle'
+        || model.transcriptError?.trim() || model.summaryStatus !== 'idle'
+        || model.summaryError?.trim() || model.suggestedTags?.status !== undefined
+        || model.instagramCaptionMentions?.length || model.instagramHashtags?.length
+        || model.coverCredits?.length || model.tags?.some((tag) => !['podcast', 'rpg', 'dragaocareca', 'humor'].includes(tag))
+        || editor.selectedMembers.some((member) => !this.configuredParticipantNames.includes(member))
+        || Object.values(editor.listDrafts).some((value) => value.trim().length > 0)
+        || Boolean(editor.trailerVideoDraftId));
+  }
+
+  private restoreFormDrafts(): void {
+    this.restoreFormDraft(this.addEditorState);
+    this.addDraftRestored = this.hasStoredDraft(this.addEditorState);
+    this.restoreFormDraft(this.episodesEditorState);
+  }
+
+  private hasStoredDraft(editor: EpisodeEditorState): boolean {
+    try {
+      return Boolean(window.localStorage.getItem(this.formDraftStorageKey(editor)));
+    } catch {
+      return false;
+    }
+  }
+
+  private restoreFormDraft(editor: EpisodeEditorState, expectedEpisodeId?: number): void {
+    try {
+      const raw = window.localStorage.getItem(this.formDraftStorageKey(editor));
+      if (!raw) return;
+      const snapshot = JSON.parse(raw) as Partial<EpisodeEditorState> & { savedAt?: number };
+      if (!snapshot.formModel || (expectedEpisodeId !== undefined && snapshot.editingEpisodeId !== expectedEpisodeId)) return;
+      editor.formModel = { ...editor.formModel, ...snapshot.formModel };
+      editor.selectedMembers = Array.isArray(snapshot.selectedMembers) ? snapshot.selectedMembers : editor.selectedMembers;
+      editor.listDrafts = { ...editor.listDrafts, ...(snapshot.listDrafts ?? {}) };
+      editor.editingEpisodeId = snapshot.editingEpisodeId ?? editor.editingEpisodeId;
+      editor.trailerVideoDraftId = snapshot.trailerVideoDraftId ?? editor.trailerVideoDraftId;
+      editor.instagramHashtagsManuallyEdited = snapshot.instagramHashtagsManuallyEdited ?? editor.instagramHashtagsManuallyEdited;
+    } catch {
+      // Ignore malformed or unavailable drafts and keep the server/default state.
+    }
+  }
+
+  private clearFormDraft(editor: EpisodeEditorState): void {
+    try {
+      window.localStorage.removeItem(this.formDraftStorageKey(editor));
+    } catch {
+      // Ignore storage failures.
+    }
+  }
+
   private buildEmptyListDrafts(): Record<EpisodeListField, string> {
     return {
       coverCredits: '',
@@ -3109,6 +3211,10 @@ export class ManageComponent implements OnInit, OnDestroy {
     editor.selectedMembers = [];
     editor.listDrafts = this.buildEmptyListDrafts();
     editor.editingEpisodeId = null;
+    this.clearFormDraft(editor);
+    if (editor === this.addEditorState) {
+      this.addDraftRestored = false;
+    }
     if (editor === this.addEditorState) {
       this.scheduleAddEditorDefaults();
     }
@@ -3198,6 +3304,9 @@ export class ManageComponent implements OnInit, OnDestroy {
   }
 
   private ensureAddEditorDefaults(): void {
+    if (this.addDraftRestored) {
+      return;
+    }
     if (this.addEditorState.editingEpisodeId !== null) {
       return;
     }
