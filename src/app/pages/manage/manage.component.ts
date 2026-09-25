@@ -2001,12 +2001,16 @@ export class ManageComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const payload = this.buildPayload(editor);
     const videoState = this.getTrailerVideoState(editor);
     const currentYoutubeJob = this.getYoutubeTrailerJob(editor);
     if (!editor.formModel.youtube && currentYoutubeJob?.privateWatchUrl) {
       editor.formModel.youtube = currentYoutubeJob.privateWatchUrl;
     }
+    if (editor === this.addEditorState && !editor.editingEpisodeId && !editor.formModel.youtube?.trim()) {
+      this.errorMessage = 'Send the trailer to YouTube before saving the episode.';
+      return;
+    }
+    const payload = this.buildPayload(editor);
     const youtubeState = this.getYoutubeTrailerJobState(editor);
     const transaction: SaveTransactionState = {
       phase: 'saving',
@@ -2445,7 +2449,8 @@ export class ManageComponent implements OnInit, OnDestroy {
       || editor.formModel.transcriptStatus === 'pending'
       || editor.formModel.transcriptStatus === 'processing'
       || Boolean(this.getTrailerTitleValidationError(editor))
-      || !this.hasCompleteMusicCredit(editor);
+      || !this.hasCompleteMusicCredit(editor)
+      || (editor === this.addEditorState && !editor.editingEpisodeId && !editor.formModel.youtube?.trim());
   }
 
   getSaveTransaction(editor: EpisodeEditorState): SaveTransactionState | null {

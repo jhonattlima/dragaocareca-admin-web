@@ -122,6 +122,7 @@ When `authBypass=true`:
 - The Angular form displays bytes as decimal megabytes (`1 MB = 1,000,000 bytes`) with exactly two decimal places using deterministic nonnegative half-up rounding. Duration, Bytes, and Spotify ID are native read-only fields with light-gray styling and no hint text.
 - Frontend environments expose `defaultParticipants`. The editor intersects those configured names with the loaded member catalog and ignores unknown names; component logic and the API contract remain unchanged when the list is edited.
 - Save requires at least one music credit with a trimmed name and at least one trimmed reference URL. The frontend gates Save early, while the API validates the same invariant on create/update.
+- New Episode Save requires a non-empty YouTube Link from the completed trailer upload. The frontend disables Save until it is present, and the API enforces the same rule on create; editing existing episodes remains compatible with legacy records.
 
 ## Backend Contract Assumptions
 

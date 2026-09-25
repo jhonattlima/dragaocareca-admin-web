@@ -317,6 +317,7 @@ describe('ManageComponent summary flow', () => {
     editor.formModel.title = 'Saved title';
     editor.formModel.pubDate = '2026-08-20T10:00';
     editor.formModel.hashtags = '#rpg';
+    editor.formModel.youtube = 'https://youtu.be/private';
     editor.formModel.musicCredits[0] = {
       name: 'Artist', links: [{ label: 'Bandcamp', url: 'https://example.test/music' }],
       draftLabel: '', draftUrl: '', suggestions: [], suggestionsOpen: false,
@@ -380,6 +381,7 @@ describe('ManageComponent summary flow', () => {
     editor.formModel.title = 'Saved title';
     editor.formModel.pubDate = '2026-08-20T10:00';
     editor.formModel.hashtags = '#rpg';
+    editor.formModel.youtube = 'https://youtu.be/private';
     editor.formModel.musicCredits[0] = {
       name: 'Artist', links: [{ label: 'Bandcamp', url: 'https://example.test/music' }],
       draftLabel: '', draftUrl: '', suggestions: [], suggestionsOpen: false,
@@ -2272,6 +2274,7 @@ describe('Phase 8.1 RED form contracts FORM-01 through FORM-05', () => {
   it('FORM-04/D-11 requires a trimmed music name and at least one trimmed non-empty reference URL', () => {
     const editor = component.addEditorState;
     editor.formModel.transcriptStatus = 'idle';
+    editor.formModel.youtube = 'https://youtu.be/trailer';
     editor.formModel.musicCredits[0].name = '  ';
     editor.formModel.musicCredits[0].links = [{ label: 'Spotify', url: ' https://example.test/song ' }];
     expect(component.isEpisodeSaveDisabled(editor)).toBeTrue();
