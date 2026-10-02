@@ -1724,6 +1724,26 @@ export class ManageComponent implements OnInit, OnDestroy {
     startToken: symbol,
   ): void {
     const state = this.getYoutubeTrailerJobState(editor);
+    if (!editor.editingEpisodeId && !editor.trailerVideoDraftId) {
+      this.apiService.reserveEpisodeDraft(episodeId).subscribe({
+        next: (reservation) => {
+          if (state.startInFlight !== startToken
+            || !this.isCurrentYoutubeSource(editor, state, episodeId, sourceGeneration, sourceFileName)) return;
+          editor.trailerVideoDraftId = reservation.draftId;
+          this.getTrailerVideoState(editor).draftId = reservation.draftId;
+          this.persistFormDraft(editor);
+          this.requestYoutubeTrailerJob(editor, episodeId, sourceFileName, sourceGeneration, startToken);
+        },
+        error: (error) => {
+          if (state.startInFlight !== startToken
+            || !this.isCurrentYoutubeSource(editor, state, episodeId, sourceGeneration, sourceFileName)) return;
+          state.startInFlight = null;
+          state.error = error?.error?.message ?? 'Could not restore the episode draft reservation.';
+          this.errorMessage = state.error;
+        },
+      });
+      return;
+    }
     const hashtags = this.serializeHashtags(editor.formModel.hashtags);
     const title = this.getTrailerTitlePrefix(editor);
     this.apiService.startYoutubeTrailerJob(episodeId, title, editor.formModel.summary.trim(), editor.trailerVideoDraftId, hashtags).subscribe({

@@ -24,10 +24,20 @@ export class AuthInterceptor implements HttpInterceptor {
   }
 
   private handleUnauthorized(req: HttpRequest<unknown>, error: unknown): Observable<never> {
-    if (error instanceof HttpErrorResponse && error.status === 401 && !req.url.includes('/auth/google')) {
+    if (error instanceof HttpErrorResponse && error.status === 401 && !req.url.includes('/auth/google') && this.isAuthenticationFailure(error)) {
       this.authService.logout();
       void this.router?.navigateByUrl('/login');
     }
     return throwError(() => error);
+  }
+
+  private isAuthenticationFailure(error: HttpErrorResponse): boolean {
+    const body = error.error as { code?: unknown; message?: unknown } | null;
+    return body?.code === 'authentication_required'
+      || body?.code === 'invalid_access_token'
+      // Preserve compatibility with API instances that have not yet added
+      // the explicit authentication error codes.
+      || body?.message === 'Missing Bearer token'
+      || body?.message === 'Invalid or expired token';
   }
 }
