@@ -700,9 +700,9 @@ export class ApiService {
     return this.http.get<EpisodeTranscriptionStatus>(`${environment.apiBaseUrl}/episodes/${episodeId}/transcription`);
   }
 
-  transcribeEpisodeWithWhisper(episodeId: number): Observable<EpisodeTranscriptionQueueResponse> {
+  transcribeEpisodeWithGroq(episodeId: number): Observable<EpisodeTranscriptionQueueResponse> {
     return this.http.post<EpisodeTranscriptionQueueResponse>(
-      `${environment.apiBaseUrl}/episodes/${episodeId}/transcription/whisper`,
+      `${environment.apiBaseUrl}/episodes/${episodeId}/transcription/groq`,
       {},
     );
   }

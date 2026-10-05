@@ -307,9 +307,9 @@
           <button
             class="btn btn-sm btn-outline-primary mt-2 ms-2"
             type="button"
-            *ngIf="upload.kind === 'audio' && controller.canTranscribeWithWhisper(editor)"
-            (click)="controller.transcribeWithWhisper(editor)">
-            Transcript with Whisper
+            *ngIf="upload.kind === 'audio' && controller.canTranscribeWithGroq(editor)"
+            (click)="controller.transcribeWithGroq(editor)">
+            Retry transcript with Groq
           </button>
           <div class="progress upload-progress mt-2" *ngIf="upload.kind === 'audio' && controller.hasGenerationProgress(editor)">
             <div

@@ -61,7 +61,7 @@ The frontend expects the backend to expose:
 - `GET /v1/feed`
 - `GET /v1/feed/preview`
 - `GET /v1/episodes/:episodeId/transcription`
-- `POST /v1/episodes/:episodeId/transcription/whisper` — queues faster-whisper transcription for existing staged/final audio
+- `POST /v1/episodes/:episodeId/transcription/groq` — queues Groq transcription for existing staged/final audio; old `/whisper` path remains a temporary compatibility alias
 - `GET /v1/episodes/:episodeId/episodes-generated-summary`
 - `POST /v1/episodes/drafts` — authenticated `{episodeId}` reservation returning `{draftId, episodeId, state, expiresAt}`
 - `POST /v1/episodes/:episodeId/audio`
@@ -81,7 +81,7 @@ The frontend expects the backend to expose:
 - `GET /v1/metrics/spotify`
 - `GET /v1/metrics/youtube`
 
-Transcription providers are selected by the API through `EPISODE_TRANSCRIPTION_PROVIDER`. Supported values are `gemini`, `groq`, `faster-whisper`, and `internal`. The Groq provider uses `whisper-large-v3-turbo` by default, splits long audio into five-minute chunks to stay below Groq's upload limit, and joins the resulting Portuguese transcript before summary generation. Configure `GROQ_API_KEY` and `EPISODE_TRANSCRIPTION_GROQ_MODEL`; the browser contract is unchanged.
+Transcription defaults to Gemini. If Gemini fails, the API automatically tries Groq using the existing `GROQ_API_KEY`; if both fail, the operator can edit the transcript manually or explicitly retry with Groq. Long audio is sent to Groq in sequential five-minute chunks. WhisperX is retained only in the API for timed alignment of trailer captions, including manually edited transcripts; local Faster Whisper speech transcription is no longer part of the image.
 
 ### AI authoring provider
 

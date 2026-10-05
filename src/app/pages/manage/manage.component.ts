@@ -249,7 +249,7 @@ export class ManageComponent implements OnInit, OnDestroy {
   private transcriptionStatusPollTimer: number | null = null;
   private transcriptionStatusPollEpisodeId: number | null = null;
   private readonly transcriptionTerminalFailures = new Set<number>();
-  private readonly whisperTranscriptionInFlight = new Set<number>();
+  private readonly groqTranscriptionInFlight = new Set<number>();
   private readonly youtubeTrailerHashtagsByEpisode = new Map<number, string[]>();
   private summaryStatusPollTimer: number | null = null;
   private summaryStatusPollEpisodeId: number | null = null;
@@ -2901,31 +2901,31 @@ export class ManageComponent implements OnInit, OnDestroy {
     }
   }
 
-  canTranscribeWithWhisper(editor: EpisodeEditorState): boolean {
+  canTranscribeWithGroq(editor: EpisodeEditorState): boolean {
     const episodeId = editor.formModel.episodeId;
     return editor.formModel.transcriptStatus === 'error'
       && episodeId > 0
-      && !this.whisperTranscriptionInFlight.has(episodeId)
+      && !this.groqTranscriptionInFlight.has(episodeId)
       && !this.isUploadBusy('audio');
   }
 
-  isWhisperTranscriptionInFlight(editor: EpisodeEditorState): boolean {
-    return this.whisperTranscriptionInFlight.has(editor.formModel.episodeId);
+  isGroqTranscriptionInFlight(editor: EpisodeEditorState): boolean {
+    return this.groqTranscriptionInFlight.has(editor.formModel.episodeId);
   }
 
-  transcribeWithWhisper(editor: EpisodeEditorState): void {
+  transcribeWithGroq(editor: EpisodeEditorState): void {
     const episodeId = editor.formModel.episodeId;
-    if (!this.canTranscribeWithWhisper(editor)) {
+    if (!this.canTranscribeWithGroq(editor)) {
       return;
     }
 
-    this.whisperTranscriptionInFlight.add(episodeId);
+    this.groqTranscriptionInFlight.add(episodeId);
     this.transcriptionTerminalFailures.delete(episodeId);
     editor.formModel.transcriptStatus = 'pending';
     editor.formModel.transcriptError = '';
     editor.formModel.transcriptProgress = 0;
 
-    this.apiService.transcribeEpisodeWithWhisper(episodeId).subscribe({
+    this.apiService.transcribeEpisodeWithGroq(episodeId).subscribe({
       next: (response) => {
         if (editor.formModel.episodeId !== episodeId) {
           return;
@@ -2943,13 +2943,13 @@ export class ManageComponent implements OnInit, OnDestroy {
       error: (error) => {
         if (editor.formModel.episodeId === episodeId) {
           editor.formModel.transcriptStatus = 'error';
-          editor.formModel.transcriptError = error?.error?.message ?? error?.message ?? 'Could not start Whisper transcription.';
+          editor.formModel.transcriptError = error?.error?.message ?? error?.message ?? 'Could not start Groq transcription.';
           editor.formModel.transcriptProgress = null;
           this.transcriptionTerminalFailures.add(episodeId);
           this.clearTranscriptionStatusPolling();
         }
       },
-      complete: () => this.whisperTranscriptionInFlight.delete(episodeId),
+      complete: () => this.groqTranscriptionInFlight.delete(episodeId),
     });
   }
 

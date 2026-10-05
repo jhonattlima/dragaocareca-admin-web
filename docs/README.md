@@ -139,7 +139,7 @@ Expected endpoints include:
 - `GET /v1/feed`
 - `GET /v1/feed/preview`
 - `GET /v1/episodes/:episodeId/transcription`
-- `POST /v1/episodes/:episodeId/transcription/whisper` — explicitly retries available episode audio with the faster-whisper provider after a Gemini failure
+- `POST /v1/episodes/:episodeId/transcription/groq` — retries available episode audio through the API-owned Groq provider after a transcript failure; `/transcription/whisper` remains a temporary server compatibility alias
 - `GET /v1/episodes/:episodeId/episodes-generated-summary`
 - `POST /v1/episodes/drafts` — authenticated trailer-video draft reservation
 - `POST /v1/episodes/:episodeId/audio`

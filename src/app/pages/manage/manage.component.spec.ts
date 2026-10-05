@@ -87,7 +87,7 @@ describe('ManageComponent summary flow', () => {
   beforeEach(() => {
     apiService = jasmine.createSpyObj<ApiService>('ApiService', [
       'getEpisodeTranscriptionStatus',
-      'transcribeEpisodeWithWhisper',
+      'transcribeEpisodeWithGroq',
       'getEpisodeGeneratedSummaryStatus',
       'startEpisodeArtifactJob',
       'getEpisodeArtifactJobStatus',
@@ -136,7 +136,7 @@ describe('ManageComponent summary flow', () => {
       retirementStatus: 'confirmed_manually', retirementActorEmail: 'operator@example.test', retirementConfirmedAt: new Date().toISOString(), replacementComplete: false,
     }));
     apiService.startYoutubeTrailerJob.and.returnValue(of({} as YoutubeTrailerJobSnapshot));
-    apiService.transcribeEpisodeWithWhisper = jasmine.createSpy('transcribeEpisodeWithWhisper');
+    apiService.transcribeEpisodeWithGroq = jasmine.createSpy('transcribeEpisodeWithGroq');
     apiService.downloadEpisodeArtifact.and.returnValue(of(new HttpResponse<Blob>({
       body: new Blob(['zip'], { type: 'application/zip' }),
       headers: new HttpHeaders({ 'Content-Disposition': 'attachment; filename="episode-42-artifacts.zip"' }),
@@ -2173,20 +2173,20 @@ describe('Phase 8.1 RED form contracts FORM-01 through FORM-05', () => {
     expect(apiService.uploadEpisodeAudio.calls.mostRecent().args[1]).toBe(audio);
   });
 
-  it('offers Whisper fallback after a Gemini transcription failure', () => {
+  it('offers Groq retry after a transcription failure', () => {
     const editor = component.addEditorState;
     editor.formModel.episodeId = 42;
     editor.formModel.transcriptStatus = 'error';
-    const whisperSpy = jasmine.createSpy('transcribeEpisodeWithWhisper').and.returnValue(of({
+    const groqSpy = jasmine.createSpy('transcribeEpisodeWithGroq').and.returnValue(of({
       episodeId: 42,
       queued: true,
       version: 4,
       status: 'pending',
       progress: 0,
       transcriptError: null,
-      message: 'Whisper transcription started.',
+      message: 'Groq transcription started.',
     }));
-    apiService.transcribeEpisodeWithWhisper = whisperSpy;
+    apiService.transcribeEpisodeWithGroq = groqSpy;
     apiService.getEpisodeTranscriptionStatus.and.returnValue(of({
       status: 'processing',
       transcriptFileName: null,
@@ -2197,12 +2197,12 @@ describe('Phase 8.1 RED form contracts FORM-01 through FORM-05', () => {
       provider: null,
     }));
 
-    expect(component.canTranscribeWithWhisper(editor)).toBeTrue();
-    component.transcribeWithWhisper(editor);
+    expect(component.canTranscribeWithGroq(editor)).toBeTrue();
+    component.transcribeWithGroq(editor);
 
-    expect(whisperSpy).toHaveBeenCalledWith(42);
+    expect(groqSpy).toHaveBeenCalledWith(42);
     expect(editor.formModel.transcriptStatus).toBe('processing');
-    expect(component.canTranscribeWithWhisper(editor)).toBeFalse();
+    expect(component.canTranscribeWithGroq(editor)).toBeFalse();
   });
 
   it('shows the active Groq provider during automatic transcription fallback', () => {
